@@ -3,6 +3,32 @@ import gym
 import numpy as np
 
 
+def get_env(env, frames_per_state=3):
+    if env in ['Breakout-v0']:
+        return AtariEnvironment(env, frames_per_state)
+    return ClassicControl(env)
+
+
+class ClassicControl(object):
+
+    def __init__(self, env_name):
+        self.env = gym.make(env_name)
+        self.last_observation = self.env.reset()
+
+    def step(self, action):
+        self.last_observation, reward, terminal, info = self.env.step(action)
+        return self.last_observation, reward, terminal, info
+
+    def reset(self):
+        return self.env.reset()
+
+    def state_shape(self):
+        return self.env.observation_space.shape
+
+    def num_actions(self):
+        return self.env.action_space.n
+
+
 class AtariEnvironment(object):
 
     def __init__(self, env_name, frames_per_state=3):

@@ -1,11 +1,10 @@
 import argparse
 
 config1 = {
-    'T_max': 100000,
-    't_max': 16,
+    'T_max': 10000000,
+    't_max': 5,
     'gamma': 0.99,
     'learning_rate': 0.001,
-    'T': 1,
     'lr_decay': 0.99,
     'rms_epsilon': 0.1,
     'beta': 0.01,
@@ -13,7 +12,7 @@ config1 = {
     'input_shape': '3,84,84',
     'env': 'Breakout-v0',
     'method': 'a3c',
-    'model': 'nature',
+    'model': 'a3c_ff',
     'n_threads': 8
 }
 
