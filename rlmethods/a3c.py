@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 
 from deeprl.util.logger import logger
-from deeprl.approximators.nn import ActorCriticNN
+from deeprl.approximators.nn import ActorCriticNN, ModelNames
 from deeprl.util.environments import get_env #AtariEnvironment
 from deeprl.util.hyper_parameters import *
 import pprint
@@ -34,6 +34,12 @@ class A3CAgent(object):
         self.agent_name = agent_name
 
         self.n_episodes = 1
+
+        #self.d_theta = [tf.placeholder(tf.shape(theta)) for theta in self.local_network.theta]
+        #self.reset_d_theta = [tf.assign(d_theta, tf.zeros_like(d_theta)) for d_theta in self.d_theta]
+        #self.add_gradient = [tf.assign(d_theta, d_theta + grad)
+         #                    for d_theta, grad in tf.gradients(self.local_network.loss, self.local_network.theta)]
+        #self.async_update =
 
     def get_action(self):
         """
@@ -73,8 +79,8 @@ class A3CAgent(object):
                                     dnn.actions: actions,
                                     dnn.inputs: states,
                                     dnn.advantage_no_grad: n_step_return - values,
-                                    learning_rate: (1 - T / float(hyper_parameters.T_max)) *
-                                                   hyper_parameters.learning_rate})
+                                    learning_rate: hyper_parameters.learning_rate}
+                         )
 
     def train(self):
         """
@@ -88,8 +94,9 @@ class A3CAgent(object):
         Synhronizes the thread network parameters with the global network
         """
         logger.debug('Synchronizing global parameters')
-        #logger.debug('Global thread params: \n{}'.format(self.session.run(self.global_network.theta[0] - self.local_network.theta[0])))
         self.session.run(self.local_network.param_sync)
+        #logger.debug('Global thread params: \n{}'.format(self.session.run(self.global_network.theta[0]
+        #                                                                  - self.local_network.theta[0])))
 
     def _train(self):
         """
@@ -106,10 +113,13 @@ class A3CAgent(object):
         n_step_targets  = np.zeros(hyper_parameters.t_max, dtype='float')
         states          = np.zeros((hyper_parameters.t_max,) + self.env.state_shape(), dtype='float')
 
+        epr = 0
         # Main loop, execute this while T < T_max
         while T < hyper_parameters.T_max:
             # A new batch begins, reset the gradients and synchronize thread-specific parameters
+            #if self.n_episodes % 10 == 0:
             self.synchronize_thread_parameters()
+
             # Set t_start to current t
             t_start = self.t
 
@@ -131,25 +141,35 @@ class A3CAgent(object):
                 self.t += 1
                 T += 1
 
+                epr += rewards[i]
+
                 if self.agent_name == 'Agent_0':
                     self.env.env.render()
 
             # Initialize the n-step return
             n_step_target = 0 if terminal_state else self.state_value(self.last_state)
 
+            batch_len = self.t - t_start
+
             # Forward view of n-step returns, start from i == t_max - 1 and go to i == 0
-            for i in reversed(range(hyper_parameters.t_max)):
+            for i in reversed(range(0, batch_len)):
                 # Straightforward accumulation of rewards
                 n_step_target = rewards[i] + hyper_parameters.gamma * n_step_target
                 n_step_targets[i] = n_step_target
 
+
             # Now update the global approximator's parameters
-            self.update_params(n_step_targets, actions, states, values)
-            logger.debug('Parameters updated!')
+            self.update_params(n_step_targets[:batch_len], actions[:batch_len], states[:batch_len], values[:batch_len])
+            #logger.debug('Parameters updated!')
+            #if hyper_parameters.model == ModelNames.a3c_lstm:
+            #    self.session.run(tf.assign(self.local_network.states, np.zeros((1, hyper_parameters.t_max))))
 
             if terminal_state:
-                logger.info('Terminal state reached: resetting state')
+                logger.info('Terminal state reached (episode {}, reward {}): resetting state'.format(self.n_episodes, epr))
+                self.n_episodes += 1
                 self.last_state = self.env.reset()
+                epr = 0
+
 
 
 if __name__ == "__main__":
@@ -170,6 +190,13 @@ if __name__ == "__main__":
         decay=hyper_parameters.lr_decay,
         epsilon=hyper_parameters.rms_epsilon)
 
+    '''
+    shared_optimizer = tf.train.RMSPropCustom(
+        learning_rate=learning_rate,
+        decay=hyper_parameters.lr_decay,
+        epsilon=hyper_parameters.rms_epsilon)
+
+    '''
     global_network = ActorCriticNN(num_actions=num_actions,
                                    network_name='GLOBAL',
                                    hyper_parameters=hyper_parameters,

@@ -7,6 +7,7 @@ class ModelNames:
     a3c_ff = 'a3c_ff'
     nature = 'nature'
     small_fcn = 'small_fcn'
+    a3c_lstm = 'a3c_lstm'
 
 
 class ActorCriticNN(object):
@@ -28,6 +29,11 @@ class ActorCriticNN(object):
                 self.build_param_update()
 
     def _nature_model(self, network_name):
+        """
+        This is the more complicated model as taken from the nature paper in 2015.
+        :param network_name:   Name of the network
+        :return:               The feedforward model (last hidden layer as a graph node)
+        """
         net = tf.transpose(self.inputs, [0, 2, 3, 1])
         net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name=network_name + '_conv1')
         net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name=network_name + '_conv2')
@@ -39,6 +45,11 @@ class ActorCriticNN(object):
         return net
 
     def _a3c_ff(self, network_name):
+        """
+        This is the feedforward model taken from "Asynchronous Methods for Reinforcement Learning"
+        :param network_name:    Name of the network
+        :return:                The feedforward model (last hidden layer) as a graph node
+        """
         net = tf.transpose(self.inputs, [0, 2, 3, 1])
         net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name=network_name + '_conv1')
         net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name=network_name + '_conv2')
@@ -48,14 +59,39 @@ class ActorCriticNN(object):
         self.theta_layer_names = ['_conv1', '_conv2', '_fc3', '_policy', '_value']
         return net
 
-    def _small_fcn(self, network_name):
-        net = tflearn.fully_connected(self.inputs, 32, activation='relu', name=network_name + '_fc1')
-        net = tflearn.fully_connected(net, 16, activation='relu', name=network_name + '_fc2')
-        #net = tflearn.dropout(net, 0.5)
-        self.theta_layer_names = ['_fc1', '_fc2', '_policy', '_value']
+    def _a3c_lstm(self, network_name):
+        """
+        This is the feedforward model taken from "Asynchronous Methods for Reinforcement Learning"
+        :param network_name:    Name of the network
+        :return:                The feedforward model (last hidden layer) as a graph node
+        """
+        self.initial_state = tf.placeholder(tf.float32, shape=[None, 256])
+        net = tf.transpose(self.inputs, [0, 2, 3, 1])
+        net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name=network_name + '_conv1')
+        net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name=network_name + '_conv2')
+        net = tflearn.flatten(net)
+        net = tflearn.fully_connected(net, 256, activation='relu', name=network_name + '_fc3')
+        net = tf.expand_dims(net, 1)
+        net, states = tflearn.lstm(net, 256, initial_state=self.initial_state, return_states=True, name=network_name + '_lstm4')
+        logger.error(type(net))
+        net = tflearn.reshape(net, [-1, 256])
+        self.theta_layer_names = ['_conv1', '_conv2', '_fc3', '_policy', '_value']
+        self.states = states
+
+        logger.error(type(states))
+        #self.new_state = tf.placeholder(tf.float32, [None, 256])
+        #self.set_state = tf.assign(self.states, self.new_state)
         return net
 
-    #def _build_tensorboard_summary(self):
+    def _small_fcn(self, network_name):
+        """
+        This network works with the CartPole-v0/v1 environments (sort of)
+        :param network_name:    The name of the network
+        :return:                The network as a graph node
+        """
+        net = tflearn.fully_connected(self.inputs, 128, activation='tanh', name=network_name + '_fc1')
+        self.theta_layer_names = ['_fc1', '_policy', '_value']
+        return net
 
     def build_network(self, num_actions, input_shape, network_name, network_model='nature'):
         logger.debug('Input shape: {}'.format(input_shape))
@@ -66,6 +102,8 @@ class ActorCriticNN(object):
             net = self._nature_model(network_model)
         elif network_model == ModelNames.a3c_ff:
             net = self._a3c_ff(network_model)
+        elif network_model == ModelNames.a3c_lstm:
+            net = self._a3c_lstm(network_model)
         else:
             net = self._small_fcn(network_model)
 
@@ -76,6 +114,7 @@ class ActorCriticNN(object):
             return [item for sublist in l for item in sublist]
         self.theta = _flatten_list([tflearn.get_layer_variables_by_name(network_name + layer_name)
                                     for layer_name in self.theta_layer_names])
+        logger.debug([t.get_shape() for t in self.theta])
 
     def build_param_sync(self):
         self.param_sync = [tf.assign(local_theta, global_theta)
@@ -106,13 +145,14 @@ class ActorCriticNN(object):
         log_pi = tf.log(tf.clip_by_value(self.pi, 1e-20, 1.0))
 
         # The advantage is simply the estimated value minus the bootstrapped returns
-        advantage = self.n_step_returns - self.value 
+        advantage = self.n_step_returns - self.value
+        advantage_no_grad = self.n_step_returns - tf.stop_gradient(self.value)
 
         # The entropy is added to encourage exploration
-        entropy = -tf.reduce_sum(tf.mul(log_pi, self.pi), reduction_indices=1)
+        entropy = -tf.reduce_sum(log_pi * self.pi, reduction_indices=1)
 
         # Define the loss for the policy (minus is needed to perform *negative* gradient descent == gradient ascent)
-        pi_loss = -(tf.reduce_sum(tf.mul(action_matrix, log_pi), reduction_indices=1) * self.advantage_no_grad  #advantage_no_gradient
+        pi_loss = -(tf.reduce_sum(action_matrix * log_pi, reduction_indices=1) * advantage_no_grad #self.advantage_no_grad  #advantage_no_gradient
                     + self.beta * entropy)
         value_loss = tf.square(advantage)
 

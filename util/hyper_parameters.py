@@ -11,7 +11,7 @@ config1 = {
     'frames_per_state': 3,
     'input_shape': '3,84,84',
     'env': 'Breakout-v0',
-    'method': 'a3c',
+    'method': 'rlmethods',
     'model': 'a3c_ff',
     'n_threads': 8
 }
