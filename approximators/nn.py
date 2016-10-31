@@ -12,16 +12,18 @@ class ModelNames:
 
 class ActorCriticNN(object):
 
-    def __init__(self, num_actions, network_name, optimizer, session, hyper_parameters, global_network=None):
+    def __init__(self, num_actions, agent_name, optimizer, session, hyper_parameters, global_network=None):
         self.num_actions = num_actions
         self.optimizer = optimizer
         self.global_network = global_network
         self.session = session
         self.beta = hyper_parameters.beta
+        self.summaries = []
+        self.agent_name = agent_name
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
         with tf.device('/cpu:0'):
-            with tf.name_scope(network_name):
+            with tf.name_scope(agent_name):
                 self.build_network(num_actions, hyper_parameters.input_shape, network_model=hyper_parameters.model)
                 with tf.name_scope('Loss'):
                     self.build_loss()
@@ -29,6 +31,8 @@ class ActorCriticNN(object):
                 if global_network:
                     self.build_param_sync()
                     self.build_param_update()
+
+        self.merged_summaries = tf.merge_summary(self.summaries)
 
     def _nature_model(self):
         """
@@ -189,6 +193,7 @@ class ActorCriticNN(object):
         # We can combine the policy loss and the value loss in a single expression
         with tf.name_scope("CombinedLoss"):
             self.loss = tf.reduce_mean(pi_loss + 0.5 * value_loss)
+            self.summaries.append(tf.scalar_summary('{}/Loss'.format(self.agent_name), self.loss))
 
 
     def get_pi(self, state):

@@ -11,7 +11,7 @@ def get_sub_dirs_from_hyper_parameters(hp):
     :return:    A subdir to log into
     """
     dict = OrderedDict(sorted(hp.__dict__.items()))
-    return '/'.join([param + '={}'.format(val) for param, val in dict.items()])
+    return '/'.join([(param[:5] if len(param) > 5 else param) + '={}'.format(val) for param, val in dict.items()])
 
 
 def get_writer_new_event(base_path, hyper_parameters):
@@ -26,7 +26,6 @@ def get_writer_new_event(base_path, hyper_parameters):
 
     # Check the current directories in there
     current_dirs = sorted([o for o in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, o))])
-    print(current_dirs)
     # We're assuming at this point that we do not exceed 1M runs per version
     if not current_dirs:
         # If there are no dirs yet, start at 0

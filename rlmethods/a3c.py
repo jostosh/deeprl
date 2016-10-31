@@ -7,6 +7,13 @@ from deeprl.approximators.nn import ActorCriticNN
 from deeprl.common.environments import get_env
 from deeprl.common.hyper_parameters import *
 from deeprl.common.tensorboard import get_writer_new_event
+from tensorflow.core.framework import summary_pb2
+
+
+def make_summary(name, val):
+    return summary_pb2.Summary(value=[summary_pb2.Summary.Value(tag=name,
+                                                                simple_value=val)])
+
 
 VERSION = 'v0.2'
 LOGDIRBASE = "/home/jos/mproj/deeprl/logs/{}".format(VERSION)
@@ -26,7 +33,7 @@ class A3CAgent(object):
         self.env = get_env(env_name)
         self.num_actions = self.env.num_actions()
         self.local_network = ActorCriticNN(num_actions=self.num_actions,
-                                           network_name=agent_name,
+                                           agent_name=agent_name,
                                            optimizer=optimizer,
                                            session=session,
                                            hyper_parameters=hyper_parameters,
@@ -78,13 +85,17 @@ class A3CAgent(object):
         global T
 
         dnn = self.local_network
-        self.session.run(dnn.param_update,
+        _, summaries = self.session.run([
+            dnn.param_update,
+            dnn.merged_summaries
+            ],
                          feed_dict={dnn.n_step_returns: n_step_return,
                                     dnn.actions: actions,
                                     dnn.inputs: states,
                                     dnn.advantage_no_grad: n_step_return - values,
                                     learning_rate: hyper_parameters.learning_rate}
                          )
+        writer.add_summary(summaries, self.t)
 
     def train(self):
         """
@@ -118,6 +129,7 @@ class A3CAgent(object):
         states          = np.zeros((hyper_parameters.t_max,) + self.env.state_shape(), dtype='float')
 
         epr = 0
+
         # Main loop, execute this while T < T_max
         while T < hyper_parameters.T_max:
             # A new batch begins, reset the gradients and synchronize thread-specific parameters
@@ -167,12 +179,11 @@ class A3CAgent(object):
 
             # Now update the global approximator's parameters
             self.update_params(n_step_targets[:batch_len], actions[:batch_len], states[:batch_len], values[:batch_len])
-            #logger.debug('Parameters updated!')
-            #if hyper_parameters.model == ModelNames.a3c_lstm:
-            #    self.session.run(tf.assign(self.local_network.states, np.zeros((1, hyper_parameters.t_max))))
 
             if terminal_state:
                 logger.info('Terminal state reached (episode {}, reward {}): resetting state'.format(self.n_episodes, epr))
+
+                writer.add_summary(make_summary('{}/EpisodeReward'.format(self.agent_name), epr), self.n_episodes)
                 self.n_episodes += 1
                 self.last_state = self.env.reset()
                 epr = 0
@@ -205,7 +216,7 @@ if __name__ == "__main__":
 
     '''
     global_network = ActorCriticNN(num_actions=num_actions,
-                                   network_name='GLOBAL',
+                                   agent_name='GLOBAL',
                                    hyper_parameters=hyper_parameters,
                                    session=session,
                                    optimizer=shared_optimizer)
@@ -215,7 +226,7 @@ if __name__ == "__main__":
 
     writer = get_writer_new_event(LOGDIRBASE, hyper_parameters)
     #tf.train.SummaryWriter("/home/jos/mproj/deeprl/logs/{}/{}".format(VERSION, env_name), session.graph)
-    #merged = tf.merge_all_summaries()
+    merged = tf.merge_all_summaries()
 
     session.run(tf.initialize_all_variables())
     for agent in agents:
