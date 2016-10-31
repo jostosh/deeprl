@@ -2,11 +2,15 @@ import threading
 import tensorflow as tf
 import numpy as np
 
-from deeprl.util.logger import logger
-from deeprl.approximators.nn import ActorCriticNN, ModelNames
-from deeprl.util.environments import get_env #AtariEnvironment
-from deeprl.util.hyper_parameters import *
-import pprint
+from deeprl.common.logger import logger
+from deeprl.approximators.nn import ActorCriticNN
+from deeprl.common.environments import get_env
+from deeprl.common.hyper_parameters import *
+from deeprl.common.tensorboard import get_writer_new_event
+
+VERSION = 'v0.2'
+LOGDIRBASE = "/home/jos/mproj/deeprl/logs/{}".format(VERSION)
+
 
 class A3CAgent(object):
 
@@ -19,7 +23,7 @@ class A3CAgent(object):
         :param session:         TensorFlow session
         """
         self.global_network = global_network
-        self.env = get_env(env_name) #AtariEnvironment(env_name)
+        self.env = get_env(env_name)
         self.num_actions = self.env.num_actions()
         self.local_network = ActorCriticNN(num_actions=self.num_actions,
                                            network_name=agent_name,
@@ -117,7 +121,6 @@ class A3CAgent(object):
         # Main loop, execute this while T < T_max
         while T < hyper_parameters.T_max:
             # A new batch begins, reset the gradients and synchronize thread-specific parameters
-            #if self.n_episodes % 10 == 0:
             self.synchronize_thread_parameters()
 
             # Set t_start to current t
@@ -146,13 +149,17 @@ class A3CAgent(object):
                 if self.agent_name == 'Agent_0':
                     self.env.env.render()
 
+            if hyper_parameters.clip_rewards:
+                # Reward clipping helps to stabilize training
+                rewards = np.clip(rewards, -1.0, 1.0)
+
             # Initialize the n-step return
             n_step_target = 0 if terminal_state else self.state_value(self.last_state)
 
             batch_len = self.t - t_start
 
             # Forward view of n-step returns, start from i == t_max - 1 and go to i == 0
-            for i in reversed(range(0, batch_len)):
+            for i in reversed(range(batch_len)):
                 # Straightforward accumulation of rewards
                 n_step_target = rewards[i] + hyper_parameters.gamma * n_step_target
                 n_step_targets[i] = n_step_target
@@ -205,6 +212,10 @@ if __name__ == "__main__":
 
     agents = [A3CAgent(env_name, global_network, 'Agent_%d' % i, session, optimizer=shared_optimizer)
               for i in range(n_threads)]
+
+    writer = get_writer_new_event(LOGDIRBASE, hyper_parameters)
+    #tf.train.SummaryWriter("/home/jos/mproj/deeprl/logs/{}/{}".format(VERSION, env_name), session.graph)
+    #merged = tf.merge_all_summaries()
 
     session.run(tf.initialize_all_variables())
     for agent in agents:
