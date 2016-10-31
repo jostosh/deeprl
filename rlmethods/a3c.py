@@ -183,7 +183,6 @@ class A3CAgent(object):
                 epr = 0
 
 
-
 if __name__ == "__main__":
     hyper_parameters = HyperParameters(parse_cmd_args())
     T = 1
@@ -219,7 +218,6 @@ if __name__ == "__main__":
               for i in range(n_threads)]
 
     writer = writer_new_event(LOGDIRBASE, hyper_parameters)
-    #tf.train.SummaryWriter("/home/jos/mproj/deeprl/logs/{}/{}".format(VERSION, env_name), session.graph)
     merged = tf.merge_all_summaries()
 
     session.run(tf.initialize_all_variables())
