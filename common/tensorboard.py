@@ -2,9 +2,20 @@ import tensorflow as tf
 import os
 from collections import OrderedDict
 from deeprl.common.logger import logger
+from tensorflow.core.framework import summary_pb2
 
 
-def get_sub_dirs_from_hyper_parameters(hp):
+def make_summary_from_python_var(name, val):
+    """
+    Creates a summary from a Python variable
+    :param name:    Name to be displayed in TensorBoard
+    :param val:     Python value
+    :return:        Summary Tensor
+    """
+    return summary_pb2.Summary(value=[summary_pb2.Summary.Value(tag=name, simple_value=val)])
+
+
+def sub_dirs_from_hyper_parameters(hp):
     """
     This function generates the subdir by looking sorting the hyperparameters on keys and joining them with '/'
     :param hp:  The HyperParameters object
@@ -14,7 +25,7 @@ def get_sub_dirs_from_hyper_parameters(hp):
     return '/'.join([(param[:5] if len(param) > 5 else param) + '={}'.format(val) for param, val in dict.items()])
 
 
-def get_writer_new_event(base_path, hyper_parameters):
+def writer_new_event(base_path, hyper_parameters):
     """
     Returns the new event path for TensorBoard
     :param base_path:           The base logging path
@@ -35,7 +46,7 @@ def get_writer_new_event(base_path, hyper_parameters):
         lastdir     = current_dirs[-1]
         lastrun     = int(lastdir[3:])
         rundir      = "run%06d" % (lastrun + 1,)
-    fulldir = os.path.join(base_path, rundir, get_sub_dirs_from_hyper_parameters(hyper_parameters))
+    fulldir = os.path.join(base_path, rundir, sub_dirs_from_hyper_parameters(hyper_parameters))
 
     logger.info("Writing TensorBoard logs to {}".format(fulldir))
     return tf.train.SummaryWriter(fulldir, tf.get_default_graph())

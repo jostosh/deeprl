@@ -6,13 +6,7 @@ from deeprl.common.logger import logger
 from deeprl.approximators.nn import ActorCriticNN
 from deeprl.common.environments import get_env
 from deeprl.common.hyper_parameters import *
-from deeprl.common.tensorboard import get_writer_new_event
-from tensorflow.core.framework import summary_pb2
-
-
-def make_summary(name, val):
-    return summary_pb2.Summary(value=[summary_pb2.Summary.Value(tag=name,
-                                                                simple_value=val)])
+from deeprl.common.tensorboard import writer_new_event, make_summary_from_python_var
 
 
 VERSION = 'v0.2'
@@ -183,7 +177,7 @@ class A3CAgent(object):
             if terminal_state:
                 logger.info('Terminal state reached (episode {}, reward {}): resetting state'.format(self.n_episodes, epr))
 
-                writer.add_summary(make_summary('{}/EpisodeReward'.format(self.agent_name), epr), self.n_episodes)
+                writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr), self.n_episodes)
                 self.n_episodes += 1
                 self.last_state = self.env.reset()
                 epr = 0
@@ -224,7 +218,7 @@ if __name__ == "__main__":
     agents = [A3CAgent(env_name, global_network, 'Agent_%d' % i, session, optimizer=shared_optimizer)
               for i in range(n_threads)]
 
-    writer = get_writer_new_event(LOGDIRBASE, hyper_parameters)
+    writer = writer_new_event(LOGDIRBASE, hyper_parameters)
     #tf.train.SummaryWriter("/home/jos/mproj/deeprl/logs/{}/{}".format(VERSION, env_name), session.graph)
     merged = tf.merge_all_summaries()
 
