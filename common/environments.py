@@ -3,7 +3,7 @@ import gym
 import numpy as np
 
 
-def get_env(env, frames_per_state=3):
+def get_env(env, frames_per_state=4):
     if env in ['Breakout-v0']:
         return AtariEnvironment(env, frames_per_state)
     return ClassicControl(env)
@@ -56,9 +56,16 @@ class AtariEnvironment(object):
         return imresize(rgb2gray(preprocessed_observation), (84, 84))
 
     def step(self, action):
+        step_reward = 0
+        step_terminal = False
+
         for _ in range(self.action_repeat):
             observation, reward, terminal, info = self.env.step(action)
             preprocessed_observation = self._preprocess_observation(observation)
+
+            step_reward += reward
+            if terminal:
+                step_terminal = True
 
             if len(self.state) != self.frames_per_state:
                 self.state.append(preprocessed_observation)
@@ -67,7 +74,7 @@ class AtariEnvironment(object):
 
             self.last_observation = observation
 
-        return self.state, reward, terminal, info
+        return self.state, step_reward, step_terminal, info
 
     def reset(self):
         self.state = []
