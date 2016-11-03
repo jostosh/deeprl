@@ -46,19 +46,22 @@ class A3CAgent(object):
          #                    for d_theta, grad in tf.gradients(self.local_network.loss, self.local_network.theta)]
         #self.async_update =
 
+    '''
     def get_action(self):
         """
         Returns action that is taken
         """
-        pi = self.local_network.get_pi(self.last_state)
-        return np.random.choice(self.num_actions, 1, p=pi)[0]
-
+        pi = self.local_network.get_action(self.last_state)
+        return np.random.choice(self.num_actions, p=pi)
+    '''
+    '''
     def state_value(self, observation):
         """
         Returns the state-value
         """
         return self.local_network.get_value(observation)
-
+    '''
+    '''
     def get_value_and_action(self):
         """
         Returns the action and the value
@@ -68,7 +71,8 @@ class A3CAgent(object):
             feed_dict={self.local_network.inputs: [self.last_state]})
         action = np.random.choice(self.num_actions, 1, p=pi[0])
         return value, action
-
+    '''
+    '''
     def update_params(self, n_step_return, actions, states, values):
         """
         Updates the parameters of the global network
@@ -87,9 +91,10 @@ class A3CAgent(object):
                                     dnn.actions: actions,
                                     dnn.inputs: states,
                                     dnn.advantage_no_grad: n_step_return - values,
-                                    learning_rate: hyper_parameters.learning_rate}
+                                    learning_rate_ph: hyper_parameters.learning_rate}
                          )
         writer.add_summary(summaries, self.t)
+    '''
 
     def train(self):
         """
@@ -114,7 +119,7 @@ class A3CAgent(object):
 
         It executes the actor-critic method with asynchronous updates and n-step returns in a forward view
         """
-        global T
+        global T, current_lr, lr_step
         # Initialize the reward, action and observation arrays
         rewards         = np.zeros(hyper_parameters.t_max, dtype='float')
         actions         = np.zeros(hyper_parameters.t_max, dtype='int')
@@ -143,12 +148,13 @@ class A3CAgent(object):
                 states[i] = self.last_state
                 # Get the corresponding value and action. This is done simultaneously such that the approximators only
                 # has to perform a single forward pass.
-                values[i], actions[i] = self.get_value_and_action()
+                values[i], actions[i] = self.local_network.get_value_and_action(self.last_state)
                 # Perform step in environment and obtain rewards and observations
                 self.last_state, rewards[i], terminal_state, info = self.env.step(actions[i])
                 # Increment time counters
                 self.t += 1
                 T += 1
+                current_lr -= lr_step
 
                 epr += rewards[i]
 
@@ -160,7 +166,7 @@ class A3CAgent(object):
                 rewards = np.clip(rewards, -1.0, 1.0)
 
             # Initialize the n-step return
-            n_step_target = 0 if terminal_state else self.state_value(self.last_state)
+            n_step_target = 0 if terminal_state else self.local_network.get_value(self.last_state)
 
             batch_len = self.t - t_start
 
@@ -172,7 +178,13 @@ class A3CAgent(object):
 
 
             # Now update the global approximator's parameters
-            self.update_params(n_step_targets[:batch_len], actions[:batch_len], states[:batch_len], values[:batch_len])
+            summaries = self.local_network.update_params(n_step_targets[:batch_len],
+                                                         actions[:batch_len],
+                                                         states[:batch_len],
+                                                         values[:batch_len],
+                                                         learning_rate_ph,
+                                                         current_lr)
+            writer.add_summary(summaries, self.t)
 
             if terminal_state:
                 logger.info('Terminal state reached (episode {}, reward {}): resetting state'.format(self.n_episodes, epr))
@@ -186,6 +198,8 @@ class A3CAgent(object):
 if __name__ == "__main__":
     hyper_parameters = HyperParameters(parse_cmd_args())
     T = 1
+    lr_step = hyper_parameters.learning_rate / hyper_parameters.T_max
+    current_lr = hyper_parameters.learning_rate
 
     env_name = hyper_parameters.env
     n_threads = hyper_parameters.n_threads
@@ -194,10 +208,10 @@ if __name__ == "__main__":
     num_actions = global_env.num_actions()
 
     session = tf.InteractiveSession()
-    learning_rate = tf.placeholder(tf.float32)
+    learning_rate_ph = tf.placeholder(tf.float32)
 
     shared_optimizer = tf.train.RMSPropOptimizer(
-        learning_rate=learning_rate,
+        learning_rate=learning_rate_ph,
         decay=hyper_parameters.lr_decay,
         epsilon=hyper_parameters.rms_epsilon)
 

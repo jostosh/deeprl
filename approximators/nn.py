@@ -1,6 +1,10 @@
 import tensorflow as tf
 import tflearn
+import numpy as np
+
 from deeprl.common.logger import logger
+from tflearn.layers import lstm
+#from deeprl.approximators.layers import lstm
 
 
 class ModelNames:
@@ -20,11 +24,13 @@ class ActorCriticNN(object):
         self.beta = hyper_parameters.beta
         self.summaries = []
         self.agent_name = agent_name
+        self.model_name = hyper_parameters.model
+        self.recurrent = self.model_name in [ModelNames.a3c_lstm]
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
         with tf.device('/cpu:0'):
             with tf.name_scope(agent_name):
-                self.build_network(num_actions, hyper_parameters.input_shape, network_model=hyper_parameters.model)
+                self.build_network(num_actions, hyper_parameters.input_shape)
                 with tf.name_scope('Loss'):
                     self.build_loss()
 
@@ -83,9 +89,12 @@ class ActorCriticNN(object):
         :return:                The feedforward model (last hidden layer) as a graph node
         """
         with tf.name_scope('Inputs'):
-            self.initial_state = tf.placeholder(tf.float32, shape=[None, 256])
+            # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
+            # 'h' (256), which are both influencing the layer in the forward/backward pass.
+            self.initial_state = tf.placeholder(tf.float32, shape=[1, 2 * 256])
+            self.n_steps = tf.placeholder(tf.int32, shape=[])
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
-        with tf.name_scope('HiddenLayers'):
+        with tf.name_scope('HiddenLayers') as scope:
             net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1')
             self._add_trainable(net)
             net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name='Conv2')
@@ -94,17 +103,24 @@ class ActorCriticNN(object):
             net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
             self._add_trainable(net)
             net = tf.expand_dims(net, 1)
-            net, states = tflearn.lstm(net, 256, initial_state=self.initial_state, return_states=True, name='LSTM4')
-            self._add_trainable(net)
-            logger.error(type(net))
+            net = tf.cond(self.n_steps == 1, tf.pad(net, [0, 0], [0, 4], [0, 0]), net)
+            net, state = lstm(net, 256, initial_state=self.initial_state, dynamic=True, return_state=True, name='LSTM4')
+            self._add_trainable(scope + 'LSTM4')
             net = tflearn.reshape(net, [-1, 256])
-            self.states = states
+            self.lstm_state_variable = state
 
-        logger.error(type(states, states.get_shape()))
+        self.reset_lstm_state()
         return net
 
+    def reset_lstm_state(self):
+        self.lstm_state_numeric = np.zeros([1, 2 * 256], dtype='float32')
+        self.lstm_first_state_since_update = np.copy(self.lstm_state_numeric)
+
     def _add_trainable(self, layer):
-        self.theta += tflearn.get_layer_variables_by_name(layer.scope[:-1])
+        if isinstance(layer, str):
+            self.theta += tflearn.get_layer_variables_by_name(layer)
+            return
+        self.theta += [layer.W, layer.b]
 
     def _small_fcn(self):
         """
@@ -117,19 +133,19 @@ class ActorCriticNN(object):
             self._add_trainable(net)
         return net
 
-    def build_network(self, num_actions, input_shape, network_model='nature'):
+    def build_network(self, num_actions, input_shape):
         logger.debug('Input shape: {}'.format(input_shape))
         with tf.name_scope('Inputs'):
             self.inputs = tf.placeholder(tf.float32, [None] + input_shape)
-        logger.info('Building network: {}'.format(network_model))
+        logger.info('Building network: {}'.format(self.model_name))
 
         self.theta = []
 
-        if network_model == ModelNames.nature:
+        if self.model_name == ModelNames.nature:
             net = self._nature_model()
-        elif network_model == ModelNames.a3c_ff:
+        elif self.model_name == ModelNames.a3c_ff:
             net = self._a3c_ff()
-        elif network_model == ModelNames.a3c_lstm:
+        elif self.model_name == ModelNames.a3c_lstm:
             net = self._a3c_lstm()
         else:
             net = self._small_fcn()
@@ -142,7 +158,6 @@ class ActorCriticNN(object):
                 self.value = tflearn.fully_connected(net, 1, activation='linear', name='v_s')
                 self._add_trainable(self.value)
 
-        logger.info(self.theta, [t.get_shape() for t in self.theta])
 
 
     def build_param_sync(self):
@@ -196,13 +211,15 @@ class ActorCriticNN(object):
             self.summaries.append(tf.scalar_summary('{}/Loss'.format(self.agent_name), self.loss))
 
 
-    def get_pi(self, state):
+    def get_action(self, state):
         """
         This function returns a single array reflecting the stochastic policy pi for the given state.
         :param state: The input state
         :return: State's policy
         """
-        return self.session.run(self.pi, feed_dict={self.inputs: [state]})[0]
+        pi = self.session.run(self.pi, feed_dict={self.inputs: [state]})[0]
+        return np.random.choice(self.num_actions, p=pi)
+
 
     def get_value(self, state):
         """
@@ -210,5 +227,80 @@ class ActorCriticNN(object):
         :param state: The input state
         :return: State's value
         """
+        if self.recurrent:
+            return self.session.run(self.value,
+                                    feed_dict={
+                                        self.inputs: [state],
+                                        self.initial_state: self.lstm_state_numeric,
+                                        self.n_steps: 1
+                                    })
+
         return self.session.run(self.value, feed_dict={self.inputs: [state]})[0][0]
 
+
+    def get_value_and_action(self, state):
+        """
+        Returns the action and the value
+        """
+        if self.recurrent:
+            value, pi, self.lstm_state_numeric = self.session.run(
+                [
+                    self.value, self.pi, self.lstm_state_variable
+                ],
+                feed_dict={
+                    self.inputs: [state],
+                    self.initial_state: self.lstm_state_numeric,
+                    self.n_steps: 1
+                }
+            )
+        else:
+            value, pi = self.session.run(
+                [self.value, self.pi],
+                feed_dict={self.inputs: [state]})
+
+        action = np.random.choice(self.num_actions, p=pi[0])
+        return value, action
+
+
+    def update_params(self, n_step_return, actions, states, values, learning_rate_var, lr):
+        """
+        Updates the parameters of the global network
+        :param n_step_return:   n-step returns
+        :param actions:         array of actions
+        :param states:          array of states
+        """
+        global T
+
+        if self.recurrent:
+            _, summaries, self.lstm_state_numeric = self.session.run([
+                self.param_update,
+                self.merged_summaries,
+                self.lstm_state_variable
+            ],
+                feed_dict={
+                    self.n_step_returns: n_step_return,
+                    self.actions: actions,
+                    self.inputs: states,
+                    self.advantage_no_grad: n_step_return - values,
+                    learning_rate_var: lr,
+                    self.initial_state: self.lstm_first_state_since_update,
+                    self.n_steps: len(n_step_return)
+                }
+            )
+            self.lstm_first_state_since_update = np.copy(self.lstm_state_numeric)
+
+
+
+        _, summaries = self.session.run([
+            self.param_update,
+            self.merged_summaries
+        ],
+            feed_dict={self.n_step_returns: n_step_return,
+                       self.actions: actions,
+                       self.inputs: states,
+                       self.advantage_no_grad: n_step_return - values,
+                       learning_rate_var: lr}
+        )
+
+        return summaries
+        #writer.add_summary(summaries, t)
