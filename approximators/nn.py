@@ -25,6 +25,7 @@ class ActorCriticNN(object):
         self.summaries = []
         self.agent_name = agent_name
         self.model_name = hyper_parameters.model
+        self.clip_advantage = hyper_parameters.clip_advantage
         self.recurrent = self.model_name in [ModelNames.a3c_lstm]
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
@@ -190,6 +191,12 @@ class ActorCriticNN(object):
         advantage = self.n_step_returns - self.value
         advantage_no_grad = self.n_step_returns - tf.stop_gradient(self.value)
 
+        if self.clip_advantage:
+            # I empirically found that it might help to clip the advantage that is used for the policy loss. This might
+            # improve stability and consistency of the gradients
+            logger.info("Clipping advantage in graph")
+            self.advantage_no_grad = tf.clip_by_value(self.advantage_no_grad, -1., 1., name="ClippedAdvantage")
+
         with tf.name_scope("PolicyLoss"):
             # action matrix is n x a where each row corresponds to a time step and each column to an action
             action_mask = tf.one_hot(self.actions, self.num_actions, 1.0, 0.0, name="ActionMask")
@@ -199,8 +206,8 @@ class ActorCriticNN(object):
             entropy = -tf.reduce_sum(log_pi * self.pi, reduction_indices=1, name="Entropy")
 
             # Define the loss for the policy (minus is needed to perform *negative* gradient descent == gradient ascent)
-            pi_loss = tf.neg(tf.reduce_sum(action_mask * log_pi, reduction_indices=1) * self.advantage_no_grad  #advantage_no_gradient
-                        + self.beta * entropy, name='PiLoss')
+            pi_loss = tf.neg(tf.reduce_sum(action_mask * log_pi, reduction_indices=1) * self.advantage_no_grad
+                             + self.beta * entropy, name='PiLoss')
 
         with tf.name_scope("ValueLoss"):
             value_loss = tf.square(advantage)
@@ -304,6 +311,7 @@ class ActorCriticNN(object):
                            self.advantage_no_grad: n_step_return - values,
                            learning_rate_var: lr}
             )
+
 
         return summaries
         #writer.add_summary(summaries, t)
