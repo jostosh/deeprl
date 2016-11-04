@@ -275,9 +275,6 @@ class ActorCriticNN(object):
         """
         Returns the action and the value
         """
-        #state = np.array([state] + 3 * [np.zeros_like(state)])
-        #logger.info(state.shape)
-
         if self.recurrent:
             value, pi, self.lstm_state_numeric = self.session.run(
                 [
