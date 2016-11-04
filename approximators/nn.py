@@ -94,7 +94,7 @@ class ActorCriticNN(object):
         :param network_name:    Name of the network
         :return:                The feedforward model (last hidden layer) as a graph node
         """
-        with tf.name_scope('Inputs'):
+        with tf.name_scope('LSTMStateInput'):
             # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
             # 'h' (256), which are both influencing the layer in the forward/backward pass.
             # TODO should use tuple here
@@ -106,6 +106,7 @@ class ActorCriticNN(object):
                 self.initial_state_c,
                 self.initial_state_h
             )
+        with tf.name_scope('SequenceMasking'):
             self.n_steps = tf.placeholder(tf.int32, shape=[])
             sequence_mask = tf.reshape(tf.sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32),
                                        [1, 5, 1], name='SequenceMask')
@@ -158,7 +159,7 @@ class ActorCriticNN(object):
 
     def build_network(self, num_actions, input_shape):
         logger.debug('Input shape: {}'.format(input_shape))
-        with tf.name_scope('Inputs'):
+        with tf.name_scope('ForwardInputs'):
             self.inputs = tf.placeholder(tf.float32, [None] + input_shape)
         logger.info('Building network: {}'.format(self.model_name))
 
@@ -201,16 +202,17 @@ class ActorCriticNN(object):
         This function defines the computation graph that is needed to compute the loss of the approximators.
         """
 
-        # The n_step_return is an array of length n (where n is the batch size)
-        self.n_step_returns = tf.placeholder(tf.float32, [None], name='NStepReturns')
-        # The actions attribute is an array of length n
-        self.actions = tf.placeholder(tf.int32, [None], name='Actions')
-        # The advantage function requires a
-        self.advantage_no_grad = tf.placeholder(tf.float32, [None], name='TDErrors')
+        with tf.name_scope('BackwardInputs'):
+            # The n_step_return is an array of length n (where n is the batch size)
+            self.n_step_returns = tf.placeholder(tf.float32, [None], name='NStepReturns')
+            # The actions attribute is an array of length n
+            self.actions = tf.placeholder(tf.int32, [None], name='Actions')
+            # The advantage function requires a
+            self.advantage_no_grad = tf.placeholder(tf.float32, [None], name='TDErrors')
 
         # The advantage is simply the estimated value minus the bootstrapped returns
         advantage = self.n_step_returns - self.value
-        advantage_no_grad = self.n_step_returns - tf.stop_gradient(self.value)
+        #advantage_no_grad = self.n_step_returns - tf.stop_gradient(self.value)
 
         if self.clip_advantage:
             # I empirically found that it might help to clip the advantage that is used for the policy loss. This might
