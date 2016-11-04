@@ -15,7 +15,7 @@ LOGDIRBASE = "/home/jos/mproj/deeprl/logs/{}".format(VERSION)
 
 class A3CAgent(object):
 
-    def __init__(self, env_name, local_network, agent_name, session, optimizer):
+    def __init__(self, env_name, global_network, agent_name, session, optimizer):
         """
         Initializes an Asynchronous Advantage Actor-Critic agent (A3C).
         :param env_name:        Name of the environment
@@ -23,17 +23,16 @@ class A3CAgent(object):
         :param agent_name:      Name of this agent
         :param session:         TensorFlow session
         """
-        self.local_network = local_network
         self.env = get_env(env_name)
         self.num_actions = self.env.num_actions()
-        '''
+
         self.local_network = ActorCriticNN(num_actions=self.num_actions,
                                            agent_name=agent_name,
                                            optimizer=optimizer,
                                            session=session,
                                            hyper_parameters=hyper_parameters,
                                            global_network=global_network)
-                                           '''
+
         self._train_thread = threading.Thread(target=self._train, name=agent_name)
         self.t = 1
         self.last_state = self.env.reset()
@@ -42,61 +41,6 @@ class A3CAgent(object):
 
         self.n_episodes = 1
 
-        #self.d_theta = [tf.placeholder(tf.shape(theta)) for theta in self.local_network.theta]
-        #self.reset_d_theta = [tf.assign(d_theta, tf.zeros_like(d_theta)) for d_theta in self.d_theta]
-        #self.add_gradient = [tf.assign(d_theta, d_theta + grad)
-         #                    for d_theta, grad in tf.gradients(self.local_network.loss, self.local_network.theta)]
-        #self.async_update =
-
-    '''
-    def get_action(self):
-        """
-        Returns action that is taken
-        """
-        pi = self.local_network.get_action(self.last_state)
-        return np.random.choice(self.num_actions, p=pi)
-    '''
-    '''
-    def state_value(self, observation):
-        """
-        Returns the state-value
-        """
-        return self.local_network.get_value(observation)
-    '''
-    '''
-    def get_value_and_action(self):
-        """
-        Returns the action and the value
-        """
-        value, pi = self.session.run(
-            [self.local_network.value, self.local_network.pi],
-            feed_dict={self.local_network.inputs: [self.last_state]})
-        action = np.random.choice(self.num_actions, 1, p=pi[0])
-        return value, action
-    '''
-    '''
-    def update_params(self, n_step_return, actions, states, values):
-        """
-        Updates the parameters of the global network
-        :param n_step_return:   n-step returns
-        :param actions:         array of actions
-        :param states:          array of states
-        """
-        global T
-
-        dnn = self.local_network
-        _, summaries = self.session.run([
-            dnn.param_update,
-            dnn.merged_summaries
-            ],
-                         feed_dict={dnn.n_step_returns: n_step_return,
-                                    dnn.actions: actions,
-                                    dnn.inputs: states,
-                                    dnn.advantage_no_grad: n_step_return - values,
-                                    learning_rate_ph: hyper_parameters.learning_rate}
-                         )
-        writer.add_summary(summaries, self.t)
-    '''
 
     def train(self):
         """
@@ -111,8 +55,6 @@ class A3CAgent(object):
         """
         logger.debug('Synchronizing global parameters')
         self.session.run(self.local_network.param_sync)
-        #logger.debug('Global thread params: \n{}'.format(self.session.run(self.global_network.theta[0]
-        #                                                                  - self.local_network.theta[0])))
 
     def _train(self):
         """
@@ -243,7 +185,7 @@ if __name__ == "__main__":
                                   optimizer=shared_optimizer,
                                   global_network=global_network)
 
-    agents = [A3CAgent(env_name, local_network, 'Agent_%d' % i, session, optimizer=shared_optimizer)
+    agents = [A3CAgent(env_name, global_network, 'Agent_%d' % i, session, optimizer=shared_optimizer)
               for i in range(n_threads)]
 
     writer = writer_new_event(LOGDIRBASE, hyper_parameters)
