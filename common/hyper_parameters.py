@@ -1,4 +1,5 @@
 import argparse
+from deeprl.approximators.nn import ModelNames
 
 config1 = {
     'T_max': 10000000,
@@ -12,7 +13,7 @@ config1 = {
     'input_shape': '4,84,84',
     'env': 'Breakout-v0',
     'method': 'rlmethods',
-    'model': 'a3c_ff',
+    'model': ModelNames.a3c_ff,
     'n_threads': 8,
     'action_repeat': 4,
     'clip_rewards': False,
