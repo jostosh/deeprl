@@ -15,7 +15,8 @@ config1 = {
     'model': 'a3c_ff',
     'n_threads': 8,
     'action_repeat': 4,
-    'clip_rewards': True
+    'clip_rewards': False,
+    'clip_advantage': False
 }
 
 
@@ -25,7 +26,14 @@ def parse_cmd_args():
     :return:
     """
     parser = argparse.ArgumentParser(description='This program applies an RL method to an OpenAI gym environment')
-    [parser.add_argument('--' + name, type=type(val), default=val) for name, val in config1.items()]
+    for name, val in config1.items():
+        if type(val) is bool:
+            parser.add_argument('--' + name, action='store_true', dest=name)
+            parser.add_argument('--not_' + name, action='store_false', dest=name)
+            parser.set_defaults(**{name: val})
+        else:
+            parser.add_argument('--' + name, type=type(val), default=val)
+
     args = parser.parse_args()
     return args
 
@@ -57,4 +65,5 @@ class HyperParameters(object):
         self.n_threads = params.n_threads
         self.action_repeat = params.action_repeat
         self.clip_rewards = params.clip_rewards
+        self.clip_advantage = params.clip_advantage
 
