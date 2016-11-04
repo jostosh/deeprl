@@ -9,13 +9,13 @@ from deeprl.common.hyper_parameters import *
 from deeprl.common.tensorboard import writer_new_event, make_summary_from_python_var
 
 
-VERSION = 'v0.2'
+VERSION = 'v0.5'
 LOGDIRBASE = "/home/jos/mproj/deeprl/logs/{}".format(VERSION)
 
 
 class A3CAgent(object):
 
-    def __init__(self, env_name, global_network, agent_name, session, optimizer):
+    def __init__(self, env_name, local_network, agent_name, session, optimizer):
         """
         Initializes an Asynchronous Advantage Actor-Critic agent (A3C).
         :param env_name:        Name of the environment
@@ -23,15 +23,17 @@ class A3CAgent(object):
         :param agent_name:      Name of this agent
         :param session:         TensorFlow session
         """
-        self.global_network = global_network
+        self.local_network = local_network
         self.env = get_env(env_name)
         self.num_actions = self.env.num_actions()
+        '''
         self.local_network = ActorCriticNN(num_actions=self.num_actions,
                                            agent_name=agent_name,
                                            optimizer=optimizer,
                                            session=session,
                                            hyper_parameters=hyper_parameters,
                                            global_network=global_network)
+                                           '''
         self._train_thread = threading.Thread(target=self._train, name=agent_name)
         self.t = 1
         self.last_state = self.env.reset()
@@ -121,16 +123,18 @@ class A3CAgent(object):
         """
         global T, current_lr, lr_step
         # Initialize the reward, action and observation arrays
-        rewards         = np.zeros(hyper_parameters.t_max, dtype='float')
-        actions         = np.zeros(hyper_parameters.t_max, dtype='int')
-        values          = np.zeros(hyper_parameters.t_max, dtype='float')
-        n_step_targets  = np.zeros(hyper_parameters.t_max, dtype='float')
-        states          = np.zeros((hyper_parameters.t_max,) + self.env.state_shape(), dtype='float')
+        rewards = np.zeros(hyper_parameters.t_max, dtype='float')
+        actions = np.zeros(hyper_parameters.t_max, dtype='int')
+        values = np.zeros(hyper_parameters.t_max, dtype='float')
+        n_step_targets = np.zeros(hyper_parameters.t_max, dtype='float')
+        states = np.zeros((hyper_parameters.t_max,) + self.env.state_shape(), dtype='float')
 
         epr = 0
 
         # Main loop, execute this while T < T_max
         while T < hyper_parameters.T_max:
+            [arr.fill(0) for arr in [rewards, actions, values, n_step_targets, states]]
+
             # A new batch begins, reset the gradients and synchronize thread-specific parameters
             self.synchronize_thread_parameters()
 
@@ -158,8 +162,8 @@ class A3CAgent(object):
 
                 epr += rewards[i]
 
-                if self.agent_name == 'Agent_0':
-                    self.env.env.render()
+                #if self.agent_name == 'Agent_0':
+                #    self.env.env.render()
 
             if hyper_parameters.clip_rewards:
                 # Reward clipping helps to stabilize training
@@ -193,6 +197,7 @@ class A3CAgent(object):
                 self.n_episodes += 1
                 self.last_state = self.env.reset()
                 epr = 0
+                self.local_network.reset()
 
 
 if __name__ == "__main__":
@@ -213,7 +218,9 @@ if __name__ == "__main__":
     shared_optimizer = tf.train.RMSPropOptimizer(
         learning_rate=learning_rate_ph,
         decay=hyper_parameters.lr_decay,
-        epsilon=hyper_parameters.rms_epsilon)
+        epsilon=hyper_parameters.rms_epsilon,
+        momentum=0.0
+    )
 
     '''
     shared_optimizer = tf.train.RMSPropCustom(
@@ -222,13 +229,21 @@ if __name__ == "__main__":
         epsilon=hyper_parameters.rms_epsilon)
 
     '''
+
     global_network = ActorCriticNN(num_actions=num_actions,
                                    agent_name='GLOBAL',
                                    hyper_parameters=hyper_parameters,
                                    session=session,
                                    optimizer=shared_optimizer)
 
-    agents = [A3CAgent(env_name, global_network, 'Agent_%d' % i, session, optimizer=shared_optimizer)
+    local_network = ActorCriticNN(num_actions=num_actions,
+                                  agent_name='LOCAL',
+                                  hyper_parameters=hyper_parameters,
+                                  session=session,
+                                  optimizer=shared_optimizer,
+                                  global_network=global_network)
+
+    agents = [A3CAgent(env_name, local_network, 'Agent_%d' % i, session, optimizer=shared_optimizer)
               for i in range(n_threads)]
 
     writer = writer_new_event(LOGDIRBASE, hyper_parameters)
