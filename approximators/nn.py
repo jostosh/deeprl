@@ -4,8 +4,13 @@ import numpy as np
 
 from deeprl.common.logger import logger
 #from tflearn.layers import lstm
-from deeprl.approximators.layers import lstm
 
+from deeprl.approximators.layers import lstm
+from tensorflow.python.ops.rnn_cell import LSTMStateTuple
+
+from tflearn.data_utils import pad_sequences
+
+from copy import deepcopy
 
 class ModelNames:
     a3c_ff = 'a3c_ff'
@@ -92,8 +97,18 @@ class ActorCriticNN(object):
         with tf.name_scope('Inputs'):
             # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
             # 'h' (256), which are both influencing the layer in the forward/backward pass.
-            self.initial_state = tf.placeholder(tf.float32, shape=[1, 2 * 256], name="InitialLSTMState")
+            # TODO should use tuple here
+            #self.initial_state = tf.placeholder(tf.float32, shape=[1, 2 * 256], name="InitialLSTMState")
+
+            self.initial_state_c = tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_c")
+            self.initial_state_h = tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_h")
+            self.initial_state = LSTMStateTuple(
+                self.initial_state_c,
+                self.initial_state_h
+            )
             self.n_steps = tf.placeholder(tf.int32, shape=[])
+            sequence_mask = tf.reshape(tf.sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32),
+                                       [1, 5, 1], name='SequenceMask')
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
         with tf.name_scope('HiddenLayers'):
             net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1')
@@ -103,8 +118,8 @@ class ActorCriticNN(object):
             net = tflearn.flatten(net)
             net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
             self._add_trainable(net)
-            net = tflearn.reshape(net, [1, 5, 256]) # tf.expand_dims(net, 1)
-            net, state = lstm(net, 256, initial_state=self.initial_state, return_state=True, name='LSTM4')
+            net = tf.mul(tflearn.reshape(net, [1, 5, 256]), sequence_mask, name='MaskedSequence')  # tf.expand_dims(net, 1)
+            net, state = lstm(net, 256, initial_state=self.initial_state, return_state=True, name='LSTM4', dynamic=True)
             #logger.info(net._op.__dict__)
             self._add_trainable(net)
             net = tflearn.reshape(net, [-1, 256])
@@ -114,8 +129,14 @@ class ActorCriticNN(object):
         return net
 
     def reset_lstm_state(self):
-        self.lstm_state_numeric = np.zeros([1, 2 * 256], dtype='float32')
-        self.lstm_first_state_since_update = np.copy(self.lstm_state_numeric)
+        self.lstm_state_numeric = LSTMStateTuple(
+            np.zeros([1, 256], dtype='float32'),
+            np.zeros([1, 256], dtype='float32')
+        )
+        self.lstm_first_state_since_update = LSTMStateTuple(
+            np.zeros([1, 256], dtype='float32'),
+            np.zeros([1, 256], dtype='float32')
+        )
 
     def reset(self):
         if self.recurrent:
@@ -214,6 +235,10 @@ class ActorCriticNN(object):
 
         # We can combine the policy loss and the value loss in a single expression
         with tf.name_scope("CombinedLoss"):
+            if self.recurrent:
+                seq_mask = tf.sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32)
+                pi_loss = seq_mask * pi_loss
+                value_loss = seq_mask * value_loss
             self.loss = tf.reduce_mean(pi_loss + 0.5 * value_loss)
             self.summaries.append(tf.scalar_summary('{}/Loss'.format(self.agent_name), self.loss))
 
@@ -270,7 +295,6 @@ class ActorCriticNN(object):
                 feed_dict={self.inputs: [state]})
 
         action = np.random.choice(self.num_actions, p=pi[0])
-        #logger.info("pi: {}\nvalue: {}\naction: {}".format(pi[0], value[0][0], action))
         return value[0][0], action
 
     def update_params(self, n_step_return, actions, states, values, learning_rate_var, lr):
@@ -283,6 +307,10 @@ class ActorCriticNN(object):
         global T
 
         if self.recurrent:
+            n_steps = len(n_step_return)
+            n_step_return, actions, values = pad_sequences([n_step_return, actions, values], maxlen=5)
+            states = np.concatenate([states, np.zeros((5 - n_steps,) + states[0].shape)])
+
             _, summaries, self.lstm_state_numeric = self.session.run([
                 self.param_update,
                 self.merged_summaries,
@@ -295,10 +323,10 @@ class ActorCriticNN(object):
                     self.advantage_no_grad: n_step_return - values,
                     learning_rate_var: lr,
                     self.initial_state: self.lstm_first_state_since_update,
-                    self.n_steps: len(n_step_return)
+                    self.n_steps: n_steps
                 }
             )
-            self.lstm_first_state_since_update = np.copy(self.lstm_state_numeric)
+            self.lstm_first_state_since_update = deepcopy(self.lstm_state_numeric)
 
         else:
             _, summaries = self.session.run([
