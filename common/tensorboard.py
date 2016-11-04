@@ -22,7 +22,7 @@ def sub_dirs_from_hyper_parameters(hp):
     :return:    A subdir to log into
     """
     dict = OrderedDict(sorted(hp.__dict__.items()))
-    return '/'.join([(param[:5] if len(param) > 5 else param) + '={}'.format(val) for param, val in dict.items()])
+    return '/'.join([(param[:5] if len(param) > 5 else param) + '={}'.format(val) if type(val) is not str else val for param, val in dict.items()])
 
 
 def writer_new_event(base_path, hyper_parameters):
