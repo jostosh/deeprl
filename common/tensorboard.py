@@ -25,7 +25,7 @@ def sub_dirs_from_hyper_parameters(hp):
     return '/'.join([(param[:5] if len(param) > 5 else param) + '={}'.format(val) if type(val) is not str else val for param, val in dict.items()])
 
 
-def writer_new_event(base_path, hyper_parameters):
+def writer_new_event(base_path, hyper_parameters, session):
     """
     Returns the new event path for TensorBoard
     :param base_path:           The base logging path
@@ -46,8 +46,8 @@ def writer_new_event(base_path, hyper_parameters):
         lastdir     = current_dirs[-1]
         lastrun     = int(lastdir[3:])
         rundir      = "run%06d" % (lastrun + 1,)
-    fulldir = os.path.join(base_path, rundir, sub_dirs_from_hyper_parameters(hyper_parameters))
+    fulldir = os.path.join(base_path, rundir) #, sub_dirs_from_hyper_parameters(hyper_parameters))
 
     logger.info("Writing TensorBoard logs to {}".format(fulldir))
-    return tf.train.SummaryWriter(fulldir, tf.get_default_graph())
+    return tf.train.SummaryWriter(fulldir, session.graph)
 

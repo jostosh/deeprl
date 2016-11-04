@@ -9,7 +9,7 @@ from deeprl.common.hyper_parameters import *
 from deeprl.common.tensorboard import writer_new_event, make_summary_from_python_var
 
 
-VERSION = 'v0.5'
+VERSION = 'v0.6'
 LOGDIRBASE = "/home/jos/mproj/deeprl/logs/{}".format(VERSION)
 
 
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     agents = [A3CAgent(env_name, global_network, 'Agent_%d' % i, session, optimizer=shared_optimizer)
               for i in range(n_threads)]
 
-    writer = writer_new_event(LOGDIRBASE, hyper_parameters)
+    writer = writer_new_event(LOGDIRBASE, hyper_parameters, session)
     merged = tf.merge_all_summaries()
 
     session.run(tf.initialize_all_variables())
