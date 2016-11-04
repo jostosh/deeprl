@@ -75,7 +75,7 @@ class A3CAgent(object):
 
         # Main loop, execute this while T < T_max
         while T < hyper_parameters.T_max:
-            [arr.fill(0) for arr in [rewards, actions, values, n_step_targets, states]]
+            #[arr.fill(0) for arr in [rewards, actions, values, n_step_targets, states]]
 
             # A new batch begins, reset the gradients and synchronize thread-specific parameters
             self.synchronize_thread_parameters()
