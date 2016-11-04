@@ -327,7 +327,6 @@ class ActorCriticNN(object):
                 }
             )
             self.lstm_first_state_since_update = deepcopy(self.lstm_state_numeric)
-
         else:
             _, summaries = self.session.run([
                 self.param_update,
@@ -339,7 +338,6 @@ class ActorCriticNN(object):
                            self.advantage_no_grad: n_step_return - values,
                            learning_rate_var: lr}
             )
-
 
         return summaries
         #writer.add_summary(summaries, t)
