@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+#SBATCH --time=00:10:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=16
+#SBATCH --job-name=a3c_lstm_v07
+#SBATCH --mail-type ALL
+#SBATCH --mail-user jos.vandewolfshaar@gmail.com
+#SBATCH --output job-%j.log
+#SBATCH --mem=2000
+
+module load tensorflow/0.10.0-foss-2016a-Python-3.5.1
+
+srun python deeprl/rlmethods/a3c.py --model a3c_lstm
