@@ -10,4 +10,4 @@
 
 module load tensorflow/0.10.0-foss-2016a-Python-3.5.1
 
-srun python deeprl/rlmethods/a3c.py --model a3c_lstm
+srun python deeprl/rlmethods/a3c.py --model a3c_lstm &| tee out.log
