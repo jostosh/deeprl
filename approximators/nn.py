@@ -12,6 +12,7 @@ from tflearn.data_utils import pad_sequences
 
 from copy import deepcopy
 
+
 class ModelNames:
     a3c_ff = 'a3c_ff'
     nature = 'nature'
