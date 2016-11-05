@@ -12,6 +12,8 @@ from tflearn.data_utils import pad_sequences
 
 from copy import deepcopy
 
+from deeprl.common.tensorflowutils import sequence_mask
+
 
 class ModelNames:
     a3c_ff = 'a3c_ff'
@@ -109,7 +111,7 @@ class ActorCriticNN(object):
             )
         with tf.name_scope('SequenceMasking'):
             self.n_steps = tf.placeholder(tf.int32, shape=[])
-            sequence_mask = tf.reshape(tf.sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32),
+            seq_mask = tf.reshape(sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32),
                                        [1, 5, 1], name='SequenceMask')
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
         with tf.name_scope('HiddenLayers'):
@@ -120,7 +122,7 @@ class ActorCriticNN(object):
             net = tflearn.flatten(net)
             net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
             self._add_trainable(net)
-            net = tf.mul(tflearn.reshape(net, [1, 5, 256]), sequence_mask, name='MaskedSequence')  # tf.expand_dims(net, 1)
+            net = tf.mul(tflearn.reshape(net, [1, 5, 256]), seq_mask, name='MaskedSequence')  # tf.expand_dims(net, 1)
             net, state = lstm(net, 256, initial_state=self.initial_state, return_state=True, name='LSTM4', dynamic=True)
             #logger.info(net._op.__dict__)
             self._add_trainable(net)
@@ -239,7 +241,7 @@ class ActorCriticNN(object):
         # We can combine the policy loss and the value loss in a single expression
         with tf.name_scope("CombinedLoss"):
             if self.recurrent:
-                seq_mask = tf.sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32)
+                seq_mask = sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32)
                 pi_loss = seq_mask * pi_loss
                 value_loss = seq_mask * value_loss
             self.loss = tf.reduce_mean(pi_loss + 0.5 * value_loss)
