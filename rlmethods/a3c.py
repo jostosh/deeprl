@@ -150,7 +150,7 @@ if __name__ == "__main__":
     global_env = get_env(env_name)
     num_actions = global_env.num_actions()
 
-    session = tf.InteractiveSession()
+    session = tf.Session()
     learning_rate_ph = tf.placeholder(tf.float32)
 
     shared_optimizer = tf.train.RMSPropOptimizer(
