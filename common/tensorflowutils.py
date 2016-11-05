@@ -26,7 +26,7 @@ def sequence_mask(lengths, maxlen=None, dtype=dtypes.bool, name=None):
   Raises:
     ValueError: if the arguments have invalid rank.
   """
-  with ops.name_scope(name, "SequenceMask"):
+  with ops.name_scope(name):
     lengths = ops.convert_to_tensor(lengths)
     if lengths.get_shape().ndims != 1:
       raise ValueError("lengths must be 1D for sequence_mask")
