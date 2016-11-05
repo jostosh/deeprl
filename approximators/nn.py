@@ -35,15 +35,15 @@ class ActorCriticNN(object):
         self.recurrent = self.model_name in [ModelNames.a3c_lstm]
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
-        with tf.device('/cpu:0'):
-            with tf.name_scope(agent_name):
-                self.build_network(num_actions, hyper_parameters.input_shape)
-                with tf.name_scope('Loss'):
-                    self.build_loss()
+        #with tf.device('/cpu:0'):
+        with tf.name_scope(agent_name):
+            self.build_network(num_actions, hyper_parameters.input_shape)
+            with tf.name_scope('Loss'):
+                self.build_loss()
 
-                if global_network:
-                    self.build_param_sync()
-                    self.build_param_update()
+            if global_network:
+                self.build_param_sync()
+                self.build_param_update()
 
         self.merged_summaries = tf.merge_summary(self.summaries)
 
