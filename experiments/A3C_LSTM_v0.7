@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-#SBATCH --time=00:10:00
+#SBATCH --time=24:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --job-name=a3c_lstm_v07
+#SBATCH --cpus-per-task=6
+#SBATCH --job-name=A3C_LSTM_v07
 #SBATCH --mail-type ALL
 #SBATCH --mail-user jos.vandewolfshaar@gmail.com
 #SBATCH --output job-%j.log
@@ -11,4 +12,4 @@
 
 module load tensorflow/0.10.0-foss-2016a-Python-3.5.1-CUDA-7.5.18
 
-srun python mproj/deeprl/rlmethods/a3c.py --model a3c_lstm |& tee out.log
+srun python mproj/deeprl/rlmethods/a3c.py --model a3c_lstm --n_threads 24
