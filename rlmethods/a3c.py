@@ -9,10 +9,6 @@ from deeprl.common.hyper_parameters import *
 from deeprl.common.tensorboard import writer_new_event, make_summary_from_python_var
 
 
-VERSION = 'v0.6'
-LOGDIRBASE = "/home/jos/mproj/deeprl/logs/{}".format(VERSION)
-
-
 class A3CAgent(object):
 
     def __init__(self, env_name, global_network, agent_name, session, optimizer):
@@ -151,7 +147,7 @@ if __name__ == "__main__":
     env_name = hyper_parameters.env
     n_threads = hyper_parameters.n_threads
 
-    global_env = get_env(env_name) #AtariEnvironment(env_name)
+    global_env = get_env(env_name)
     num_actions = global_env.num_actions()
 
     session = tf.InteractiveSession()
@@ -164,31 +160,16 @@ if __name__ == "__main__":
         momentum=0.0
     )
 
-    '''
-    shared_optimizer = tf.train.RMSPropCustom(
-        learning_rate=learning_rate,
-        decay=hyper_parameters.lr_decay,
-        epsilon=hyper_parameters.rms_epsilon)
-
-    '''
-
     global_network = ActorCriticNN(num_actions=num_actions,
                                    agent_name='GLOBAL',
                                    hyper_parameters=hyper_parameters,
                                    session=session,
                                    optimizer=shared_optimizer)
 
-    local_network = ActorCriticNN(num_actions=num_actions,
-                                  agent_name='LOCAL',
-                                  hyper_parameters=hyper_parameters,
-                                  session=session,
-                                  optimizer=shared_optimizer,
-                                  global_network=global_network)
-
     agents = [A3CAgent(env_name, global_network, 'Agent_%d' % i, session, optimizer=shared_optimizer)
               for i in range(n_threads)]
 
-    writer = writer_new_event(LOGDIRBASE, hyper_parameters, session)
+    writer = writer_new_event(hyper_parameters, session)
     merged = tf.merge_all_summaries()
 
     session.run(tf.initialize_all_variables())
