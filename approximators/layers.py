@@ -1,8 +1,4 @@
-import tensorflow as tf
-from tflearn.layers.recurrent import DropoutWrapper, BasicLSTMCell, _rnn, advanced_indexing_op, retrieve_seq_length_op, _rnn_template
-import tflearn.utils as utils
-import tflearn.initializations as initializations
-import numpy as np
+from tflearn.layers.recurrent import BasicLSTMCell, _rnn_template
 
 
 def lstm(incoming, n_units, activation='tanh', inner_activation='sigmoid',
