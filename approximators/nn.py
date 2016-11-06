@@ -37,7 +37,6 @@ class ActorCriticNN(object):
         self.recurrent = self.model_name in [ModelNames.a3c_lstm]
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
-        #with tf.device('/cpu:0'):
         with tf.name_scope(agent_name):
             self.build_network(num_actions, hyper_parameters.input_shape)
             with tf.name_scope('Loss'):
@@ -100,9 +99,6 @@ class ActorCriticNN(object):
         with tf.name_scope('LSTMStateInput'):
             # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
             # 'h' (256), which are both influencing the layer in the forward/backward pass.
-            # TODO should use tuple here
-            #self.initial_state = tf.placeholder(tf.float32, shape=[1, 2 * 256], name="InitialLSTMState")
-
             self.initial_state_c = tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_c")
             self.initial_state_h = tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_h")
             self.initial_state = LSTMStateTuple(
@@ -112,7 +108,8 @@ class ActorCriticNN(object):
         with tf.name_scope('SequenceMasking'):
             self.n_steps = tf.placeholder(tf.int32, shape=[])
             seq_mask = tf.reshape(sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32),
-                                       [1, 5, 1], name='SequenceMask')
+                                  [1, 5, 1], name='SequenceMask')
+        with tf.name_scope('ForwardInputs'):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
         with tf.name_scope('HiddenLayers'):
             net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1')
@@ -123,10 +120,11 @@ class ActorCriticNN(object):
             net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
             self._add_trainable(net)
             net = tf.mul(tflearn.reshape(net, [1, 5, 256]), seq_mask, name='MaskedSequence')  # tf.expand_dims(net, 1)
-            net, state = lstm(net, 256, initial_state=self.initial_state, return_state=True, name='LSTM4', dynamic=True)
+            net, state = lstm(net, 256, initial_state=self.initial_state, return_state=True,
+                              name='LSTM4', dynamic=True, return_seq=True)
             #logger.info(net._op.__dict__)
             self._add_trainable(net)
-            net = tflearn.reshape(net, [-1, 256])
+            #net = tflearn.reshape(net, [-1, 256])
             self.lstm_state_variable = state
 
         self.reset_lstm_state()
@@ -163,7 +161,10 @@ class ActorCriticNN(object):
     def build_network(self, num_actions, input_shape):
         logger.debug('Input shape: {}'.format(input_shape))
         with tf.name_scope('ForwardInputs'):
-            self.inputs = tf.placeholder(tf.float32, [None] + input_shape)
+            if self.recurrent:
+                self.inputs = tf.placeholder(tf.float32, [5] + input_shape)
+            else:
+                self.inputs = tf.placeholder(tf.float32, [None] + input_shape)
         logger.info('Building network: {}'.format(self.model_name))
 
         self.theta = []
@@ -185,13 +186,10 @@ class ActorCriticNN(object):
                 self.value = tflearn.fully_connected(net, 1, activation='linear', name='v_s')
                 self._add_trainable(self.value)
 
-
-
     def build_param_sync(self):
         with tf.name_scope("ParamSynchronization"):
             self.param_sync = [tf.assign(local_theta, global_theta)
                                for local_theta, global_theta in zip(self.theta, self.global_network.theta)]
-
 
     def build_param_update(self):
         with tf.name_scope("ParamUpdate"):
@@ -247,7 +245,6 @@ class ActorCriticNN(object):
             self.loss = tf.reduce_mean(pi_loss + 0.5 * value_loss)
             self.summaries.append(tf.scalar_summary('{}/Loss'.format(self.agent_name), self.loss))
 
-
     def get_action(self, state):
         """
         This function returns a single array reflecting the stochastic policy pi for the given state.
@@ -256,7 +253,6 @@ class ActorCriticNN(object):
         """
         pi = self.session.run(self.pi, feed_dict={self.inputs: [state]})[0]
         return np.random.choice(self.num_actions, p=pi)
-
 
     def get_value(self, state):
         """
@@ -274,7 +270,6 @@ class ActorCriticNN(object):
                                     })[0][0]
 
         return self.session.run(self.value, feed_dict={self.inputs: [state]})[0][0]
-
 
     def get_value_and_action(self, state):
         """
@@ -302,21 +297,28 @@ class ActorCriticNN(object):
     def update_params(self, n_step_return, actions, states, values, learning_rate_var, lr):
         """
         Updates the parameters of the global network
-        :param n_step_return:   n-step returns
-        :param actions:         array of actions
-        :param states:          array of states
+        :param n_step_return:       n-step returns
+        :param actions:             array of actions
+        :param states:              array of states
+        :param values:              array of values
+        :param learning_rate_var:   learning rate placeholder,
+        :param lr:                  actual learning rate
         """
-        global T
-
         if self.recurrent:
+            # First we need to pad the sequences we got
             n_steps = len(n_step_return)
-            n_step_return, actions, values = pad_sequences([n_step_return, actions, values], maxlen=5)
-            states = np.concatenate([states, np.zeros((5 - n_steps,) + states[0].shape)])
+            n_pad = 5 - n_steps
+            pad1d = np.zeros(n_pad)
+            n_step_return   = np.concatenate([n_step_return, pad1d])
+            actions         = np.concatenate([actions, pad1d])
+            values          = np.concatenate([values, pad1d])
+            states          = np.concatenate([states, np.zeros((5 - n_steps,) + states[0].shape)])
 
+            # Now we update our parameters AND we take the lstm_state
             _, summaries, self.lstm_state_numeric = self.session.run([
                 self.param_update,
                 self.merged_summaries,
-                self.lstm_state_variable
+                self.lstm_state_variable,
             ],
                 feed_dict={
                     self.n_step_returns: n_step_return,
@@ -328,8 +330,10 @@ class ActorCriticNN(object):
                     self.n_steps: n_steps
                 }
             )
+            # We also need to remember the LSTM state for the next backward pass
             self.lstm_first_state_since_update = deepcopy(self.lstm_state_numeric)
         else:
+            # Update the parameters
             _, summaries = self.session.run([
                 self.param_update,
                 self.merged_summaries

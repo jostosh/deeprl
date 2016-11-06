@@ -1,4 +1,24 @@
 from tflearn.layers.recurrent import BasicLSTMCell, _rnn_template
+import tensorflow as tf
+
+
+def spatialsoftmax(incoming, epsilon=0.01):
+    b, m, n, c = incoming.get_shape().as_list()
+
+    cartesian_y = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, m), (1, m, 1, 1), name="CartesianY")
+    cartesian_x = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, n), (1, 1, n, 1), name="CartesianX")
+
+    numerator_softmax = tf.exp(incoming, name='Numerator')
+    denominator_softmax = tf.reshape(tf.reduce_sum(numerator_softmax, reduction_indices=[1, 2]), (b, 1, 1, c),
+                                     name='Denominator')
+
+    softmax_per_channel = tf.div(numerator_softmax, denominator_softmax)
+    x_coordinates = tf.reduce_sum(tf.mul(cartesian_x, softmax_per_channel), reduction_indices=[1, 2], name='xOut')
+    y_coordinates = tf.reduce_sum(tf.mul(cartesian_y, softmax_per_channel), reduction_indices=[1, 2], name='yOut')
+
+    o = tf.concat(1, [x_coordinates, y_coordinates], "Output")
+
+    return o
 
 
 def lstm(incoming, n_units, activation='tanh', inner_activation='sigmoid',
@@ -71,7 +91,12 @@ def lstm(incoming, n_units, activation='tanh', inner_activation='sigmoid',
                       return_seq=return_seq, return_state=return_state,
                       initial_state=initial_state, dynamic=dynamic,
                       scope=scope, name=name)
+
     o, state = x
+    if return_seq:
+        o = tf.concat(0, o, name="StackedSequence")
+
+    #print(o)
     o.scope = scope
     o.W = cell.W
     o.b = cell.b
