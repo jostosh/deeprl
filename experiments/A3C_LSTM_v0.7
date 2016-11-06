@@ -9,7 +9,7 @@
 #SBATCH --output job-%j.log
 #SBATCH --mem=2000
 #SBATCH --partition=gpu
-#SBATCH --gres=gpu:k40:2
+#SBATCH --gres=gpu:k40:1
 
 module load tensorflow/0.10.0-foss-2016a-Python-3.5.1-CUDA-7.5.18
 
