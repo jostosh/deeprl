@@ -5,7 +5,7 @@ import numpy as np
 from deeprl.common.logger import logger
 #from tflearn.layers import lstm
 
-from deeprl.approximators.layers import lstm
+from deeprl.approximators.layers import lstm, spatialsoftmax
 from tensorflow.python.ops.rnn_cell import LSTMStateTuple
 
 from tflearn.data_utils import pad_sequences
@@ -16,10 +16,11 @@ from deeprl.common.tensorflowutils import sequence_mask
 
 
 class ModelNames:
-    a3c_ff = 'a3c_ff'
-    nature = 'nature'
-    small_fcn = 'small_fcn'
-    a3c_lstm = 'a3c_lstm'
+    A3C_FF      = 'a3c_ff'
+    NATURE      = 'nature'
+    SMALL_FCN   = 'small_fcn'
+    A3C_LSTM    = 'a3c_lstm'
+    A3C_FF_SS   = 'a3c_ff_ss'
 
 
 class ActorCriticNN(object):
@@ -34,7 +35,7 @@ class ActorCriticNN(object):
         self.agent_name = agent_name
         self.model_name = hyper_parameters.model
         self.clip_advantage = hyper_parameters.clip_advantage
-        self.recurrent = self.model_name in [ModelNames.a3c_lstm]
+        self.recurrent = self.model_name in [ModelNames.A3C_LSTM]
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
         with tf.name_scope(agent_name):
@@ -85,6 +86,26 @@ class ActorCriticNN(object):
             net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name='Conv2')
             self._add_trainable(net)
             net = tflearn.flatten(net)
+            net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
+            self._add_trainable(net)
+
+        return net
+
+    def _a3c_ff_ss(self):
+        """
+        This is the feedforward model taken from
+        :param network_name:    Name of the network
+        :return:                The feedforward model (last hidden layer) as a graph node
+        """
+        with tf.name_scope('Inputs'):
+            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+
+        with tf.name_scope('HiddenLayers'):
+            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1')
+            self._add_trainable(net)
+            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='linear', name='Conv2')
+            self._add_trainable(net)
+            net = spatialsoftmax(net)
             net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
             self._add_trainable(net)
 
@@ -169,12 +190,14 @@ class ActorCriticNN(object):
 
         self.theta = []
 
-        if self.model_name == ModelNames.nature:
+        if self.model_name == ModelNames.NATURE:
             net = self._nature_model()
-        elif self.model_name == ModelNames.a3c_ff:
+        elif self.model_name == ModelNames.A3C_FF:
             net = self._a3c_ff()
-        elif self.model_name == ModelNames.a3c_lstm:
+        elif self.model_name == ModelNames.A3C_LSTM:
             net = self._a3c_lstm()
+        elif self.model_name == ModelNames.A3C_FF_SS:
+            net = self._a3c_ff_ss()
         else:
             net = self._small_fcn()
 
@@ -239,10 +262,11 @@ class ActorCriticNN(object):
         # We can combine the policy loss and the value loss in a single expression
         with tf.name_scope("CombinedLoss"):
             if self.recurrent:
-                seq_mask = sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32)
-                pi_loss = seq_mask * pi_loss
-                value_loss = seq_mask * value_loss
-            self.loss = tf.reduce_mean(pi_loss + 0.5 * value_loss)
+                with tf.name_scope("SequenceMasking"):
+                    seq_mask = sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32, name='SequenceMaskLoss')
+                    pi_loss = tf.mul(seq_mask, pi_loss, name='MaskedPiLoss')
+                    value_loss = tf.mul(seq_mask, value_loss, name='MaskedValueLoss')
+            self.loss = tf.reduce_mean(pi_loss + 0.5 * value_loss, name='Loss')
             self.summaries.append(tf.scalar_summary('{}/Loss'.format(self.agent_name), self.loss))
 
     def get_action(self, state):
