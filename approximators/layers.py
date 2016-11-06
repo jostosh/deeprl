@@ -3,13 +3,13 @@ import tensorflow as tf
 
 
 def spatialsoftmax(incoming, epsilon=0.01):
-    b, m, n, c = incoming.get_shape().as_list()
+    _, m, n, c = incoming.get_shape().as_list()
 
     cartesian_y = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, m), (1, m, 1, 1), name="CartesianY")
     cartesian_x = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, n), (1, 1, n, 1), name="CartesianX")
 
     numerator_softmax = tf.exp(incoming, name='Numerator')
-    denominator_softmax = tf.reshape(tf.reduce_sum(numerator_softmax, reduction_indices=[1, 2]), (b, 1, 1, c),
+    denominator_softmax = tf.reshape(tf.reduce_sum(numerator_softmax, reduction_indices=[1, 2]), (-1, 1, 1, c),
                                      name='Denominator')
 
     softmax_per_channel = tf.div(numerator_softmax, denominator_softmax)
