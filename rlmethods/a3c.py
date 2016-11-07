@@ -7,7 +7,7 @@ from deeprl.approximators.nn import ActorCriticNN
 from deeprl.common.environments import get_env
 from deeprl.common.hyper_parameters import *
 from deeprl.common.tensorboard import writer_new_event, make_summary_from_python_var
-
+from deeprl.approximators.optimizers import RMSPropCustom
 
 class A3CAgent(object):
 
@@ -153,18 +153,17 @@ if __name__ == "__main__":
     session = tf.Session()
     learning_rate_ph = tf.placeholder(tf.float32)
 
-    shared_optimizer = tf.train.RMSPropOptimizer(
-        learning_rate=learning_rate_ph,
-        decay=hyper_parameters.lr_decay,
-        epsilon=hyper_parameters.rms_epsilon,
-        momentum=0.0
-    )
+    shared_optimizer = RMSPropCustom(session,
+                                     learning_rate_ph,
+                                     decay=hyper_parameters.rms_decay,
+                                     epsilon=hyper_parameters.rms_epsilon)
 
     global_network = ActorCriticNN(num_actions=num_actions,
                                    agent_name='GLOBAL',
                                    hyper_parameters=hyper_parameters,
                                    session=session,
                                    optimizer=shared_optimizer)
+    shared_optimizer.build_update(global_network.theta)
 
     agents = [A3CAgent(env_name, global_network, 'Agent_%d' % i, session, optimizer=shared_optimizer)
               for i in range(n_threads)]
