@@ -3,20 +3,33 @@ import tensorflow as tf
 
 
 def spatialsoftmax(incoming, epsilon=0.01):
-    _, m, n, c = incoming.get_shape().as_list()
+    # Get the incoming dimensions (should be a 4D tensor)
+    _, h, w, c = incoming.get_shape().as_list()
 
-    cartesian_y = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, m), (1, m, 1, 1), name="CartesianY")
-    cartesian_x = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, n), (1, 1, n, 1), name="CartesianX")
+    with tf.name_scope('SpatialSoftmax'):
+        # First we create a linspace from -1 + epsilon to 1 - epsilon. Epsilon is needed to ensure that the output is
+        # actually in the range (-1, 1) and not greater than 1 or smaller than -1.
+        #
+        # Note that each '1' in the reshape is to enforce broadcasting along that dimension
+        cartesian_y = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, h), (1, h, 1, 1), name="CartesianY")
+        cartesian_x = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, w), (1, 1, w, 1), name="CartesianX")
 
-    numerator_softmax = tf.exp(incoming, name='Numerator')
-    denominator_softmax = tf.reshape(tf.reduce_sum(numerator_softmax, reduction_indices=[1, 2]), (-1, 1, 1, c),
-                                     name='Denominator')
+        # Compute the softmax numerator
+        numerator_softmax = tf.exp(incoming, name='Numerator')
+        # The denominator is computed by computing the sum per channel
+        # Again, the '1's in the reshaping are to ensure broadcasting along those dimensions
+        denominator_softmax = tf.reshape(tf.reduce_sum(numerator_softmax, reduction_indices=[1, 2]), (-1, 1, 1, c),
+                                         name='Denominator')
+        # Now we compute the softmax per channel
+        softmax_per_channel = tf.div(numerator_softmax, denominator_softmax, name='SoftmaxPerChannel')
 
-    softmax_per_channel = tf.div(numerator_softmax, denominator_softmax)
-    x_coordinates = tf.reduce_sum(tf.mul(cartesian_x, softmax_per_channel), reduction_indices=[1, 2], name='xOut')
-    y_coordinates = tf.reduce_sum(tf.mul(cartesian_y, softmax_per_channel), reduction_indices=[1, 2], name='yOut')
+        # Compute the x coordinates by element-wise multiplicatoin of the cartesion coordinates with the softmax
+        # activations and summing the result
+        x_coordinates = tf.reduce_sum(tf.mul(cartesian_x, softmax_per_channel), reduction_indices=[1, 2], name='xOut')
+        y_coordinates = tf.reduce_sum(tf.mul(cartesian_y, softmax_per_channel), reduction_indices=[1, 2], name='yOut')
 
-    o = tf.concat(1, [x_coordinates, y_coordinates], "Output")
+        # Concatenate the resulting tensors to get the output
+        o = tf.concat(1, [x_coordinates, y_coordinates], "Output")
 
     return o
 
