@@ -9,6 +9,8 @@ from deeprl.common.hyper_parameters import *
 from deeprl.common.tensorboard import writer_new_event, make_summary_from_python_var
 from deeprl.approximators.optimizers import RMSPropCustom
 
+import multiprocessing
+
 class A3CAgent(object):
 
     def __init__(self, env_name, global_network, agent_name, session, optimizer):
@@ -155,7 +157,9 @@ if __name__ == "__main__":
     global_env = get_env(env_name)
     num_actions = global_env.num_actions()
 
-    session = tf.Session()
+    session = tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
+                                               inter_op_parallelism_threads=hyper_parameters.n_threads,
+                                               intra_op_parallelism_threads=hyper_parameters.n_threads))
     learning_rate_ph = tf.placeholder(tf.float32)
 
     shared_optimizer = RMSPropCustom(session,
