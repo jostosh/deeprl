@@ -2,10 +2,10 @@ import argparse
 from deeprl.approximators.nn import ModelNames
 
 config1 = {
-    'T_max': 10000000,
+    'T_max': 20e6,
     't_max': 5,
     'gamma': 0.99,
-    'learning_rate': 0.00025,
+    'learning_rate': 0.001,
     'lr_decay': 0.95,
     'rms_epsilon': 1e-8,
     'beta': 0.01,
@@ -13,7 +13,7 @@ config1 = {
     'input_shape': '4,84,84',
     'env': 'Breakout-v0',
     'method': 'rlmethods',
-    'model': ModelNames.a3c_ff,
+    'model': ModelNames.A3C_FF,
     'n_threads': 8,
     'action_repeat': 4,
     'clip_rewards': False,
