@@ -12,7 +12,6 @@ from copy import deepcopy
 
 from deeprl.common.tensorflowutils import sequence_mask
 
-
 class ModelNames:
     A3C_FF      = 'a3c_ff'
     NATURE      = 'nature'
@@ -48,13 +47,31 @@ class ActorCriticNN(object):
 
         self.merged_summaries = tf.merge_summary(self.summaries)
 
+    def _nips_hidden_layers(self):
+        with tf.name_scope('ForwardInputs'):
+            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+
+        with tf.name_scope('HiddenLayers'):
+            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1', weight_decay=0.0,
+                                  bias_init=tf.constant_initializer(0.1))
+            self._add_trainable(net)
+            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name='Conv2', weight_decay=0.0,
+                                  bias_init=tf.constant_initializer(0.1))
+            self._add_trainable(net)
+            net = tflearn.flatten(net)
+            net = tflearn.fully_connected(net, 256, activation='relu', name='FC3', weight_decay=0.0,
+                                          bias_init=tf.constant_initializer(0.1))
+            self._add_trainable(net)
+
+        return net
+
     def _nature_model(self):
         """
         This is the more complicated model as taken from the nature paper in 2015.
         :param network_name:   Name of the network
         :return:               The feedforward model (last hidden layer as a graph node)
         """
-        with tf.name_scope('Inputs'):
+        with tf.name_scope('ForwardInputs'):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers'):
@@ -76,19 +93,7 @@ class ActorCriticNN(object):
         :param network_name:    Name of the network
         :return:                The feedforward model (last hidden layer) as a graph node
         """
-        with tf.name_scope('Inputs'):
-            net = tf.transpose(self.inputs, [0, 2, 3, 1])
-
-        with tf.name_scope('HiddenLayers'):
-            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1')
-            self._add_trainable(net)
-            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name='Conv2')
-            self._add_trainable(net)
-            net = tflearn.flatten(net)
-            net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
-            self._add_trainable(net)
-
-        return net
+        return self._nips_hidden_layers()
 
     def _a3c_ff_ss(self):
         """
@@ -129,25 +134,14 @@ class ActorCriticNN(object):
             self.n_steps = tf.placeholder(tf.int32, shape=[])
             seq_mask = tf.reshape(sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32),
                                   [1, 5, 1], name='SequenceMask')
-        with tf.name_scope('ForwardInputs'):
-            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+
+        net = self._nips_hidden_layers()
+
         with tf.name_scope('HiddenLayers'):
-            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1',
-                                  weight_decay=0.0, bias_init=0.1)
-            self._add_trainable(net)
-            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name='Conv2',
-                                  weight_decay=0.0, bias_init=0.1)
-            self._add_trainable(net)
-            net = tflearn.flatten(net)
-            net = tflearn.fully_connected(net, 256, activation='relu', name='FC3',
-                                          weight_decay=0.0, bias_init=0.1)
-            self._add_trainable(net)
             net = tf.mul(tflearn.reshape(net, [1, 5, 256]), seq_mask, name='MaskedSequence')  # tf.expand_dims(net, 1)
             net, state = lstm(net, 256, initial_state=self.initial_state, return_state=True,
                               name='LSTM4', dynamic=True, return_seq=True)
-            #logger.info(net._op.__dict__)
             self._add_trainable(net)
-            #net = tflearn.reshape(net, [-1, 256])
             self.lstm_state_variable = state
 
         self.reset_lstm_state()
@@ -260,11 +254,6 @@ class ActorCriticNN(object):
 
     def build_param_update(self):
         with tf.name_scope("ParamUpdate"):
-            '''
-            gradients = [tf.clip_by_norm(grad, 40.0)
-                         for grad, _ in self.optimizer.compute_gradients(self.loss, var_list=self.theta)]
-            self.param_update = self.optimizer.apply_gradients(zip(gradients, self.global_network.theta))
-            '''
             self.local_gradients = [tf.clip_by_norm(grad, 20.0) for grad in tf.gradients(self.loss, self.theta)]
 
 
@@ -391,7 +380,7 @@ class ActorCriticNN(object):
             gradients, summaries, self.lstm_state_numeric = self.session.run([
                 self.local_gradients,
                 self.merged_summaries,
-                self.lstm_state_variable,
+                self.lstm_state_variable
             ],
                 feed_dict={
                     self.n_step_returns: n_step_return,
