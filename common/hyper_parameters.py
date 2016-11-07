@@ -2,12 +2,12 @@ import argparse
 from deeprl.approximators.nn import ModelNames
 
 config1 = {
-    'T_max': 20e6,
+    'T_max': 80e6,
     't_max': 5,
     'gamma': 0.99,
-    'learning_rate': 0.001,
-    'lr_decay': 0.95,
-    'rms_epsilon': 1e-8,
+    'learning_rate': 0.0007,
+    'rms_decay': 0.99,
+    'rms_epsilon': 1e-1,
     'beta': 0.01,
     'frames_per_state': 4,
     'input_shape': '4,84,84',
@@ -55,7 +55,7 @@ class HyperParameters(object):
         self.t_max = params.t_max
         self.gamma = params.gamma
         self.learning_rate = params.learning_rate
-        self.lr_decay = params.lr_decay
+        self.rms_decay = params.rms_decay
         self.rms_epsilon = params.rms_epsilon
         self.beta = params.beta
         self.frames_per_state = params.frames_per_state
