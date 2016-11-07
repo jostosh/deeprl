@@ -8,8 +8,6 @@ from deeprl.common.logger import logger
 from deeprl.approximators.layers import lstm, spatialsoftmax
 from tensorflow.python.ops.rnn_cell import LSTMStateTuple
 
-from tflearn.data_utils import pad_sequences
-
 from copy import deepcopy
 
 from deeprl.common.tensorflowutils import sequence_mask
@@ -259,9 +257,12 @@ class ActorCriticNN(object):
 
     def build_param_update(self):
         with tf.name_scope("ParamUpdate"):
+            '''
             gradients = [tf.clip_by_norm(grad, 40.0)
                          for grad, _ in self.optimizer.compute_gradients(self.loss, var_list=self.theta)]
             self.param_update = self.optimizer.apply_gradients(zip(gradients, self.global_network.theta))
+            '''
+            self.local_gradients = [tf.clip_by_norm(grad, 20.0) for grad in tf.gradients(self.loss, self.theta)]
 
 
     def build_loss(self):
@@ -311,6 +312,8 @@ class ActorCriticNN(object):
                     value_loss = tf.mul(seq_mask, value_loss, name='MaskedValueLoss')
             self.loss = tf.reduce_mean(pi_loss + 0.5 * value_loss, name='Loss')
             self.summaries.append(tf.scalar_summary('{}/Loss'.format(self.agent_name), self.loss))
+            self.summaries.append(tf.scalar_summary('{}/MaxAbsValue'.format(self.agent_name),
+                                                    tf.reduce_max(tf.abs(self.value))))
 
     def get_action(self, state):
         """
@@ -382,8 +385,8 @@ class ActorCriticNN(object):
             states          = np.concatenate([states, np.zeros((5 - n_steps,) + states[0].shape)])
 
             # Now we update our parameters AND we take the lstm_state
-            _, summaries, self.lstm_state_numeric = self.session.run([
-                self.param_update,
+            gradients, summaries, self.lstm_state_numeric = self.session.run([
+                self.local_gradients,
                 self.merged_summaries,
                 self.lstm_state_variable,
             ],
@@ -392,25 +395,34 @@ class ActorCriticNN(object):
                     self.actions: actions,
                     self.inputs: states,
                     self.advantage_no_grad: n_step_return - values,
-                    learning_rate_var: lr,
                     self.initial_state: self.lstm_first_state_since_update,
                     self.n_steps: n_steps
                 }
             )
+
+            #logger.info("Average gradient: {}".format(np.mean(gradients[0])))
+            fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
+            fdict[self.optimizer.learning_rate] = lr
+            self.session.run(self.optimizer.minimize, feed_dict=fdict)
             # We also need to remember the LSTM state for the next backward pass
             self.lstm_first_state_since_update = deepcopy(self.lstm_state_numeric)
         else:
             # Update the parameters
-            _, summaries = self.session.run([
-                self.param_update,
+            gradients, summaries = self.session.run([
+                self.local_gradients,
                 self.merged_summaries
             ],
                 feed_dict={self.n_step_returns: n_step_return,
                            self.actions: actions,
                            self.inputs: states,
-                           self.advantage_no_grad: n_step_return - values,
-                           learning_rate_var: lr}
+                           self.advantage_no_grad: n_step_return - values}
             )
+
+            fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
+            fdict[self.optimizer.learning_rate] = lr
+            self.session.run(self.optimizer.minimize, feed_dict=fdict)
+
+
 
         return summaries
         #writer.add_summary(summaries, t)
