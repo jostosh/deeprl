@@ -252,7 +252,7 @@ class ActorCriticNN(object):
 
     def build_param_sync(self):
         with tf.name_scope("ParamSynchronization"):
-            self.param_sync = [tf.assign(local_theta, global_theta)
+            self.param_sync = [tf.assign(local_theta, global_theta, use_locking=False)
                                for local_theta, global_theta in zip(self.theta, self.global_network.theta)]
 
     def build_param_update(self):

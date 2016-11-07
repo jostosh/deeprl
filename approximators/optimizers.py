@@ -19,10 +19,11 @@ class RMSPropCustom(object):
 
         with tf.name_scope("MovingAverageGradient"):
             self.g_moving_average = [tf.Variable(tf.zeros(shape=var.get_shape().as_list(), dtype=tf.float32)) for var in theta]
-            self.g_update = [tf.assign(g, self.decay * g + (1 - self.decay) * tf.square(d_t))
+            self.g_update = [tf.assign(g, self.decay * g + (1 - self.decay) * tf.square(d_t), use_locking=False)
                              for g, d_t in zip(self.g_moving_average, self.gradients)]
         with tf.name_scope("RMSPropMinimize"):
-            self.minimize = [tf.assign_add(t, -self.learning_rate * tf.div(grad, tf.sqrt(g_mov_avg + self.epsilon))) for
+            self.minimize = [tf.assign_add(t, -self.learning_rate * tf.div(grad, tf.sqrt(g_mov_avg + self.epsilon)),
+                                           use_locking=False) for
                              t, grad, g_mov_avg in zip(theta, self.gradients, self.g_moving_average)]
 
 
