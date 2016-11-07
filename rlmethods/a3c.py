@@ -84,6 +84,7 @@ class A3CAgent(object):
 
             # Now take steps following the thread-specific policy given by self.theta and self.theta_v
             while not terminal_state and self.t - t_start != hyper_parameters.t_max:
+
                 # Index of current step
                 i = self.t - t_start
                 # Set the current observation
@@ -93,6 +94,7 @@ class A3CAgent(object):
                 values[i], actions[i] = self.local_network.get_value_and_action(self.last_state)
                 # Perform step in environment and obtain rewards and observations
                 self.last_state, rewards[i], terminal_state, info = self.env.step(actions[i])
+                #logger.info("t: {}, v: {}, r: {}".format(self.t, values[i], rewards[i]))
                 # Increment time counters
                 self.t += 1
                 T += 1
@@ -102,6 +104,8 @@ class A3CAgent(object):
 
                 #if self.agent_name == 'Agent_0':
                 #    self.env.env.render()
+
+
 
             if hyper_parameters.clip_rewards:
                 # Reward clipping helps to stabilize training
@@ -139,6 +143,7 @@ class A3CAgent(object):
 
 
 if __name__ == "__main__":
+
     hyper_parameters = HyperParameters(parse_cmd_args())
     T = 1
     lr_step = hyper_parameters.learning_rate / hyper_parameters.T_max
@@ -174,6 +179,7 @@ if __name__ == "__main__":
     session.run(tf.initialize_all_variables())
     for agent in agents:
         agent.train()
+
 
 
 
