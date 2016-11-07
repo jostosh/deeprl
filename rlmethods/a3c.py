@@ -8,8 +8,7 @@ from deeprl.common.environments import get_env
 from deeprl.common.hyper_parameters import *
 from deeprl.common.tensorboard import writer_new_event, make_summary_from_python_var
 from deeprl.approximators.optimizers import RMSPropCustom
-
-import multiprocessing
+import time
 
 class A3CAgent(object):
 
@@ -104,8 +103,6 @@ class A3CAgent(object):
 
                 epr += rewards[i]
 
-                #if self.agent_name == 'Agent_0':
-                #    self.env.env.render()
 
 
 
@@ -184,6 +181,11 @@ if __name__ == "__main__":
     for agent in agents:
         agent.train()
 
+    if hyper_parameters.render:
+        while T < hyper_parameters.T_max:
+            for a in agents:
+                a.env.env.render()
+                time.sleep(0.01)
 
 
 

@@ -17,7 +17,8 @@ config1 = {
     'n_threads': 8,
     'action_repeat': 4,
     'clip_rewards': False,
-    'clip_advantage': False
+    'clip_advantage': False,
+    'render': False
 }
 
 
@@ -67,4 +68,5 @@ class HyperParameters(object):
         self.action_repeat = params.action_repeat
         self.clip_rewards = params.clip_rewards
         self.clip_advantage = params.clip_advantage
+        self.render = params.render
 
