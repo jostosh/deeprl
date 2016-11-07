@@ -1,13 +1,17 @@
 import argparse
 from deeprl.approximators.nn import ModelNames
 
+"""
+For some important parameter settings checkout:
+https://github.com/muupan/async-rl/wiki
+"""
 config1 = {
     'T_max': 80e6,
     't_max': 5,
     'gamma': 0.99,
-    'learning_rate': 0.0007,
+    'learning_rate': 7e-4,
     'rms_decay': 0.99,
-    'rms_epsilon': 1e-1,
+    'rms_epsilon': 0.1,
     'beta': 0.01,
     'frames_per_state': 4,
     'input_shape': '4,84,84',
