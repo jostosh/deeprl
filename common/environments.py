@@ -4,7 +4,7 @@ import numpy as np
 
 
 def get_env(env, frames_per_state=4):
-    if env in ['Breakout-v0']:
+    if env in ['Breakout-v0', 'Pong-v0']:
         return AtariEnvironment(env, frames_per_state)
     return ClassicControl(env)
 
