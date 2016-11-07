@@ -21,6 +21,7 @@ class ModelNames:
     SMALL_FCN   = 'small_fcn'
     A3C_LSTM    = 'a3c_lstm'
     A3C_FF_SS   = 'a3c_ff_ss'
+    A3C_LSTM_SS = 'a3c_lstm_ss'
 
 
 class ActorCriticNN(object):
@@ -138,6 +139,48 @@ class ActorCriticNN(object):
             net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name='Conv2')
             self._add_trainable(net)
             net = tflearn.flatten(net)
+            net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
+            self._add_trainable(net)
+            net = tf.mul(tflearn.reshape(net, [1, 5, 256]), seq_mask, name='MaskedSequence')  # tf.expand_dims(net, 1)
+            net, state = lstm(net, 256, initial_state=self.initial_state, return_state=True,
+                              name='LSTM4', dynamic=True, return_seq=True)
+            #logger.info(net._op.__dict__)
+            self._add_trainable(net)
+            #net = tflearn.reshape(net, [-1, 256])
+            self.lstm_state_variable = state
+
+        self.reset_lstm_state()
+        return net
+
+
+    def _a3c_lstm_ss(self):
+        """
+        This is the feedforward model taken from "Asynchronous Methods for Reinforcement Learning"
+        :param network_name:    Name of the network
+        :return:                The feedforward model (last hidden layer) as a graph node
+        """
+        with tf.name_scope('LSTMStateInput'):
+            # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
+            # 'h' (256), which are both influencing the layer in the forward/backward pass.
+            self.initial_state_c = tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_c")
+            self.initial_state_h = tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_h")
+            self.initial_state = LSTMStateTuple(
+                self.initial_state_c,
+                self.initial_state_h
+            )
+        with tf.name_scope('SequenceMasking'):
+            self.n_steps = tf.placeholder(tf.int32, shape=[])
+            seq_mask = tf.reshape(sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32),
+                                  [1, 5, 1], name='SequenceMask')
+        with tf.name_scope('ForwardInputs'):
+            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+        with tf.name_scope('HiddenLayers'):
+            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1')
+            self._add_trainable(net)
+            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='linear', name='Conv2')
+            self._add_trainable(net)
+            #net = tflearn.flatten(net)
+            net = spatialsoftmax(net)
             net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
             self._add_trainable(net)
             net = tf.mul(tflearn.reshape(net, [1, 5, 256]), seq_mask, name='MaskedSequence')  # tf.expand_dims(net, 1)
