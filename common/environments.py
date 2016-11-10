@@ -59,20 +59,29 @@ class AtariEnvironment(object):
         step_reward = 0
         step_terminal = False
 
-        for _ in range(self.action_repeat):
-            observation, reward, terminal, info = self.env.step(action)
-            preprocessed_observation = self._preprocess_observation(observation)
+        for i in range(self.action_repeat):
+            if not step_terminal:
+                # Only if we are not already at a terminal state we actually perform an action and preprocess the
+                # observation, as well as a check whether the current state is terminal
+                observation, reward, terminal, info = self.env.step(action)
+                step_reward += reward
+                preprocessed_observation = self._preprocess_observation(observation)
 
-            step_reward += reward
-            if terminal:
-                step_terminal = True
+                if terminal:
+                    step_terminal = True
+                self.last_observation = observation
 
+            # preprocessed_observation must be set and should be added to the buffer whether it is terminal or not
+            self.state.append(preprocessed_observation)
+
+            '''
             if len(self.state) != self.frames_per_state:
                 self.state.append(preprocessed_observation)
             else:
                 self.state = self.state[1:] + [preprocessed_observation]
-
-            self.last_observation = observation
+            '''
+            #
+        self.state = self.state[-self.frames_per_state:]
 
         return self.state, step_reward, step_terminal, info
 
