@@ -134,8 +134,7 @@ class A3CAgent(object):
             if terminal_state:
                 logger.info('Terminal state reached (episode {}, reward {}): resetting state'.format(self.n_episodes, epr))
 
-                writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr),
-                                   self.t / 1e-6)
+                writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr), T)
                 self.n_episodes += 1
                 self.last_state = self.env.reset()
                 epr = 0
