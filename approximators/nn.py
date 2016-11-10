@@ -47,11 +47,11 @@ class ActorCriticNN(object):
 
         self.merged_summaries = tf.merge_summary(self.summaries)
 
-    def _nips_hidden_layers(self):
+    def _nips_hidden_layers(self, return_scope=False):
         with tf.name_scope('ForwardInputs'):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
-        with tf.name_scope('HiddenLayers'):
+        with tf.name_scope('HiddenLayers') as scope:
             net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1', weight_decay=0.0,
                                   bias_init=tf.constant_initializer(0.1))
             self._add_trainable(net)
@@ -63,7 +63,7 @@ class ActorCriticNN(object):
                                           bias_init=tf.constant_initializer(0.1))
             self._add_trainable(net)
 
-        return net
+        return net if not return_scope else net, scope
 
     def _nature_model(self):
         """
@@ -135,12 +135,12 @@ class ActorCriticNN(object):
             seq_mask = tf.reshape(sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32),
                                   [1, 5, 1], name='SequenceMask')
 
-        net = self._nips_hidden_layers()
+        net, scope = self._nips_hidden_layers(return_scope=True)
 
-        with tf.name_scope('HiddenLayers'):
+        with tf.name_scope(scope) as scope:
             net = tf.mul(tflearn.reshape(net, [1, 5, 256]), seq_mask, name='MaskedSequence')  # tf.expand_dims(net, 1)
             net, state = lstm(net, 256, initial_state=self.initial_state, return_state=True,
-                              name='LSTM4', dynamic=True, return_seq=True)
+                              name='LSTM4_{}'.format(self.agent_name), dynamic=True, return_seq=True)
             self._add_trainable(net)
             self.lstm_state_variable = state
 
@@ -246,6 +246,7 @@ class ActorCriticNN(object):
             with tf.name_scope("Value"):
                 self.value = tflearn.fully_connected(net, 1, activation='linear', name='v_s')
                 self._add_trainable(self.value)
+
 
     def build_param_sync(self):
         with tf.name_scope("ParamSynchronization"):
