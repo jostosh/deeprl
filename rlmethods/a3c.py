@@ -10,6 +10,7 @@ from deeprl.common.tensorboard import writer_new_event, make_summary_from_python
 from deeprl.approximators.optimizers import RMSPropCustom
 import time
 
+
 class A3CAgent(object):
 
     def __init__(self, env_name, global_network, agent_name, session, optimizer):
@@ -20,7 +21,9 @@ class A3CAgent(object):
         :param agent_name:      Name of this agent
         :param session:         TensorFlow session
         """
-        self.env = get_env(env_name)
+        self.env = get_env(env_name,
+                           frames_per_state=hyper_parameters.frames_per_state,
+                           output_shape=hyper_parameters.input_shape[1:])
         self.num_actions = self.env.num_actions()
 
         self.local_network = ActorCriticNN(num_actions=self.num_actions,
@@ -95,16 +98,12 @@ class A3CAgent(object):
                 values[i], actions[i] = self.local_network.get_value_and_action(self.last_state)
                 # Perform step in environment and obtain rewards and observations
                 self.last_state, rewards[i], terminal_state, info = self.env.step(actions[i])
-                #logger.info("t: {}, v: {}, r: {}".format(self.t, values[i], rewards[i]))
                 # Increment time counters
                 self.t += 1
                 T += 1
                 current_lr -= lr_step
 
                 epr += rewards[i]
-
-
-
 
             if hyper_parameters.clip_rewards:
                 # Reward clipping helps to stabilize training
@@ -120,7 +119,6 @@ class A3CAgent(object):
                 # Straightforward accumulation of rewards
                 n_step_target = rewards[i] + hyper_parameters.gamma * n_step_target
                 n_step_targets[i] = n_step_target
-
 
             # Now update the global approximator's parameters
             summaries = self.local_network.update_params(n_step_targets[:batch_len],
