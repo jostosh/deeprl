@@ -3,9 +3,9 @@ import gym
 import numpy as np
 
 
-def get_env(env, frames_per_state=4):
+def get_env(env, frames_per_state=4, output_shape=None):
     if env in ['Breakout-v0', 'Pong-v0']:
-        return AtariEnvironment(env, frames_per_state)
+        return AtariEnvironment(env, frames_per_state, output_shape=output_shape)
     return ClassicControl(env)
 
 
@@ -31,12 +31,15 @@ class ClassicControl(object):
 
 class AtariEnvironment(object):
 
-    def __init__(self, env_name, frames_per_state=4, action_repeat=4):
+    def __init__(self, env_name, frames_per_state=4, action_repeat=4, output_shape=(84, 84)):
         self.env = gym.make(env_name)
         self.last_observation = self.env.reset()
         self.frames_per_state = frames_per_state
         self.state = []
         self.action_repeat = action_repeat
+
+        self.output_shape = output_shape
+        self.env.frame_skip = 1
 
         assert action_repeat > 0
 
@@ -53,13 +56,13 @@ class AtariEnvironment(object):
         # Remove Atari artifacts
         preprocessed_observation = np.maximum(self.last_observation, observation)
         # Convert to gray scale and resize
-        return imresize(rgb2gray(preprocessed_observation), (84, 84))
+        return imresize(rgb2gray(preprocessed_observation), self.output_shape) #(84, 84))
 
     def step(self, action):
         step_reward = 0
         step_terminal = False
 
-        for i in range(self.action_repeat):
+        for _ in range(self.action_repeat):
             if not step_terminal:
                 # Only if we are not already at a terminal state we actually perform an action and preprocess the
                 # observation, as well as a check whether the current state is terminal
@@ -74,13 +77,6 @@ class AtariEnvironment(object):
             # preprocessed_observation must be set and should be added to the buffer whether it is terminal or not
             self.state.append(preprocessed_observation)
 
-            '''
-            if len(self.state) != self.frames_per_state:
-                self.state.append(preprocessed_observation)
-            else:
-                self.state = self.state[1:] + [preprocessed_observation]
-            '''
-            #
         self.state = self.state[-self.frames_per_state:]
 
         return self.state, step_reward, step_terminal, info
@@ -88,15 +84,14 @@ class AtariEnvironment(object):
     def reset(self):
         self.state = []
         self.last_observation = self.env.reset()
-        for _ in range(0, self.frames_per_state):
-            self.step(0)
+        self.step(0)
 
         assert len(self.state) == self.frames_per_state, 'State length: {}'.format(len(self.state))
 
         return self.state
 
     def state_shape(self):
-        return (self.frames_per_state, 84, 84)
+        return tuple([self.frames_per_state] + self.output_shape)
 
     def num_actions(self):
         return self.env.action_space.n
