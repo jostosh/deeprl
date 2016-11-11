@@ -5,7 +5,7 @@ import numpy as np
 from deeprl.common.logger import logger
 #from tflearn.layers import lstm
 
-from deeprl.approximators.layers import lstm, spatialsoftmax
+from deeprl.approximators.layers import lstm, spatialsoftmax, custom_lstm
 from tensorflow.python.ops.rnn_cell import LSTMStateTuple
 
 from copy import deepcopy
@@ -63,7 +63,7 @@ class ActorCriticNN(object):
                                           bias_init=tf.constant_initializer(0.1))
             self._add_trainable(net)
 
-        return net if not return_scope else net, scope
+        return net, scope
 
     def _nature_model(self):
         """
@@ -93,7 +93,7 @@ class ActorCriticNN(object):
         :param network_name:    Name of the network
         :return:                The feedforward model (last hidden layer) as a graph node
         """
-        return self._nips_hidden_layers()
+        return self._nips_hidden_layers()[0]
 
     def _a3c_ff_ss(self):
         """
@@ -131,18 +131,25 @@ class ActorCriticNN(object):
                 self.initial_state_h
             )
         with tf.name_scope('SequenceMasking'):
-            self.n_steps = tf.placeholder(tf.int32, shape=[])
-            seq_mask = tf.reshape(sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32),
+            self.n_steps = tf.placeholder(tf.int32, shape=[1])
+            seq_mask = tf.reshape(sequence_mask(self.n_steps, maxlen=5, dtype=tf.float32),
                                   [1, 5, 1], name='SequenceMask')
 
         net, scope = self._nips_hidden_layers(return_scope=True)
 
         with tf.name_scope(scope) as scope:
             net = tf.mul(tflearn.reshape(net, [1, 5, 256]), seq_mask, name='MaskedSequence')  # tf.expand_dims(net, 1)
-            net, state = lstm(net, 256, initial_state=self.initial_state, return_state=True,
-                              name='LSTM4_{}'.format(self.agent_name), dynamic=True, return_seq=True)
+            net, state = custom_lstm(net, 256, initial_state=self.initial_state, name='LSTM4_{}'.format(self.agent_name),
+                                     sequence_length=self.n_steps)
+            #lstm(net, 256, initial_state=self.initial_state, return_state=True,
+                         #     name='LSTM4_{}'.format(self.agent_name), dynamic=True, return_seq=True)
+            #logger.info("LSTM output tensor: {}".format(net))
             self._add_trainable(net)
+            net = tflearn.reshape(net, [5, 256], name="ReshapedLSTMOutput")
             self.lstm_state_variable = state
+
+
+            #logger.info(tflearn.get_layer_variables_by_name('LSTM4_{}'.format(self.agent_name)))
 
         self.reset_lstm_state()
         return net
@@ -201,10 +208,14 @@ class ActorCriticNN(object):
 
     def reset(self):
         if self.recurrent:
+            logger.debug("Resetting LSTM state")
             self.reset_lstm_state()
 
-    def _add_trainable(self, layer):
-        self.theta += [layer.W, layer.b]
+    def _add_trainable(self, layer, name=None):
+        if name:
+            self.theta += tflearn.get_layer_variables_by_name(name)
+        else:
+            self.theta += [layer.W, layer.b]
 
     def _small_fcn(self):
         """
@@ -238,6 +249,8 @@ class ActorCriticNN(object):
             net = self._a3c_ff_ss()
         else:
             net = self._small_fcn()
+
+        logger.info(net)
 
         with tf.name_scope("Outputs"):
             with tf.name_scope("Policy"):
@@ -300,7 +313,7 @@ class ActorCriticNN(object):
         with tf.name_scope("CombinedLoss"):
             if self.recurrent:
                 with tf.name_scope("SequenceMasking"):
-                    seq_mask = sequence_mask([self.n_steps], maxlen=5, dtype=tf.float32, name='SequenceMaskLoss')
+                    seq_mask = sequence_mask(self.n_steps, maxlen=5, dtype=tf.float32, name='SequenceMaskLoss')
                     pi_loss = tf.mul(seq_mask, pi_loss, name='MaskedPiLoss')
                     value_loss = tf.mul(seq_mask, value_loss, name='MaskedValueLoss')
             self.loss = tf.reduce_mean(pi_loss + 0.5 * value_loss, name='Loss')
@@ -329,7 +342,7 @@ class ActorCriticNN(object):
                                     feed_dict={
                                         self.inputs: [state] + 4 * [np.zeros_like(state)],
                                         self.initial_state: self.lstm_state_numeric,
-                                        self.n_steps: 1
+                                        self.n_steps: [1]
                                     })[0][0]
 
         return self.session.run(self.value, feed_dict={self.inputs: [state]})[0][0]
@@ -346,7 +359,7 @@ class ActorCriticNN(object):
                 feed_dict={
                     self.inputs: [state] + 4 * [np.zeros_like(state)],
                     self.initial_state: self.lstm_state_numeric,
-                    self.n_steps: 1
+                    self.n_steps: [1]
                 }
             )
         else:
@@ -389,7 +402,7 @@ class ActorCriticNN(object):
                     self.inputs: states,
                     self.advantage_no_grad: n_step_return - values,
                     self.initial_state: self.lstm_first_state_since_update,
-                    self.n_steps: n_steps
+                    self.n_steps: [n_steps]
                 }
             )
 
