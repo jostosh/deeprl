@@ -183,7 +183,7 @@ if __name__ == "__main__":
         while T < hyper_parameters.T_max:
             for a in agents:
                 a.env.env.render()
-                time.sleep(0.01)
+                time.sleep(0.02 / hyper_parameters.n_threads)
 
 
 
