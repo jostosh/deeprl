@@ -173,8 +173,7 @@ if __name__ == "__main__":
               for i in range(n_threads)]
 
     writer = writer_new_event(hyper_parameters, session)
-    merged = tf.merge_all_summaries()
-
+    
     session.run(tf.initialize_all_variables())
     for agent in agents:
         agent.train()
