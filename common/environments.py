@@ -39,7 +39,7 @@ class AtariEnvironment(object):
         self.action_repeat = action_repeat
 
         self.output_shape = output_shape
-        self.env.frame_skip = 1
+        self.env.frameskip = 1
 
         assert action_repeat > 0
 
