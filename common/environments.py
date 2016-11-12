@@ -56,7 +56,7 @@ class AtariEnvironment(object):
         # Remove Atari artifacts
         preprocessed_observation = np.maximum(self.last_observation, observation)
         # Convert to gray scale and resize
-        return imresize(rgb2gray(preprocessed_observation), self.output_shape) #(84, 84))
+        return imresize(rgb2gray(preprocessed_observation), self.output_shape) / 255. #(84, 84))
 
     def step(self, action):
         step_reward = 0
