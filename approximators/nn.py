@@ -35,6 +35,7 @@ class ActorCriticNN(object):
         self.clip_advantage = hyper_parameters.clip_advantage
         self.recurrent = self.model_name in [ModelNames.A3C_LSTM]
         self.t_max = hyper_parameters.t_max
+        self.input_shape = hyper_parameters.input_shape
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
         with tf.name_scope(agent_name):
@@ -103,7 +104,13 @@ class ActorCriticNN(object):
         :return:                The feedforward model (last hidden layer) as a graph node
         """
         with tf.name_scope('Inputs'):
-            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+            net = self.inputs #tf.transpose(self.inputs, [0, 2, 3, 1])
+            net = tflearn.reshape(net, (-1, self.input_shape[-2], self.input_shape[-1], 1))
+            #logger.info(net)
+            net = tflearn.conv_2d(net, 1, 3, strides=2, activation='linear', name='Downsampling')
+            #logger.info(net)
+            net = tflearn.reshape(net, (-1, self.input_shape[0], 105, 80))
+            net = tf.transpose(net, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers'):
             net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1')
@@ -154,7 +161,6 @@ class ActorCriticNN(object):
 
         self.reset_lstm_state()
         return net
-
 
     def _a3c_lstm_ss(self):
         """
