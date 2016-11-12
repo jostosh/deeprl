@@ -129,7 +129,7 @@ class ActorCriticNN(object):
         :param network_name:    Name of the network
         :return:                The feedforward model (last hidden layer) as a graph node
         """
-        with tf.name_scope('LSTMStateInput'):
+        with tf.name_scope('LSTMInput'):
             # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
             # 'h' (256), which are both influencing the layer in the forward/backward pass.
             self.initial_state_c = tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_c")
@@ -138,23 +138,18 @@ class ActorCriticNN(object):
                 self.initial_state_c,
                 self.initial_state_h
             )
-        with tf.name_scope('SequenceMasking'):
             self.n_steps = tf.placeholder(tf.int32, shape=[1])
-            seq_mask = tf.reshape(sequence_mask(self.n_steps, maxlen=self.t_max, dtype=tf.float32),
-                                  [1, self.t_max, 1], name='SequenceMask')
 
         net, scope = self._nips_hidden_layers(return_scope=True)
 
         with tf.name_scope(scope) as scope:
-            net = tf.mul(tflearn.reshape(net, [1, self.t_max, 256]), seq_mask, name='MaskedSequence')  # tf.expand_dims(net, 1)
+            net = tflearn.reshape(net, [1, self.t_max, 256], "ReshapedLSTMInput")
             net, state = custom_lstm(net, 256, initial_state=self.initial_state, name='LSTM4_{}'.format(self.agent_name),
                                      sequence_length=self.n_steps)
-            #lstm(net, 256, initial_state=self.initial_state, return_state=True,
-                         #     name='LSTM4_{}'.format(self.agent_name), dynamic=True, return_seq=True)
-            logger.info("LSTM state tensor: {}".format(state))
             self._add_trainable(net)
             net = tflearn.reshape(net, [self.t_max, 256], name="ReshapedLSTMOutput")
             self.lstm_state_variable = state
+
 
 
             #logger.info(tflearn.get_layer_variables_by_name('LSTM4_{}'.format(self.agent_name)))
@@ -285,11 +280,11 @@ class ActorCriticNN(object):
 
         with tf.name_scope('BackwardInputs'):
             # The n_step_return is an array of length n (where n is the batch size)
-            self.n_step_returns = tf.placeholder(tf.float32, [None], name='NStepReturns')
+            self.n_step_returns = tf.placeholder(tf.float32, [None, 1], name='NStepReturns')
             # The actions attribute is an array of length n
             self.actions = tf.placeholder(tf.int32, [None], name='Actions')
             # The advantage function requires a
-            self.advantage_no_grad = tf.placeholder(tf.float32, [None], name='TDErrors')
+            self.advantage_no_grad = tf.placeholder(tf.float32, [None, 1], name='TDErrors')
 
         # The advantage is simply the estimated value minus the bootstrapped returns
         advantage = self.n_step_returns - self.value
@@ -307,11 +302,13 @@ class ActorCriticNN(object):
             # self.pi and log_pi are n x a matrices
             log_pi = tf.log(tf.clip_by_value(self.pi, 1e-20, 1.0), name="LogPi")
             # The entropy is added to encourage exploration
-            entropy = -tf.reduce_sum(log_pi * self.pi, reduction_indices=1, name="Entropy")
+            entropy = -tf.reshape(tf.reduce_sum(log_pi * self.pi, reduction_indices=1), (-1, 1), name="Entropy")
 
             # Define the loss for the policy (minus is needed to perform *negative* gradient descent == gradient ascent)
-            pi_loss = tf.neg(tf.reduce_sum(action_mask * log_pi, reduction_indices=1) * self.advantage_no_grad
-                             + self.beta * entropy, name='PiLoss')
+            pi_loss = tf.neg(
+                tflearn.reshape(tf.reduce_sum(action_mask * log_pi, reduction_indices=1), (-1, 1))
+                * self.advantage_no_grad
+                + self.beta * entropy, name='PiLoss')
 
         with tf.name_scope("ValueLoss"):
             value_loss = tf.square(advantage)
@@ -320,7 +317,11 @@ class ActorCriticNN(object):
         with tf.name_scope("CombinedLoss"):
             if self.recurrent:
                 with tf.name_scope("SequenceMasking"):
-                    seq_mask = sequence_mask(self.n_steps, maxlen=self.t_max, dtype=tf.float32, name='SequenceMaskLoss')
+                    seq_mask = tflearn.reshape(
+                        sequence_mask(self.n_steps, maxlen=self.t_max, dtype=tf.float32),
+                        new_shape=(self.t_max, 1),
+                        name='SequenceMaskLoss'
+                    )
                     pi_loss = tf.mul(seq_mask, pi_loss, name='MaskedPiLoss')
                     value_loss = tf.mul(seq_mask, value_loss, name='MaskedValueLoss')
             self.loss = tf.reduce_mean(pi_loss + 0.5 * value_loss, name='Loss')
@@ -387,14 +388,14 @@ class ActorCriticNN(object):
         :param learning_rate_var:   learning rate placeholder,
         :param lr:                  actual learning rate
         """
+        n_steps = len(n_step_return)
         if self.recurrent:
             # First we need to pad the sequences we got
-            n_steps = len(n_step_return)
             n_pad = self.t_max - n_steps
             pad1d = np.zeros(n_pad)
-            n_step_return   = np.concatenate([n_step_return, pad1d])
+            n_step_return   = np.concatenate([n_step_return, pad1d]).reshape((self.t_max, 1))
             actions         = np.concatenate([actions, pad1d])
-            values          = np.concatenate([values, pad1d])
+            values          = np.concatenate([values, pad1d]).reshape((self.t_max, 1))
             states          = np.concatenate([states, np.zeros((self.t_max - n_steps,) + states[0].shape)])
 
             # Now we update our parameters AND we take the lstm_state
@@ -412,8 +413,8 @@ class ActorCriticNN(object):
                     self.n_steps: [n_steps]
                 }
             )
-
-            #logger.info("Average gradient: {}".format(np.mean(gradients[0])))
+            #if n_steps < 5:
+            #    logger.info("Length = {}, value loss output: {}\n{}\n{}".format(n_steps, value_loss, masked_val_loss, ad))
             fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
             fdict[self.optimizer.learning_rate] = lr
             self.session.run(self.optimizer.minimize, feed_dict=fdict)
@@ -425,10 +426,10 @@ class ActorCriticNN(object):
                 self.local_gradients,
                 self.merged_summaries
             ],
-                feed_dict={self.n_step_returns: n_step_return,
+                feed_dict={self.n_step_returns: n_step_return.reshape((n_steps, 1)),
                            self.actions: actions,
                            self.inputs: states,
-                           self.advantage_no_grad: n_step_return - values}
+                           self.advantage_no_grad: (n_step_return - values).reshape((n_steps, 1))}
             )
 
             fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
