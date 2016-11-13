@@ -15,7 +15,7 @@ import os
 
 # cluster specification
 parameter_servers = ["localhost:2222"]
-workers = ["localhost:{}".format(str(2222 + i)) for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']))]
+workers = ["localhost:{}".format(str(2223 + i)) for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']))]
 cluster = tf.train.ClusterSpec({"ps": parameter_servers, "worker": workers})
 tf.train.Server.create_local_server()
 
@@ -87,7 +87,7 @@ class A3CAgent(object):
             start = time.time()
             self.synchronize_thread_parameters(session)
             end = time.time()
-            logger.info("Time for param synchronization: {}".format((end - start)))
+            logger.debug("Time for param synchronization: {}".format((end - start)))
 
 
             # Set t_start to current t
@@ -124,7 +124,7 @@ class A3CAgent(object):
 
             batch_len = self.t - t_start
             end = time.time()
-            logger.info("Time per step: {}".format((end - start) / batch_len))
+            logger.debug("Time per step: {}".format((end - start) / batch_len))
 
             start = time.time()
             # Forward view of n-step returns, start from i == t_max - 1 and go to i == 0
@@ -143,7 +143,7 @@ class A3CAgent(object):
                                                          session)
             step = session.run(increment_step)
             end = time.time()
-            logger.info("Time per backward pass: {}".format((end - start)))
+            logger.debug("Time per backward pass: {}".format((end - start)))
 
             writer.add_summary(summaries, self.t)
 
@@ -158,7 +158,7 @@ class A3CAgent(object):
                 epr = 0
                 self.local_network.reset()
             end = time.time()
-            logger.info("Time for episode reset: {}".format((end - start)))
+            logger.debug("Time for episode reset: {}".format((end - start)))
 
 
 if __name__ == "__main__":
@@ -187,11 +187,14 @@ if __name__ == "__main__":
             #     intra_op_parallelism_threads=2))
 
             # start a server for a specific task
-            with tf.device('/cpu:0'):
+            #with tf.device('/job:worker/task:0'):
+
+            with tf.device(tf.train.replica_device_setter(
+                    worker_device="/job:worker/task:%d" % hyper_parameters.task_index,
+                    cluster=cluster
+            )):
                 global_step = tf.Variable(0)
                 increment_step = global_step.assign_add(1, use_locking=False)
-
-            with tf.device("/job:worker/task:0"):
                 learning_rate_ph = tf.placeholder(tf.float32)
 
                 shared_optimizer = RMSPropCustom(None,
@@ -205,17 +208,22 @@ if __name__ == "__main__":
                                                optimizer=shared_optimizer)
                 shared_optimizer.build_update(global_network.theta)
 
-            agents = []
-            for i in range(len(workers)):
-                with tf.device("/job:worker/task:{}".format(i)):
+                agents = []
+                for i in range(len(workers)):
                     agents.append(A3CAgent(env_name, global_network, 'Agent_%d' % i, optimizer=shared_optimizer))
 
-            tf.initialize_all_variables()
-            writer = tf.train.SummaryWriter(hyper_parameters.log_dir)
-            sv = tf.train.Supervisor(is_chief=(hyper_parameters.task_index == 0),
+                init_op = tf.initialize_all_variables()
+                writer = tf.train.SummaryWriter(hyper_parameters.log_dir)
+                summary_op = tf.merge_all_summaries()
+                saver = tf.train.Saver()
+
+            sv = tf.train.Supervisor(is_chief=is_chief,
                                      global_step=global_step,
+                                     summary_op=summary_op,
+                                     summary_writer=writer,
                                      logdir=hyper_parameters.log_dir,
-                                     summary_writer=writer)
+                                     saver=saver
+                                     )
 
             with sv.managed_session(server.target) as sess:
                 #writer_new_event(hyper_parameters, sess)
