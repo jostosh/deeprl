@@ -155,8 +155,10 @@ if __name__ == "__main__":
     global_env = get_env(env_name)
     num_actions = global_env.num_actions()
 
-    session = tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=hyper_parameters.n_threads,
-                                               intra_op_parallelism_threads=4))
+    session = tf.Session(config=tf.ConfigProto(
+        allow_soft_placement=True,
+        inter_op_parallelism_threads=hyper_parameters.n_threads,
+        intra_op_parallelism_threads=1))
     learning_rate_ph = tf.placeholder(tf.float32)
 
     shared_optimizer = RMSPropCustom(session,
