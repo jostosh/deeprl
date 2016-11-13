@@ -24,6 +24,6 @@ class RMSPropCustom(object):
         with tf.name_scope("RMSPropMinimize"):
             self.minimize = [tf.assign_add(t, -self.learning_rate * tf.div(grad, tf.sqrt(g_mov_avg + self.epsilon)),
                                            use_locking=False) for
-                             t, grad, g_mov_avg in zip(theta, self.gradients, self.g_moving_average)]
+                             t, grad, g_mov_avg in zip(theta, self.gradients, self.g_update)]
 
 
