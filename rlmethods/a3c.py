@@ -86,6 +86,7 @@ class A3CAgent(object):
             # Boolean to denote whether the current state is terminal
             terminal_state = False
 
+            start = time.time()
             # Now take steps following the thread-specific policy given by self.theta and self.theta_v
             while not terminal_state and self.t - t_start != hyper_parameters.t_max:
 
@@ -113,6 +114,8 @@ class A3CAgent(object):
             n_step_target = 0 if terminal_state else self.local_network.get_value(self.last_state)
 
             batch_len = self.t - t_start
+            end = time.time()
+            logger.info("Time per step: {}".format((end-start) / batch_len))
 
             # Forward view of n-step returns, start from i == t_max - 1 and go to i == 0
             for i in reversed(range(batch_len)):
@@ -154,7 +157,7 @@ if __name__ == "__main__":
 
     session = tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
                                                inter_op_parallelism_threads=hyper_parameters.n_threads,
-                                               intra_op_parallelism_threads=hyper_parameters.n_threads))
+                                               intra_op_parallelism_threads=1))
     learning_rate_ph = tf.placeholder(tf.float32)
 
     shared_optimizer = RMSPropCustom(session,

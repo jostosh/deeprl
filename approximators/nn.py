@@ -36,16 +36,16 @@ class ActorCriticNN(object):
         self.recurrent = self.model_name in [ModelNames.A3C_LSTM]
         self.t_max = hyper_parameters.t_max
         self.input_shape = hyper_parameters.input_shape
+        with tf.device('/cpu:0'):
+            # Build computational graphs for loss, synchronization of parameters and parameter updates
+            with tf.name_scope(agent_name):
+                self.build_network(num_actions, hyper_parameters.input_shape)
+                with tf.name_scope('Loss'):
+                    self.build_loss()
 
-        # Build computational graphs for loss, synchronization of parameters and parameter updates
-        with tf.name_scope(agent_name):
-            self.build_network(num_actions, hyper_parameters.input_shape)
-            with tf.name_scope('Loss'):
-                self.build_loss()
-
-            if global_network:
-                self.build_param_sync()
-                self.build_param_update()
+                if global_network:
+                    self.build_param_sync()
+                    self.build_param_update()
 
         self.merged_summaries = tf.merge_summary(self.summaries)
 
@@ -270,7 +270,7 @@ class ActorCriticNN(object):
 
     def build_param_update(self):
         with tf.name_scope("ParamUpdate"):
-            self.local_gradients = [tf.clip_by_norm(grad, 20.0) for grad in tf.gradients(self.loss, self.theta)]
+            self.local_gradients = [tf.clip_by_norm(grad, 40.0) for grad in tf.gradients(self.loss, self.theta)]
 
 
     def build_loss(self):
