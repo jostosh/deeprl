@@ -11,11 +11,11 @@ from deeprl.approximators.optimizers import RMSPropCustom
 import time
 from deeprl.common.logger import get_log_dir
 
-
+import os
 
 # cluster specification
 parameter_servers = ["localhost:2222"]
-workers = ["localhost:2223", "localhost:2224", "localhost:2225"]
+workers = ["localhost:{}".format(str(2222 + i)) for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']))]
 cluster = tf.train.ClusterSpec({"ps": parameter_servers, "worker": workers})
 tf.train.Server.create_local_server()
 
