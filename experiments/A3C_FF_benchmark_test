@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --time=48:00:00
+#SBATCH --time=00:10:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
@@ -8,6 +8,7 @@
 #SBATCH --mail-user jos.vandewolfshaar@gmail.com
 #SBATCH --output job-%j.log
 #SBATCH --mem=2000
+#SBATCH --partition=short
 
 module load tensorflow/0.10.0-foss-2016a-Python-3.5.1
 
