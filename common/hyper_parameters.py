@@ -22,7 +22,8 @@ config1 = {
     'action_repeat': 4,
     'clip_rewards': False,
     'clip_advantage': False,
-    'render': False
+    'render': False,
+    'pwv': False
 }
 
 
@@ -73,4 +74,5 @@ class HyperParameters(object):
         self.clip_rewards = params.clip_rewards
         self.clip_advantage = params.clip_advantage
         self.render = params.render
+        self.policy_weighted_val = params.pwv
 

@@ -36,6 +36,7 @@ class ActorCriticNN(object):
         self.recurrent = self.model_name in [ModelNames.A3C_LSTM]
         self.t_max = hyper_parameters.t_max
         self.input_shape = hyper_parameters.input_shape
+        self.policy_weighted_val = hyper_parameters.policy_weighted_val
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
         with tf.name_scope(agent_name):
@@ -99,18 +100,21 @@ class ActorCriticNN(object):
 
     def _a3c_ff_ss(self):
         """
-        This is the feedforward model taken from
+        This is the feedforward model taken from "Asynchronous Methods for Reinforcement Learning" together with a
+        spatial softmax layer.
         :param network_name:    Name of the network
         :return:                The feedforward model (last hidden layer) as a graph node
         """
         with tf.name_scope('Inputs'):
+            '''
             net = self.inputs #tf.transpose(self.inputs, [0, 2, 3, 1])
             net = tflearn.reshape(net, (-1, self.input_shape[-2], self.input_shape[-1], 1))
             #logger.info(net)
             net = tflearn.conv_2d(net, 1, 3, strides=2, activation='linear', name='Downsampling')
             #logger.info(net)
             net = tflearn.reshape(net, (-1, self.input_shape[0], 105, 80))
-            net = tf.transpose(net, [0, 2, 3, 1])
+            '''
+            net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers'):
             net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1')
@@ -259,9 +263,14 @@ class ActorCriticNN(object):
                 self.pi = tflearn.fully_connected(net, num_actions, activation='softmax', name='pi_sa')
                 self._add_trainable(self.pi)
             with tf.name_scope("Value"):
-                self.value = tflearn.fully_connected(net, 1, activation='linear', name='v_s')
-                self._add_trainable(self.value)
-
+                if self.policy_weighted_val:
+                    q_val = tflearn.fully_connected(net, num_actions, activation='linear')
+                    self._add_trainable(q_val)
+                    self.value = tf.reshape(tf.reduce_sum(tf.mul(q_val, tf.stop_gradient(self.pi)),
+                                                          reduction_indices=1), (-1, 1), name='vq_s')
+                else:
+                    self.value = tflearn.fully_connected(net, 1, activation='linear', name='v_s')
+                    self._add_trainable(self.value)
 
     def build_param_sync(self):
         with tf.name_scope("ParamSynchronization"):
@@ -271,7 +280,6 @@ class ActorCriticNN(object):
     def build_param_update(self):
         with tf.name_scope("ParamUpdate"):
             self.local_gradients = [tf.clip_by_norm(grad, 40.0) for grad in tf.gradients(self.loss, self.theta)]
-
 
     def build_loss(self):
         """
@@ -413,8 +421,6 @@ class ActorCriticNN(object):
                     self.n_steps: [n_steps]
                 }
             )
-            #if n_steps < 5:
-            #    logger.info("Length = {}, value loss output: {}\n{}\n{}".format(n_steps, value_loss, masked_val_loss, ad))
             fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
             fdict[self.optimizer.learning_rate] = lr
             self.session.run(self.optimizer.minimize, feed_dict=fdict)
