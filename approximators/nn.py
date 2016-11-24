@@ -37,6 +37,7 @@ class ActorCriticNN(object):
         self.t_max = hyper_parameters.t_max
         self.input_shape = hyper_parameters.input_shape
         self.policy_weighted_val = hyper_parameters.policy_weighted_val
+        self.frame_prediction = hyper_parameters.frame_prediction
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
         with tf.name_scope(agent_name):
@@ -48,10 +49,14 @@ class ActorCriticNN(object):
                 self.build_param_sync()
                 self.build_param_update()
 
+            if self.frame_prediction:
+                with tf.name_scope('FramePrediction'):
+                    self.build_frame_predictor()
+
         self.merged_summaries = tf.merge_summary(self.summaries)
 
     def _nips_hidden_layers(self, return_scope=False):
-        with tf.name_scope('ForwardInputs'):
+        with tf.name_scope(self.forward_input_scope):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers') as scope:
@@ -236,7 +241,8 @@ class ActorCriticNN(object):
 
     def build_network(self, num_actions, input_shape):
         logger.debug('Input shape: {}'.format(input_shape))
-        with tf.name_scope('ForwardInputs'):
+        with tf.name_scope('ForwardInputs') as scope:
+            self.forward_input_scope = scope
             if self.recurrent:
                 self.inputs = tf.placeholder(tf.float32, [self.t_max] + input_shape)
             else:
@@ -271,6 +277,41 @@ class ActorCriticNN(object):
                 else:
                     self.value = tflearn.fully_connected(net, 1, activation='linear', name='v_s')
                     self._add_trainable(self.value)
+
+        self.hidden_head = net
+
+    def build_frame_predictor(self):
+        def decoding_network(incoming, conv1, conv2):
+            net = tflearn.reshape(incoming, [-1] + conv2.get_shape().as_list()[1:])
+            logger.info('Decoding input shape: {}'.format(net.get_shape()))
+            logger.info("Shape conv1 {}".format(conv1.get_shape().as_list()[1:]))
+            logger.info("Shape conv2 {}".format(conv2.get_shape().as_list()[1:]))
+            net = tflearn.conv_2d_transpose(net, 32, 4, strides=2, activation='relu',
+                                            output_shape=conv1.get_shape().as_list()[1:],
+                                            weight_decay=0., padding='valid')
+            logger.info("input shape {}".format(self.input_shape))
+            net = tflearn.conv_2d_transpose(net, self.input_shape[0], 8, strides=4, activation='linear',
+                                            output_shape=[84, 84, 4], padding='valid', weight_decay=0.)
+            return net
+
+        action_one_hot = tflearn.one_hot_encoding(self.actions, self.num_actions)
+
+        action_embedding = tflearn.fully_connected(action_one_hot, 256, weight_decay=0.0, bias=False,
+                                                   name='ActionEmbedding', restore=False)
+        encoding = tflearn.fully_connected(self.hidden_head, 256, weight_decay=0.0, bias=False,
+                                           name='EncodingEmbedding', restore=False)
+
+        conv1 = tflearn.get_layer_by_name('Conv1'.format(self.agent_name))
+        conv2 = tflearn.get_layer_by_name('Conv2'.format(self.agent_name))
+        transformation = tflearn.fully_connected(tf.mul(action_embedding, encoding),
+                                                 np.prod(conv2.get_shape().as_list()[1:]), weight_decay=0.0,
+                                                 activation='relu', name='Transformation', restore=False)
+
+        self.predicted_frame = tf.transpose(decoding_network(transformation, conv1, conv2), [0, 3, 1, 2]) + self.inputs
+        self.frame_target = tf.placeholder(tf.float32, [None] + self.input_shape)
+        self.loss += tf.reduce_mean((self.frame_target - self.predicted_frame) ** 2)  # tf.nn.l2_loss(self.target - self.output)
+
+
 
     def build_param_sync(self):
         with tf.name_scope("ParamSynchronization"):
@@ -324,15 +365,22 @@ class ActorCriticNN(object):
         # We can combine the policy loss and the value loss in a single expression
         with tf.name_scope("CombinedLoss"):
             if self.recurrent:
+                # In case of a recurrent implementation, we need to mask the the losses that are not in the sequence
                 with tf.name_scope("SequenceMasking"):
+                    # Get the sequence mask
                     seq_mask = tflearn.reshape(
                         sequence_mask(self.n_steps, maxlen=self.t_max, dtype=tf.float32),
                         new_shape=(self.t_max, 1),
                         name='SequenceMaskLoss'
                     )
+                    # Multiply the losses with the mask
                     pi_loss = tf.mul(seq_mask, pi_loss, name='MaskedPiLoss')
                     value_loss = tf.mul(seq_mask, value_loss, name='MaskedValueLoss')
+
+            # Add losses and use a factor 0.5 for the value loss as suggested by Mnih
             self.loss = tf.reduce_mean(pi_loss + 0.5 * value_loss, name='Loss')
+
+            # Add TensorBoard summaries
             self.summaries.append(tf.scalar_summary('{}/Loss'.format(self.agent_name), self.loss))
             self.summaries.append(tf.scalar_summary('{}/MaxAbsValue'.format(self.agent_name),
                                                     tf.reduce_max(tf.abs(self.value))))
@@ -386,7 +434,7 @@ class ActorCriticNN(object):
         action = np.random.choice(self.num_actions, p=pi[0])
         return value[0][0], action
 
-    def update_params(self, n_step_return, actions, states, values, learning_rate_var, lr):
+    def update_params(self, n_step_return, actions, states, values, learning_rate_var, lr, last_state):
         """
         Updates the parameters of the global network
         :param n_step_return:       n-step returns
@@ -397,6 +445,7 @@ class ActorCriticNN(object):
         :param lr:                  actual learning rate
         """
         n_steps = len(n_step_return)
+
         if self.recurrent:
             # First we need to pad the sequences we got
             n_pad = self.t_max - n_steps
@@ -406,20 +455,24 @@ class ActorCriticNN(object):
             values          = np.concatenate([values, pad1d]).reshape((self.t_max, 1))
             states          = np.concatenate([states, np.zeros((self.t_max - n_steps,) + states[0].shape)])
 
+            fdict = {
+                self.n_step_returns: n_step_return.reshape((self.t_max, 1)),
+                self.actions: actions,
+                self.inputs: states,
+                self.advantage_no_grad: (n_step_return - values).reshape((self.t_max, 1)),
+                self.initial_state: self.lstm_first_state_since_update,
+                self.n_steps: [n_steps]
+            }
+            if self.frame_prediction:
+                fdict.update({self.frame_target: states[1:] + [last_state]})
+
             # Now we update our parameters AND we take the lstm_state
             gradients, summaries, self.lstm_state_numeric = self.session.run([
                 self.local_gradients,
                 self.merged_summaries,
                 self.lstm_state_variable
             ],
-                feed_dict={
-                    self.n_step_returns: n_step_return,
-                    self.actions: actions,
-                    self.inputs: states,
-                    self.advantage_no_grad: n_step_return - values,
-                    self.initial_state: self.lstm_first_state_since_update,
-                    self.n_steps: [n_steps]
-                }
+                feed_dict=fdict
             )
             fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
             fdict[self.optimizer.learning_rate] = lr
@@ -427,15 +480,21 @@ class ActorCriticNN(object):
             # We also need to remember the LSTM state for the next backward pass
             self.lstm_first_state_since_update = deepcopy(self.lstm_state_numeric)
         else:
+            fdict = {
+                self.n_step_returns: n_step_return.reshape((n_steps, 1)),
+                self.actions: actions,
+                self.inputs: states,
+                self.advantage_no_grad: (n_step_return - values).reshape((n_steps, 1))
+            }
+            if self.frame_prediction:
+                fdict.update({self.frame_target: states[1:] + [last_state]})
+
             # Update the parameters
             gradients, summaries = self.session.run([
                 self.local_gradients,
                 self.merged_summaries
             ],
-                feed_dict={self.n_step_returns: n_step_return.reshape((n_steps, 1)),
-                           self.actions: actions,
-                           self.inputs: states,
-                           self.advantage_no_grad: (n_step_return - values).reshape((n_steps, 1))}
+                feed_dict=fdict
             )
 
             fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}

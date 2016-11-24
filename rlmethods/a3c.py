@@ -126,7 +126,8 @@ class A3CAgent(object):
                                                          states[:batch_len],
                                                          values[:batch_len],
                                                          learning_rate_ph,
-                                                         current_lr)
+                                                         current_lr,
+                                                         self.last_state)
             writer.add_summary(summaries, self.t)
 
             if terminal_state:

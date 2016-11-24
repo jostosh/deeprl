@@ -23,7 +23,8 @@ config1 = {
     'clip_rewards': False,
     'clip_advantage': False,
     'render': False,
-    'pwv': False
+    'pwv': False,
+    'frame_prediction': False
 }
 
 
@@ -75,4 +76,5 @@ class HyperParameters(object):
         self.clip_advantage = params.clip_advantage
         self.render = params.render
         self.policy_weighted_val = params.pwv
+        self.frame_prediction = params.frame_prediction
 
