@@ -79,7 +79,7 @@ class AtariEnvironment(object):
 
         self.state = self.state[-self.frames_per_state:]
 
-        return self.state, step_reward, step_terminal, info
+        return np.copy(self.state), step_reward, step_terminal, info
 
     def reset(self):
         self.state = []
@@ -88,10 +88,11 @@ class AtariEnvironment(object):
 
         assert len(self.state) == self.frames_per_state, 'State length: {}'.format(len(self.state))
 
-        return self.state
+        return np.copy(self.state)
 
     def state_shape(self):
         return tuple([self.frames_per_state] + self.output_shape)
 
     def num_actions(self):
         return self.env.action_space.n
+
