@@ -5,6 +5,7 @@ from deeprl.common.environments import get_env
 from deeprl.common.logger import logger
 import numpy as np
 import pprint
+import os
 
 input_index = 0
 action_index = 1
@@ -156,7 +157,7 @@ def train(sess):
     D_train = generate_data(env, 1000000)
     #D_test  = generate_data(env, 100)
 
-    writer = tf.train.SummaryWriter(logdir='~/tensorflowlogs/frame_prediction')
+    writer = tf.train.SummaryWriter(logdir='{}/tensorflowlogs/frame_prediction'.format(os.path.expanduser('~')))
     optimizers = [tf.train.RMSPropOptimizer(phase['lr'], decay=0.95, momentum=0.9) for phase in phases]
     all_variables = set(tf.all_variables())
 
