@@ -27,7 +27,9 @@ config1 = {
     'render': False,
     'job_name': 'ps',
     'task_index': 0,
-    'log_dir': os.path.expanduser('~') + '/tensorflowlogs'
+    'log_dir': os.path.expanduser('~') + '/tensorflowlogs',
+    'pwv': False,
+    'frame_prediction': False
 }
 
 
@@ -81,4 +83,6 @@ class HyperParameters(object):
         self.job_name = params.job_name
         self.task_index = params.task_index
         self.log_dir = params.log_dir
+        self.policy_weighted_val = params.pwv
+        self.frame_prediction = params.frame_prediction
 
