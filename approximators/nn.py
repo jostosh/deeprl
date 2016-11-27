@@ -23,11 +23,11 @@ class ModelNames:
 
 class ActorCriticNN(object):
 
-    def __init__(self, num_actions, agent_name, optimizer, session, hyper_parameters, global_network=None):
+    def __init__(self, num_actions, agent_name, optimizer, hyper_parameters, global_network=None):
         self.num_actions = num_actions
         self.optimizer = optimizer
         self.global_network = global_network
-        self.session = session
+        #self.session = session
         self.beta = hyper_parameters.beta
         self.summaries = []
         self.agent_name = agent_name
@@ -385,16 +385,16 @@ class ActorCriticNN(object):
             self.summaries.append(tf.scalar_summary('{}/MaxAbsValue'.format(self.agent_name),
                                                     tf.reduce_max(tf.abs(self.value))))
 
-    def get_action(self, state):
+    def get_action(self, state, session):
         """
         This function returns a single array reflecting the stochastic policy pi for the given state.
         :param state: The input state
         :return: State's policy
         """
-        pi = self.session.run(self.pi, feed_dict={self.inputs: [state]})[0]
+        pi = session.run(self.pi, feed_dict={self.inputs: [state]})[0]
         return np.random.choice(self.num_actions, p=pi)
 
-    def get_value(self, state):
+    def get_value(self, state, session):
         """
         This function returns a single value that corresponds to the critic's valuation of the given state.
         :param state: The input state
@@ -402,21 +402,21 @@ class ActorCriticNN(object):
         """
         if self.recurrent:
             # If we use a recurrent model
-            return self.session.run(self.value,
+            return session.run(self.value,
                                     feed_dict={
                                         self.inputs: [state] + (self.t_max-1) * [np.zeros_like(state)],
                                         self.initial_state: self.lstm_state_numeric,
                                         self.n_steps: [1]
                                     })[0][0]
 
-        return self.session.run(self.value, feed_dict={self.inputs: [state]})[0][0]
+        return session.run(self.value, feed_dict={self.inputs: [state]})[0][0]
 
-    def get_value_and_action(self, state):
+    def get_value_and_action(self, state, session):
         """
         Returns the action and the value
         """
         if self.recurrent:
-            value, pi, self.lstm_state_numeric = self.session.run(
+            value, pi, self.lstm_state_numeric = session.run(
                 [
                     self.value, self.pi, self.lstm_state_variable
                 ],
@@ -427,14 +427,14 @@ class ActorCriticNN(object):
                 }
             )
         else:
-            value, pi = self.session.run(
+            value, pi = session.run(
                 [self.value, self.pi],
                 feed_dict={self.inputs: [state]})
 
         action = np.random.choice(self.num_actions, p=pi[0])
         return value[0][0], action
 
-    def update_params(self, n_step_return, actions, states, values, learning_rate_var, lr, last_state):
+    def update_params(self, n_step_return, actions, states, values, learning_rate_var, lr, last_state, session):
         """
         Updates the parameters of the global network
         :param n_step_return:       n-step returns
@@ -467,7 +467,7 @@ class ActorCriticNN(object):
                 fdict.update({self.frame_target: states[1:] + [last_state]})
 
             # Now we update our parameters AND we take the lstm_state
-            gradients, summaries, self.lstm_state_numeric = self.session.run([
+            gradients, summaries, self.lstm_state_numeric = session.run([
                 self.local_gradients,
                 self.merged_summaries,
                 self.lstm_state_variable
@@ -476,7 +476,7 @@ class ActorCriticNN(object):
             )
             fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
             fdict[self.optimizer.learning_rate] = lr
-            self.session.run(self.optimizer.minimize, feed_dict=fdict)
+            session.run(self.optimizer.minimize, feed_dict=fdict)
             # We also need to remember the LSTM state for the next backward pass
             self.lstm_first_state_since_update = deepcopy(self.lstm_state_numeric)
         else:
@@ -490,7 +490,7 @@ class ActorCriticNN(object):
                 fdict.update({self.frame_target: states[1:] + [last_state]})
 
             # Update the parameters
-            gradients, summaries = self.session.run([
+            gradients, summaries = session.run([
                 self.local_gradients,
                 self.merged_summaries
             ],
@@ -499,9 +499,7 @@ class ActorCriticNN(object):
 
             fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
             fdict[self.optimizer.learning_rate] = lr
-            self.session.run(self.optimizer.minimize, feed_dict=fdict)
-
-
+            session.run(self.optimizer.minimize, feed_dict=fdict)
 
         return summaries
         #writer.add_summary(summaries, t)
