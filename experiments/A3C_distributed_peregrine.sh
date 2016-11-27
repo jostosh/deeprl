@@ -3,8 +3,7 @@
 #SBATCH --time=00:10:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=4
-#SBATCH --cpus-per-task=1
-#SBATCH --job-name=A3C_FF_v07
+#SBATCH --job-name=A3C_CartPole_distributed
 #SBATCH --mail-type ALL
 #SBATCH --mail-user jos.vandewolfshaar@gmail.com
 #SBATCH --output job-%j.log
