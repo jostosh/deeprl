@@ -54,10 +54,10 @@ class ActorCriticNN(object):
 
         with tf.name_scope('HiddenLayers') as scope:
             net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1', weight_decay=0.0,
-                                  bias_init=tf.constant_initializer(0.1))
+                                  bias_init=tf.constant_initializer(0.1), padding='valid')
             self._add_trainable(net)
             net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name='Conv2', weight_decay=0.0,
-                                  bias_init=tf.constant_initializer(0.1))
+                                  bias_init=tf.constant_initializer(0.1), padding='valid')
             self._add_trainable(net)
             net = tflearn.flatten(net)
             net = tflearn.fully_connected(net, 256, activation='relu', name='FC3', weight_decay=0.0,
@@ -255,10 +255,10 @@ class ActorCriticNN(object):
 
         with tf.name_scope("Outputs"):
             with tf.name_scope("Policy"):
-                self.pi = tflearn.fully_connected(net, num_actions, activation='softmax', name='pi_sa')
+                self.pi = tflearn.fully_connected(net, num_actions, activation='softmax', name='pi_sa', weight_decay=0.)
                 self._add_trainable(self.pi)
             with tf.name_scope("Value"):
-                self.value = tflearn.fully_connected(net, 1, activation='linear', name='v_s')
+                self.value = tflearn.fully_connected(net, 1, activation='linear', name='v_s', weight_decay=0.)
                 self._add_trainable(self.value)
 
 
@@ -434,8 +434,6 @@ class ActorCriticNN(object):
             fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
             fdict[self.optimizer.learning_rate] = lr
             session.run(self.optimizer.minimize, feed_dict=fdict)
-
-
 
         return summaries
         #writer.add_summary(summaries, t)
