@@ -29,7 +29,6 @@ class A3CAgent(object):
         self.local_network = ActorCriticNN(num_actions=self.num_actions,
                                            agent_name=agent_name,
                                            optimizer=optimizer,
-                                           session=session,
                                            hyper_parameters=hyper_parameters,
                                            global_network=global_network)
 
@@ -95,7 +94,7 @@ class A3CAgent(object):
                 states[i] = self.last_state
                 # Get the corresponding value and action. This is done simultaneously such that the approximators only
                 # has to perform a single forward pass.
-                values[i], actions[i] = self.local_network.get_value_and_action(self.last_state)
+                values[i], actions[i] = self.local_network.get_value_and_action(self.last_state, session)
                 # Perform step in environment and obtain rewards and observations
                 self.last_state, rewards[i], terminal_state, info = self.env.step(actions[i])
                 # Increment time counters
@@ -110,7 +109,7 @@ class A3CAgent(object):
                 rewards = np.clip(rewards, -1.0, 1.0)
 
             # Initialize the n-step return
-            n_step_target = 0 if terminal_state else self.local_network.get_value(self.last_state)
+            n_step_target = 0 if terminal_state else self.local_network.get_value(self.last_state, session)
 
             batch_len = self.t - t_start
 
@@ -127,7 +126,8 @@ class A3CAgent(object):
                                                          values[:batch_len],
                                                          learning_rate_ph,
                                                          current_lr,
-                                                         self.last_state)
+                                                         self.last_state,
+                                                         session)
             writer.add_summary(summaries, self.t)
 
             if terminal_state:
@@ -167,7 +167,6 @@ if __name__ == "__main__":
     global_network = ActorCriticNN(num_actions=num_actions,
                                    agent_name='GLOBAL',
                                    hyper_parameters=hyper_parameters,
-                                   session=session,
                                    optimizer=shared_optimizer)
     shared_optimizer.build_update(global_network.theta)
 
