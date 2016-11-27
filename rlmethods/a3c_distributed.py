@@ -214,7 +214,7 @@ if __name__ == "__main__":
                 for i in range(len(workers)):
                     agents.append(A3CAgent(env_name, global_network, 'Agent_%d' % i, optimizer=shared_optimizer))
 
-                init_op = tf.global_variables_initializer() #initialize_all_variables()
+                init_op = tf.initialize_all_variables()
                 writer = tf.train.SummaryWriter(hyper_parameters.log_dir)
                 summary_op = tf.merge_all_summaries()
                 saver = tf.train.Saver()
