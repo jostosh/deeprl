@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 
 from deeprl.common.logger import logger
-from deeprl.approximators.nn_distributed import ActorCriticNN
+from deeprl.approximators.nn import ActorCriticNN
 from deeprl.common.environments import get_env
 from deeprl.common.hyper_parameters_distributed import *
 from deeprl.common.tensorboard import writer_new_event, make_summary_from_python_var
@@ -114,6 +114,7 @@ class A3CAgent(object):
                 current_lr -= lr_step
 
                 epr += rewards[i]
+                step = session.run(increment_step)
 
             if hyper_parameters.clip_rewards:
                 # Reward clipping helps to stabilize training
@@ -140,8 +141,9 @@ class A3CAgent(object):
                                                          values[:batch_len],
                                                          learning_rate_ph,
                                                          current_lr,
+                                                         self.last_state,
                                                          session)
-            step = session.run(increment_step)
+
             end = time.time()
             logger.debug("Time per backward pass: {}".format((end - start)))
 
@@ -149,8 +151,8 @@ class A3CAgent(object):
 
             start = time.time()
             if terminal_state:
-                logger.info('Terminal state reached (episode {}, step {}, reward {}): resetting state'
-                            .format(self.n_episodes, step, epr))
+                logger.info('Terminal state reached (episode {}, step {}, reward {}, worker {}): resetting state'
+                            .format(self.n_episodes, step, epr, hyper_parameters.task_index))
 
                 writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr), T)
                 self.n_episodes += 1
@@ -212,7 +214,7 @@ if __name__ == "__main__":
                 for i in range(len(workers)):
                     agents.append(A3CAgent(env_name, global_network, 'Agent_%d' % i, optimizer=shared_optimizer))
 
-                init_op = tf.initialize_all_variables()
+                init_op = tf.global_variables_initializer() #initialize_all_variables()
                 writer = tf.train.SummaryWriter(hyper_parameters.log_dir)
                 summary_op = tf.merge_all_summaries()
                 saver = tf.train.Saver()
@@ -222,7 +224,8 @@ if __name__ == "__main__":
                                      summary_op=summary_op,
                                      summary_writer=writer,
                                      logdir=hyper_parameters.log_dir,
-                                     saver=saver
+                                     saver=saver,
+                                     init_op=init_op
                                      )
 
             with sv.managed_session(server.target) as sess:
