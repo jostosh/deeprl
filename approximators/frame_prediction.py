@@ -6,6 +6,7 @@ from deeprl.common.logger import logger
 import numpy as np
 import pprint
 import os
+RESIDUAL = True
 
 input_index = 0
 action_index = 1
@@ -33,22 +34,30 @@ class FramePrediction(object):
     def encoding_network(self):
         #self.input = tf.placeholder(tf.float32, self.input_shape)
         net = tf.transpose(self.input, [0, 2, 3, 1])
-        conv1 = tflearn.conv_2d(net, 32, 8, 4, activation='relu', padding='valid', weight_decay=0.,
+        conv1 = tflearn.conv_2d(net, 32, 8, 4, activation='linear', padding='valid', weight_decay=0.,
                                 reuse=self.reuse, scope='Conv1', restore=False)
-        conv2 = tflearn.conv_2d(conv1, 64, 4, 2, activation='relu', padding='valid', weight_decay=0.,
+        conv1_act = tf.nn.relu(conv1, name='Conv1Relu')
+        conv2 = tflearn.conv_2d(conv1_act, 64, 4, 2, activation='linear', padding='valid', weight_decay=0.,
                                 reuse=self.reuse, scope='Conv2', restore=False)
-        net = tflearn.flatten(conv2)
+        conv2_act = tf.nn.relu(conv2, name='Conv2Relu')
+        net = tflearn.flatten(conv2_act)
         net = tflearn.fully_connected(net, 256, weight_decay=0., reuse=self.reuse, scope='FC1', restore=False)
 
         return net, conv1, conv2
 
     def decoding_network(self, incoming, conv1, conv2):
         net = tflearn.reshape(incoming, [-1] + conv2.get_shape().as_list()[1:])
+        if RESIDUAL:
+            net += conv2
+        net = tf.nn.relu(net, name='TransformationRelu')
         logger.info('Decoding input shape: {}'.format(net.get_shape()))
         logger.info("Shape conv1 {}".format(conv1.get_shape().as_list()[1:]))
         logger.info("Shape conv2 {}".format(conv2.get_shape().as_list()[1:]))
-        net = tflearn.conv_2d_transpose(net, 32, 4, strides=2, activation='relu', output_shape=conv1.get_shape().as_list()[1:],
+        net = tflearn.conv_2d_transpose(net, 32, 4, strides=2, activation='linear', output_shape=conv1.get_shape().as_list()[1:],
                                         weight_decay=0., reuse=self.reuse, scope='DeConv1', restore=False, padding='valid')
+        if RESIDUAL:
+            net += conv1
+        net = tf.nn.relu(net, name='DeConv1Relu')
         logger.info("input shape {}".format(self.input_shape))
         net = tflearn.conv_2d_transpose(net, self.input_shape[0], 8, strides=4, activation='linear',
                                         output_shape=[84, 84, 4], padding='valid',
@@ -67,9 +76,8 @@ class FramePrediction(object):
 
         transformation = tflearn.fully_connected(tf.mul(action_embedding, encoding),
                                                  np.prod(conv2.get_shape().as_list()[1:]), weight_decay=0.0,
-                                                 activation='relu', reuse=self.reuse, scope='Transformation', restore=False)
-        self.output = tf.transpose(self.decoding_network(transformation, conv1, conv2), [0, 3, 1, 2]) + \
-                      tf.stop_gradient(self.input)
+                                                 activation='linear', reuse=self.reuse, scope='Transformation', restore=False)
+        self.output = tf.transpose(self.decoding_network(transformation, conv1, conv2), [0, 3, 1, 2]) + self.input
 
         self.target = tf.placeholder(tf.float32, [None] + self.input_shape)
         self.loss = tf.reduce_mean((self.target - self.output) ** 2) #tf.nn.l2_loss(self.target - self.output)
@@ -154,10 +162,11 @@ def train(sess):
 
     chained_nets = chain_network(frame_predictor, max([p['n_steps'] for p in phases]), input_shape[1:], env.num_actions())
 
-    D_train = generate_data(env, 1000000)
+    D_train = generate_data(env, 1000)
     #D_test  = generate_data(env, 100)
 
-    writer = tf.train.SummaryWriter(logdir='{}/tensorflowlogs/frame_prediction'.format(os.path.expanduser('~')))
+    writer = tf.train.SummaryWriter(logdir='{}/tensorflowlogs/frame_prediction'.format(os.path.expanduser('~')),
+                                    graph=tf.get_default_graph())
     optimizers = [tf.train.RMSPropOptimizer(phase['lr'], decay=0.95, momentum=0.9) for phase in phases]
     all_variables = set(tf.all_variables())
 
