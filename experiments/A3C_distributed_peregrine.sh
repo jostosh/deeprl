@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 
 #SBATCH --time=00:10:00
 #SBATCH --nodes=1
