@@ -7,11 +7,11 @@
 #SBATCH --mail-type ALL
 #SBATCH --mail-user jos.vandewolfshaar@gmail.com
 #SBATCH --output job-%j.log
-#SBATCH --mem-per-cpu=1000
+#SBATCH --mem-per-cpu=2000
 #SBATCH --partition=short
 
 module load tensorflow/0.10.0-foss-2016a-Python-3.5.1
-LOGS=/home/s2098407/tensorflowlogs/distributed/cartpole/run0001
+LOGS=/home/s2098407/tensorflowlogs/distributed/cartpole/run0002
 srun -n 1 -N 1 python3 mproj/deeprl/rlmethods/a3c_distributed.py --job_name ps --task_index 0 --env CartPole-v0 --log_dir $LOGS &
 
 START=0
