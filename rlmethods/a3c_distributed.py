@@ -14,14 +14,15 @@ from deeprl.common.logger import get_log_dir
 import os
 
 # cluster specification
-parameter_servers = ["localhost:42084"]
-workers = ["localhost:{}".format(str(42085 + i)) for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']))]
+parameter_servers = ["localhost:60000"]
+workers = ["localhost:{}".format(str(60001 + i)) for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']))]
 cluster = tf.train.ClusterSpec({"ps": parameter_servers, "worker": workers})
 tf.train.Server.create_local_server()
 
 
+
 class A3CAgent(object):
-    def __init__(self, env_name, global_network, agent_name, optimizer):
+    def __init__(self, env, global_network, agent_name, optimizer):
         """
         Initializes an Asynchronous Advantage Actor-Critic agent (A3C).
         :param env_name:        Name of the environment
@@ -29,9 +30,9 @@ class A3CAgent(object):
         :param agent_name:      Name of this agent
         :param session:         TensorFlow session
         """
-        self.env = get_env(env_name,
-                           frames_per_state=hyper_parameters.frames_per_state,
-                           output_shape=hyper_parameters.input_shape[1:])
+        self.env = env #get_env(env_name,
+                    #       frames_per_state=hyper_parameters.frames_per_state,
+                    #       output_shape=hyper_parameters.input_shape[1:])
         self.num_actions = self.env.num_actions()
 
         self.local_network = ActorCriticNN(num_actions=self.num_actions,
@@ -210,9 +211,10 @@ if __name__ == "__main__":
                                                optimizer=shared_optimizer)
                 shared_optimizer.build_update(global_network.theta)
 
+                env = get_env(env_name, frames_per_state=hyper_parameters.frames_per_state, output_shape=hyper_parameters.input_shape[1:])
                 agents = []
                 for i in range(len(workers)):
-                    agents.append(A3CAgent(env_name, global_network, 'Agent_%d' % i, optimizer=shared_optimizer))
+                    agents.append(A3CAgent(env, global_network, 'Agent_%d' % i, optimizer=shared_optimizer))
 
                 init_op = tf.initialize_all_variables()
                 writer = tf.train.SummaryWriter(hyper_parameters.log_dir)
