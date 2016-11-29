@@ -14,8 +14,8 @@ from deeprl.common.logger import get_log_dir
 import os
 
 # cluster specification
-parameter_servers = ["localhost:41084"]
-workers = ["localhost:{}".format(str(41085 + i)) for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']))]
+parameter_servers = ["localhost:42084"]
+workers = ["localhost:{}".format(str(42085 + i)) for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']))]
 cluster = tf.train.ClusterSpec({"ps": parameter_servers, "worker": workers})
 tf.train.Server.create_local_server()
 
