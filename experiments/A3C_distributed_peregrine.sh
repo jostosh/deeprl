@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 
 #SBATCH --time=00:10:00
 #SBATCH --nodes=1
@@ -7,7 +6,7 @@
 #SBATCH --mail-type ALL
 #SBATCH --mail-user jos.vandewolfshaar@gmail.com
 #SBATCH --output job-%j.log
-#SBATCH --mem=4000
+#SBATCH --mem-per-cpu=1000
 #SBATCH --partition=short
 
 module load tensorflow/0.10.0-foss-2016a-Python-3.5.1
