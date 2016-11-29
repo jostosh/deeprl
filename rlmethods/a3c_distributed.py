@@ -204,17 +204,18 @@ if __name__ == "__main__":
                                                  learning_rate_ph,
                                                  decay=hyper_parameters.rms_decay,
                                                  epsilon=hyper_parameters.rms_epsilon)
-
-                global_network = ActorCriticNN(num_actions=num_actions,
-                                               agent_name='GLOBAL',
-                                               hyper_parameters=hyper_parameters,
-                                               optimizer=shared_optimizer)
-                shared_optimizer.build_update(global_network.theta)
+                with tf.device('/job:ps/task:0'):
+                    global_network = ActorCriticNN(num_actions=num_actions,
+                                                   agent_name='GLOBAL',
+                                                   hyper_parameters=hyper_parameters,
+                                                   optimizer=shared_optimizer)
+                    shared_optimizer.build_update(global_network.theta)
 
                 env = get_env(env_name, frames_per_state=hyper_parameters.frames_per_state, output_shape=hyper_parameters.input_shape[1:])
                 agents = []
                 for i in range(len(workers)):
-                    agents.append(A3CAgent(env, global_network, 'Agent_%d' % i, optimizer=shared_optimizer))
+                    with tf.device('/job:worker/task:%d' % i):
+                        agents.append(A3CAgent(env, global_network, 'Agent_%d' % i, optimizer=shared_optimizer))
 
                 init_op = tf.initialize_all_variables()
                 writer = tf.train.SummaryWriter(hyper_parameters.log_dir)
