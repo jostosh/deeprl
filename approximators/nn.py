@@ -53,7 +53,7 @@ class ActorCriticNN(object):
                 with tf.name_scope('FramePrediction'):
                     self.build_frame_predictor()
 
-        self.merged_summaries = tf.merge_summary(self.summaries)
+        self.merged_summaries = tf.summary.merge(self.summaries)#tf.merge_summary(self.summaries)
 
     def _nips_hidden_layers(self, return_scope=False):
         with tf.name_scope(self.forward_input_scope):
@@ -381,8 +381,8 @@ class ActorCriticNN(object):
             self.loss = tf.reduce_mean(pi_loss + 0.5 * value_loss, name='Loss')
 
             # Add TensorBoard summaries
-            self.summaries.append(tf.scalar_summary('{}/Loss'.format(self.agent_name), self.loss))
-            self.summaries.append(tf.scalar_summary('{}/MaxAbsValue'.format(self.agent_name),
+            self.summaries.append(tf.summary.scalar('{}/Loss'.format(self.agent_name), self.loss))
+            self.summaries.append(tf.summary.scalar('{}/MaxAbsValue'.format(self.agent_name),
                                                     tf.reduce_max(tf.abs(self.value))))
 
     def get_action(self, state, session):
