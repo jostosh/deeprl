@@ -10,7 +10,7 @@
 #SBATCH --mem-per-cpu=2000
 #SBATCH --partition=short
 
-module load tensorflow/0.10.0-foss-2016a-Python-3.5.1
+module load Python/3.5.1-foss-2016a
 LOGS=/home/s2098407/tensorflowlogs/distributed/cartpole/run0002
 srun -n 1 -N 1 python3 mproj/deeprl/rlmethods/a3c_distributed.py --job_name ps --task_index 0 --env CartPole-v0 --log_dir $LOGS &
 
