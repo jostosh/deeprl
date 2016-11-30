@@ -13,4 +13,4 @@ do
     sleep 4
 done
 
-wait
+wait ${!}

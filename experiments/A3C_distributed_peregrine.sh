@@ -23,4 +23,4 @@ do
     sleep 1
 done
 
-wait
+wait ${!}

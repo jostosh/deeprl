@@ -217,9 +217,9 @@ if __name__ == "__main__":
                     with tf.device('/job:worker/task:%d' % i):
                         agents.append(A3CAgent(env, global_network, 'Agent_%d' % i, optimizer=shared_optimizer))
 
-                init_op = tf.initialize_all_variables()
+                init_op = tf.global_variables_initializer()
                 writer = tf.train.SummaryWriter(hyper_parameters.log_dir)
-                summary_op = tf.merge_all_summaries()
+                summary_op = tf.summary.merge_all()
                 saver = tf.train.Saver()
 
             sv = tf.train.Supervisor(is_chief=is_chief,
