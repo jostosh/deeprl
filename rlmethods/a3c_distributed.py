@@ -15,7 +15,7 @@ import os
 
 # cluster specification
 parameter_servers = ["localhost:46666"]
-workers = ["localhost:{}".format(str(46667 + i)) for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']))]
+workers = ["localhost:{}".format(str(46667 + i)) for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']) - 1)]
 cluster = tf.train.ClusterSpec({"ps": parameter_servers, "worker": workers})
 tf.train.Server.create_local_server()
 
