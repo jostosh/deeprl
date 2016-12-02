@@ -195,12 +195,12 @@ if __name__ == "__main__":
                                                  learning_rate_ph,
                                                  decay=hyper_parameters.rms_decay,
                                                  epsilon=hyper_parameters.rms_epsilon)
-                with tf.device('/job:ps/task:0'):
-                    global_network = ActorCriticNN(num_actions=num_actions,
-                                                   agent_name='GLOBAL',
-                                                   hyper_parameters=hyper_parameters,
-                                                   optimizer=shared_optimizer)
-                    shared_optimizer.build_update(global_network.theta)
+                #with tf.device('/job:ps/task:0'):
+                global_network = ActorCriticNN(num_actions=num_actions,
+                                               agent_name='GLOBAL',
+                                               hyper_parameters=hyper_parameters,
+                                               optimizer=shared_optimizer)
+                shared_optimizer.build_update(global_network.theta)
 
                 env = get_env(env_name, frames_per_state=hyper_parameters.frames_per_state, output_shape=hyper_parameters.input_shape[1:])
                 agents = [A3CAgent(env, global_network, 'Agent_%d' % hyper_parameters.task_index, optimizer=shared_optimizer)]
