@@ -1,7 +1,7 @@
 from tensorflow.python.framework import dtypes
 from tensorflow.python.ops import gen_math_ops
 from tensorflow.python.ops.gen_array_ops import *
-
+import tensorflow as tf
 
 def sequence_mask(lengths, maxlen=None, dtype=dtypes.bool, name=None):
   """Return a mask tensor representing the first N positions of each row.
@@ -43,7 +43,7 @@ def sequence_mask(lengths, maxlen=None, dtype=dtypes.bool, name=None):
     # to length as a matrix with 1 column: [[1], [3], [2]].
     # Because of broadcasting on both arguments this comparison results
     # in a matrix of size (len(lengths), maxlen)
-    result = gen_math_ops._range(0, maxlen, 1) < expand_dims(lengths, 1)
+    result = gen_math_ops._range(0, maxlen, 1) < tf.expand_dims(lengths, 1)
     if dtype is None or result.dtype.base_dtype == dtype.base_dtype:
       return result
     else:
