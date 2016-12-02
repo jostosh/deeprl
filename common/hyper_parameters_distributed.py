@@ -22,14 +22,15 @@ config1 = {
     'model': ModelNames.A3C_FF,
     'n_threads': 8,
     'action_repeat': 4,
-    'clip_rewards': False,
+    'clip_rewards': True,
     'clip_advantage': False,
     'render': False,
     'job_name': 'ps',
     'task_index': 0,
     'log_dir': os.path.expanduser('~') + '/tensorflowlogs',
     'pwv': False,
-    'frame_prediction': False
+    'frame_prediction': False,
+    'port0': 46666
 }
 
 
@@ -85,4 +86,5 @@ class HyperParameters(object):
         self.log_dir = params.log_dir
         self.policy_weighted_val = params.pwv
         self.frame_prediction = params.frame_prediction
+        self.port0 = params.port0
 
