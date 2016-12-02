@@ -16,8 +16,6 @@ import os
 # cluster specification
 #tf.train.Server.create_local_server()
 
-
-
 class A3CAgent(object):
     def __init__(self, env, global_network, agent_name, optimizer):
         """
@@ -57,8 +55,8 @@ class A3CAgent(object):
         """
         Synhronizes the thread network parameters with the global network
         """
-        logger.debug('Synchronizing global parameters')
         session.run(self.local_network.param_sync)
+
 
     def _train(self, session):
         """
@@ -85,7 +83,7 @@ class A3CAgent(object):
             start = time.time()
             self.synchronize_thread_parameters(session)
             end = time.time()
-            logger.debug("Time for param synchronization: {}".format((end - start)))
+            #logger.debug("Time for param synchronization: {}".format((end - start)))
 
 
             # Set t_start to current t
@@ -123,7 +121,7 @@ class A3CAgent(object):
 
             batch_len = self.t - t_start
             end = time.time()
-            logger.debug("Time per step: {}".format((end - start) / batch_len))
+            #logger.debug("Time per step: {}".format((end - start) / batch_len))
 
             start = time.time()
             # Forward view of n-step returns, start from i == t_max - 1 and go to i == 0
@@ -141,24 +139,27 @@ class A3CAgent(object):
                                                          current_lr,
                                                          self.last_state,
                                                          session)
+            if is_chief:
+                sv.summary_computed(sess=session, summary=summaries)
 
             end = time.time()
-            logger.debug("Time per backward pass: {}".format((end - start)))
-
-            writer.add_summary(summaries, self.t)
+            #writer.add_summary(summaries, self.t)
 
             start = time.time()
             if terminal_state:
                 logger.info('Terminal state reached (episode {}, step {}, reward {}, worker {}): resetting state'
                             .format(self.n_episodes, step, epr, hyper_parameters.task_index))
 
-                writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr), T)
+
+                if is_chief:
+                    sv.summary_computed(sess=session, summary=make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr))
+                #writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr), T)
                 self.n_episodes += 1
                 self.last_state = self.env.reset()
                 epr = 0
                 self.local_network.reset()
             end = time.time()
-            logger.debug("Time for episode reset: {}".format((end - start)))
+            #logger.debug("Time for episode reset: {}".format((end - start)))
 
 
 if __name__ == "__main__":
@@ -204,27 +205,30 @@ if __name__ == "__main__":
 
                 env = get_env(env_name, frames_per_state=hyper_parameters.frames_per_state, output_shape=hyper_parameters.input_shape[1:])
                 agents = [A3CAgent(env, global_network, 'Agent_%d' % hyper_parameters.task_index, optimizer=shared_optimizer)]
+                #agents = []
                 #for i in range(len(workers)):
                 #    with tf.device('/job:worker/task:%d' % i):
                 #        agents.append(A3CAgent(env, global_network, 'Agent_%d' % i, optimizer=shared_optimizer))
 
                 init_op = tf.global_variables_initializer()
-                writer = tf.summary.FileWriter(hyper_parameters.log_dir, graph=graph) #.train.SummaryWriter(hyper_parameters.log_dir)
-                summary_op = tf.summary.merge_all()
+                #writer = tf.summary.FileWriter(hyper_parameters.log_dir, graph=graph) #.train.SummaryWriter(hyper_parameters.log_dir)
+                #summary_op = tf.summary.merge_all()
                 saver = tf.train.Saver()
 
             sv = tf.train.Supervisor(is_chief=is_chief,
                                      global_step=global_step,
-                                     summary_op=summary_op,
-                                     summary_writer=writer,
+                                     summary_op=None, #summary_op,
+                                     #summary_writer=writer,
                                      logdir=hyper_parameters.log_dir,
                                      saver=saver,
-                                     init_op=init_op
+                                     init_op=init_op,
                                      )
 
             with sv.managed_session(server.target) as sess:
                 #writer_new_event(hyper_parameters, sess)
+                #agents[hyper_parameters.task_index]._train(sess)
                 agents[0]._train(sess)
+
 
         #sv.stop()
 
@@ -237,7 +241,6 @@ if __name__ == "__main__":
         #       for a in agents:
         #            a.env.env.render()
         #            time.sleep(0.02 / hyper_parameters.n_threads)
-
 
 
 
