@@ -14,10 +14,7 @@ from deeprl.common.logger import get_log_dir
 import os
 
 # cluster specification
-parameter_servers = ["localhost:46666"]
-workers = ["localhost:{}".format(str(46667 + i)) for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']) - 1)]
-cluster = tf.train.ClusterSpec({"ps": parameter_servers, "worker": workers})
-tf.train.Server.create_local_server()
+#tf.train.Server.create_local_server()
 
 
 
@@ -166,11 +163,15 @@ class A3CAgent(object):
 
 if __name__ == "__main__":
     hyper_parameters = HyperParameters(parse_cmd_args())
+    parameter_servers = ["localhost:{}".format(hyper_parameters.port0)]
+    workers = ["localhost:{}".format(str(hyper_parameters.port0 + 1 + i))
+               for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']) - 1)]
+    cluster = tf.train.ClusterSpec({"ps": parameter_servers, "worker": workers})
     server = tf.train.Server(cluster, job_name=hyper_parameters.job_name, task_index=hyper_parameters.task_index)
     if hyper_parameters.job_name == "ps":
         server.join()
     else:
-        with tf.Graph().as_default():
+        with tf.Graph().as_default() as graph:
             is_chief = (hyper_parameters.task_index == 0)
             logger.info("This task is {}chief.".format("" if is_chief else 'NOT '))
             T = 1
@@ -178,19 +179,9 @@ if __name__ == "__main__":
             current_lr = hyper_parameters.learning_rate
 
             env_name = hyper_parameters.env
-            n_threads = hyper_parameters.n_threads
 
             global_env = get_env(env_name)
             num_actions = global_env.num_actions()
-
-            #session = tf.Session(config=tf.ConfigProto(
-            #    allow_soft_placement=True,
-            #    inter_op_parallelism_threads=hyper_parameters.n_threads,
-            #
-            #     intra_op_parallelism_threads=2))
-
-            # start a server for a specific task
-            #with tf.device('/job:worker/task:0'):
 
             with tf.device(tf.train.replica_device_setter(
                     worker_device="/job:worker/task:%d" % hyper_parameters.task_index,
@@ -212,13 +203,13 @@ if __name__ == "__main__":
                     shared_optimizer.build_update(global_network.theta)
 
                 env = get_env(env_name, frames_per_state=hyper_parameters.frames_per_state, output_shape=hyper_parameters.input_shape[1:])
-                agents = []
-                for i in range(len(workers)):
-                    with tf.device('/job:worker/task:%d' % i):
-                        agents.append(A3CAgent(env, global_network, 'Agent_%d' % i, optimizer=shared_optimizer))
+                agents = [A3CAgent(env, global_network, 'Agent_%d' % hyper_parameters.task_index, optimizer=shared_optimizer)]
+                #for i in range(len(workers)):
+                #    with tf.device('/job:worker/task:%d' % i):
+                #        agents.append(A3CAgent(env, global_network, 'Agent_%d' % i, optimizer=shared_optimizer))
 
                 init_op = tf.global_variables_initializer()
-                writer = tf.summary.FileWriter(hyper_parameters.log_dir) #.train.SummaryWriter(hyper_parameters.log_dir)
+                writer = tf.summary.FileWriter(hyper_parameters.log_dir, graph=graph) #.train.SummaryWriter(hyper_parameters.log_dir)
                 summary_op = tf.summary.merge_all()
                 saver = tf.train.Saver()
 
@@ -233,7 +224,7 @@ if __name__ == "__main__":
 
             with sv.managed_session(server.target) as sess:
                 #writer_new_event(hyper_parameters, sess)
-                agents[hyper_parameters.task_index]._train(sess)
+                agents[0]._train(sess)
 
         #sv.stop()
 
