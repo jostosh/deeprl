@@ -46,6 +46,7 @@ class ActorCriticNN(object):
                 self.build_loss()
 
             if global_network:
+                # If this NN has a global copy
                 self.build_param_sync()
                 self.build_param_update()
 
