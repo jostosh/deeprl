@@ -21,7 +21,7 @@ for (( c=$START; c<$END; c++ ))
 do
     echo Starting worker $c
     srun -n 1 -N 1 --exclusive python3 mproj/deeprl/rlmethods/a3c_distributed.py --env $1 --job_name worker \
-    --task_index $c --model a3c_lstm --log_dir $LOGS --port0 $3 &
+    --task_index $c --model a3c_ff --log_dir $LOGS --port0 $3 &
     sleep 1
 done
 
