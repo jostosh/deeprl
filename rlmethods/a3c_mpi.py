@@ -188,11 +188,11 @@ class A3CAgent(object):
                 all_values = []
                 all_rewards = []
 
-            duration = time.time() - t0
+            duration = (time.time() - t0) / batch_len
 
             nloops += 1
             mean_duration = (nloops - 1) / float(nloops) * mean_duration + duration / float(nloops)
-            logger.info("Mean duration {}".format(mean_duration / batch_len))
+            logger.info("Mean duration {}".format(mean_duration))
 
 
 def upper_bounds(v_t, r_t, v_end):
@@ -301,7 +301,7 @@ if __name__ == "__main__":
         session = tf.Session()
         agent = A3CAgent(env_name, 'mpi', 'Agent_%d' % rank, session, optimizer=None)
 
-        writer = tf.summary.FileWriter(os.path.join(hyper_parameters.logdir, 'Agent_%d'.format(rank)), session.graph) #writer_new_event(hyper_parameters, session)
+        writer = tf.summary.FileWriter(os.path.join(hyper_parameters.logdir, 'Agent_{}'.format(rank)), session.graph) #writer_new_event(hyper_parameters, session)
 
         session.run(tf.global_variables_initializer())
 
