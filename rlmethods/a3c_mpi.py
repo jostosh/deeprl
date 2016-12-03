@@ -305,8 +305,7 @@ if __name__ == "__main__":
 
         logger.info(path)
 
-        if rank == 1:
-            writer = tf.summary.FileWriter(path, session.graph) #writer_new_event(hyper_parameters, session)
+        writer = tf.summary.FileWriter(path, session.graph) #writer_new_event(hyper_parameters, session)
 
         session.run(tf.global_variables_initializer())
 
