@@ -45,9 +45,12 @@ class ActorCriticNN(object):
             with tf.name_scope('Loss'):
                 self.build_loss()
 
-            if global_network:
+            if global_network and global_network != 'mpi':
                 # If this NN has a global copy
                 self.build_param_sync()
+                self.build_param_update()
+
+            if global_network == 'mpi':
                 self.build_param_update()
 
             if self.frame_prediction:
@@ -503,4 +506,70 @@ class ActorCriticNN(object):
             session.run(self.optimizer.minimize, feed_dict=fdict)
 
         return summaries
+        #writer.add_summary(summaries, t)
+
+
+
+    def compute_delta(self, n_step_return, actions, states, values, learning_rate_var, lr, last_state, session):
+        """
+        Updates the parameters of the global network
+        :param n_step_return:       n-step returns
+        :param actions:             array of actions
+        :param states:              array of states
+        :param values:              array of values
+        :param learning_rate_var:   learning rate placeholder,
+        :param lr:                  actual learning rate
+        """
+        n_steps = len(n_step_return)
+
+        if self.recurrent:
+            # First we need to pad the sequences we got
+            n_pad = self.t_max - n_steps
+            pad1d = np.zeros(n_pad)
+            n_step_return   = np.concatenate([n_step_return, pad1d]).reshape((self.t_max, 1))
+            actions         = np.concatenate([actions, pad1d])
+            values          = np.concatenate([values, pad1d]).reshape((self.t_max, 1))
+            states          = np.concatenate([states, np.zeros((self.t_max - n_steps,) + states[0].shape)])
+
+            fdict = {
+                self.n_step_returns: n_step_return.reshape((self.t_max, 1)),
+                self.actions: actions,
+                self.inputs: states,
+                self.advantage_no_grad: (n_step_return - values).reshape((self.t_max, 1)),
+                self.initial_state: self.lstm_first_state_since_update,
+                self.n_steps: [n_steps]
+            }
+            if self.frame_prediction:
+                fdict.update({self.frame_target: states[1:] + [last_state]})
+
+            # Now we update our parameters AND we take the lstm_state
+            gradients, summaries, self.lstm_state_numeric = session.run([
+                self.local_gradients,
+                self.merged_summaries,
+                self.lstm_state_variable
+            ],
+                feed_dict=fdict
+            )
+            # We also need to remember the LSTM state for the next backward pass
+            self.lstm_first_state_since_update = deepcopy(self.lstm_state_numeric)
+        else:
+            fdict = {
+                self.n_step_returns: n_step_return.reshape((n_steps, 1)),
+                self.actions: actions,
+                self.inputs: states,
+                self.advantage_no_grad: (n_step_return - values).reshape((n_steps, 1))
+            }
+            if self.frame_prediction:
+                fdict.update({self.frame_target: states[1:] + [last_state]})
+
+            # Update the parameters
+            gradients, summaries = session.run([
+                self.local_gradients,
+                self.merged_summaries
+            ],
+                feed_dict=fdict
+            )
+
+
+        return summaries, gradients
         #writer.add_summary(summaries, t)

@@ -1,10 +1,11 @@
 import argparse
 from deeprl.approximators.nn import ModelNames
-
+import os
 """
 For some important parameter settings checkout:
 https://github.com/muupan/async-rl/wiki
 """
+
 config1 = {
     'T_max': 80e6,
     't_max': 5,
@@ -24,7 +25,8 @@ config1 = {
     'clip_advantage': False,
     'render': False,
     'pwv': False,
-    'frame_prediction': False
+    'frame_prediction': False,
+    'logdir': os.path.expanduser("~/tensorflowlogs/mpi")
 }
 
 
@@ -77,4 +79,5 @@ class HyperParameters(object):
         self.render = params.render
         self.policy_weighted_val = params.pwv
         self.frame_prediction = params.frame_prediction
+        self.logdir = params.logdir
 
