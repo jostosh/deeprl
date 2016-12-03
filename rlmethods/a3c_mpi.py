@@ -192,7 +192,7 @@ class A3CAgent(object):
 
             nloops += 1
             mean_duration = (nloops - 1) / float(nloops) * mean_duration + duration / float(nloops)
-            logger.info("Mean duration {}".format(mean_duration / batch_len))
+            #logger.info("Mean duration {}".format(mean_duration / batch_len))
 
 
 def upper_bounds(v_t, r_t, v_end):
@@ -216,10 +216,6 @@ def parameter_server():
 
     buffers = [np.empty(bufferlen, 'float32') for _ in range(1, comm.size)]
     recv_reqs = [comm.Irecv([buffers[i - 1], MPI.FLOAT], source=i, tag=MPI.ANY_TAG) for i in range(1, comm.size)]
-    #logger.info("Recieve request sent")
-
-    statuses = [MPI.Status() for _ in range(1, comm.size)]
-
     send_buffers = [None] * (comm.size - 1)
 
     while True:
