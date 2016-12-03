@@ -300,8 +300,8 @@ if __name__ == "__main__":
     else:
         session = tf.Session()
         agent = A3CAgent(env_name, 'mpi', 'Agent_%d' % rank, session, optimizer=None)
-
-        writer = tf.summary.FileWriter(os.path.join(hyper_parameters.logdir, 'Agent_{}'.format(rank)), session.graph) #writer_new_event(hyper_parameters, session)
+        path = os.path.join(hyper_parameters.logdir, 'Agent_{}'.format(rank))
+        writer = tf.summary.FileWriter(path, session.graph) #writer_new_event(hyper_parameters, session)
 
         session.run(tf.global_variables_initializer())
 
