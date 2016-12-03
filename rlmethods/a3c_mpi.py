@@ -174,15 +174,13 @@ class A3CAgent(object):
             self.req = comm.Isend([params_to_1d(delta), MPI.FLOAT], dest=0, tag=tags.DELTA)
             self.req.Free()
 
-            if rank == 1:
-                writer.add_summary(summaries, self.t)
+            writer.add_summary(summaries, self.t)
 
             if terminal_state:
                 logger.info('|WORKER {}| Terminal state reached (episode {}, t {}, reward {}): resetting state'\
                             .format(rank, self.n_episodes, self.t, epr))
 
-                if rank == 1:
-                    writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr), T)
+                writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr), T)
                 self.n_episodes += 1
                 self.last_state = self.env.reset()
                 epr = 0
@@ -195,7 +193,7 @@ class A3CAgent(object):
 
             nloops += 1
             mean_duration = (nloops - 1) / float(nloops) * mean_duration + duration / float(nloops)
-            logger.info("Mean duration {}".format(mean_duration))
+            #logger.info("Mean duration {}".format(mean_duration))
 
 
 def upper_bounds(v_t, r_t, v_end):
