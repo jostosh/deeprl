@@ -174,12 +174,15 @@ class A3CAgent(object):
             self.req = comm.Isend([params_to_1d(delta), MPI.FLOAT], dest=0, tag=tags.DELTA)
             self.req.Free()
 
-            #writer.add_summary(summaries, self.t)
+            if rank == 1:
+                writer.add_summary(summaries, self.t)
 
             if terminal_state:
-                logger.info('Terminal state reached (episode {}, reward {}): resetting state'.format(self.n_episodes, epr))
+                logger.info('|WORKER {}| Terminal state reached (episode {}, t {}, reward {}): resetting state'\
+                            .format(rank, self.n_episodes, self.t, epr))
 
-                #writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr), T)
+                if rank == 1:
+                    writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr), T)
                 self.n_episodes += 1
                 self.last_state = self.env.reset()
                 epr = 0
@@ -301,7 +304,11 @@ if __name__ == "__main__":
         session = tf.Session()
         agent = A3CAgent(env_name, 'mpi', 'Agent_%d' % rank, session, optimizer=None)
         path = os.path.join(hyper_parameters.logdir, 'Agent_{}'.format(rank))
-        writer = tf.summary.FileWriter(path, session.graph) #writer_new_event(hyper_parameters, session)
+
+        logger.info(path)
+
+        if rank == 1:
+            writer = tf.summary.FileWriter(path, session.graph) #writer_new_event(hyper_parameters, session)
 
         session.run(tf.global_variables_initializer())
 
