@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-#SBATCH --time=96:00:00
+#SBATCH --time=00:10:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=17
 #SBATCH --job-name=A3C_MPI

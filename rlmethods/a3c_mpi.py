@@ -107,9 +107,12 @@ class A3CAgent(object):
         nloops = 0
         mean_duration = 0
 
+        total_duration = 0.
+
         # Main loop, execute this while T < T_max
         while T < hyper_parameters.T_max:
             #[arr.fill(0) for arr in [rewards, actions, values, n_step_targets, states]]
+            t0 = time.time()
 
             # A new batch begins, reset the gradients and synchronize thread-specific parameters
             self.synchronize_thread_parameters()
@@ -120,7 +123,6 @@ class A3CAgent(object):
             # Boolean to denote whether the current state is terminal
             terminal_state = False
 
-            t0 = time.time()
 
             # Now take steps following the thread-specific policy given by self.theta and self.theta_v
             while not terminal_state and self.t - t_start != hyper_parameters.t_max:
@@ -190,10 +192,13 @@ class A3CAgent(object):
                 all_rewards = []
 
             duration = (time.time() - t0) / batch_len
+            total_duration += time.time() - t0
 
             nloops += 1
             mean_duration = (nloops - 1) / float(nloops) * mean_duration + duration / float(nloops)
-            #logger.info("Mean duration {}".format(mean_duration))
+            if rank == 1 and (self.t / 10) % 10 == 0:
+                logger.info("Mean duration {}, or {} per hour".format(mean_duration,
+                                                                      3600 / mean_duration * (comm.size - 1)))
 
 
 def upper_bounds(v_t, r_t, v_end):
@@ -219,6 +224,8 @@ def parameter_server():
     recv_reqs = [comm.Irecv([buffers[i - 1], MPI.FLOAT], source=i, tag=MPI.ANY_TAG) for i in range(1, comm.size)]
     send_buffers = [None] * (comm.size - 1)
 
+    theta = params_to_1d(session.run(global_network.theta))
+
     while True:
         MPI.Request.waitany(recv_reqs, status=status)
         #ret = MPI.Request.Waitsome(recv_reqs, statuses=statuses)
@@ -239,7 +246,7 @@ def parameter_server():
         #comm.Recv([data, MPI.FLOAT], source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
 
         if tag == tags.SYNCPARAM:
-            send_buffers[source - 1] = params_to_1d(session.run(global_network.theta))
+            send_buffers[source - 1] = params_to_1d(session.run(global_network.theta)) #theta
             send_req = comm.Isend([send_buffers[source - 1], MPI.FLOAT], dest=source, tag=tags.SYNCPARAM)
             send_req.Free()
         elif tag == tags.DELTA:
@@ -250,6 +257,7 @@ def parameter_server():
             }
             fdict[learning_rate_ph] = current_lr
             session.run(shared_optimizer.minimize, feed_dict=fdict)
+            #theta = params_to_1d(session.run(shared_optimizer.minimize, feed_dict=fdict))
 
 
 
