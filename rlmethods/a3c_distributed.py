@@ -75,9 +75,14 @@ class A3CAgent(object):
 
         epr = 0
 
+        nloops = 0
+        mean_duration = 0
+
+        total_duration = 0.
         # Main loop, execute this while T < T_max
         while T < hyper_parameters.T_max:
             # [arr.fill(0) for arr in [rewards, actions, values, n_step_targets, states]]
+            t0 = time.time()
 
             # A new batch begins, reset the gradients and synchronize thread-specific parameters
             start = time.time()
@@ -107,7 +112,7 @@ class A3CAgent(object):
                 # Increment time counters
                 self.t += 1
                 T += 1
-                current_lr -= lr_step
+                current_lr = hyper_parameters.learning_rate - lr_step * session.run(global_step)
 
                 epr += rewards[i]
                 step = session.run(increment_step)
@@ -161,12 +166,22 @@ class A3CAgent(object):
             end = time.time()
             #logger.debug("Time for episode reset: {}".format((end - start)))
 
+            duration = (time.time() - t0) / batch_len
+            total_duration += time.time() - t0
+
+            nloops += 1
+            mean_duration = (nloops - 1) / float(nloops) * mean_duration + duration / float(nloops)
+            # if rank == 1 and (self.t / 10) % 10 == 0:
+            logger.info("Mean duration {}, or {} per hour".format(mean_duration,
+                                                                  3600 / mean_duration * (len(workers))))
+
 
 if __name__ == "__main__":
     hyper_parameters = HyperParameters(parse_cmd_args())
-    parameter_servers = ["localhost:{}".format(hyper_parameters.port0)]
-    workers = ["localhost:{}".format(str(hyper_parameters.port0 + 1 + i))
-               for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']) - 1)]
+    parameter_servers = ["localhost:{}".format(hyper_parameters.port0), "localhost:{}".format(hyper_parameters.port0 + 1)]
+    workers = ["localhost:{}".format(str(hyper_parameters.port0 + len(parameter_servers) + i))
+               for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']) - len(parameter_servers))]
+    logger.info("We should have {} instances running".format(int(os.environ['SLURM_JOB_CPUS_PER_NODE'])))
     cluster = tf.train.ClusterSpec({"ps": parameter_servers, "worker": workers})
     server = tf.train.Server(cluster, job_name=hyper_parameters.job_name, task_index=hyper_parameters.task_index)
     if hyper_parameters.job_name == "ps":
@@ -175,6 +190,7 @@ if __name__ == "__main__":
         with tf.Graph().as_default() as graph:
             is_chief = (hyper_parameters.task_index == 0)
             logger.info("This task is {}chief.".format("" if is_chief else 'NOT '))
+            logger.info("Cluster: {}".format(cluster.as_cluster_def()))
             T = 1
             lr_step = hyper_parameters.learning_rate / hyper_parameters.T_max
             current_lr = hyper_parameters.learning_rate
@@ -186,7 +202,8 @@ if __name__ == "__main__":
 
             with tf.device(tf.train.replica_device_setter(
                     worker_device="/job:worker/task:%d" % hyper_parameters.task_index,
-                    cluster=cluster
+                    cluster=cluster,
+                    ps_ops=[]
             )):
                 global_step = tf.Variable(0)
                 increment_step = global_step.assign_add(1, use_locking=False)
@@ -201,7 +218,7 @@ if __name__ == "__main__":
                                                agent_name='GLOBAL',
                                                hyper_parameters=hyper_parameters,
                                                optimizer=shared_optimizer)
-                shared_optimizer.build_update(global_network.theta)
+                shared_optimizer.set_global_theta(global_network.theta)  # .build_update(global_network.theta)
 
                 env = get_env(env_name, frames_per_state=hyper_parameters.frames_per_state, output_shape=hyper_parameters.input_shape[1:])
                 agents = [A3CAgent(env, global_network, 'Agent_%d' % hyper_parameters.task_index, optimizer=shared_optimizer)]

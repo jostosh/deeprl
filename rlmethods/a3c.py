@@ -72,9 +72,18 @@ class A3CAgent(object):
 
         epr = 0
 
+        all_rewards = []
+        all_values = []
+
+        nloops = 0
+        mean_duration = 0
+
+        total_duration = 0.
+
         # Main loop, execute this while T < T_max
         while T < hyper_parameters.T_max:
             #[arr.fill(0) for arr in [rewards, actions, values, n_step_targets, states]]
+            t0 = time.time()
 
             # A new batch begins, reset the gradients and synchronize thread-specific parameters
             self.synchronize_thread_parameters()
@@ -103,6 +112,9 @@ class A3CAgent(object):
                 current_lr -= lr_step
 
                 epr += rewards[i]
+
+                all_rewards.append(rewards[i])
+                all_values.append(values[i])
 
             if hyper_parameters.clip_rewards:
                 # Reward clipping helps to stabilize training
@@ -139,6 +151,32 @@ class A3CAgent(object):
                 epr = 0
                 self.local_network.reset()
 
+                all_values = []
+                all_rewards = []
+
+            duration = (time.time() - t0) / batch_len
+            total_duration += time.time() - t0
+
+            nloops += 1
+            mean_duration = (nloops - 1) / float(nloops) * mean_duration + duration / float(nloops)
+            logger.info("Mean duration {}, or {} per hour".format(mean_duration,
+                                                                 3600 / mean_duration * n_threads))
+
+
+def upper_bounds(v_t, r_t, v_end):
+    T = len(r_t)
+
+    R_t = np.array(r_t)
+
+    g = hyper_parameters.gamma
+
+    R_t[-1] += g * v_end
+    for i in reversed(range(T - 1)):
+        R_t[i] += g * R_t[i+1]
+
+    return [g ** (-t2) * min([g * v_t[t1] + R_t[-t2] - R_t[t1] for t1 in range(T - t2)])
+            for t2 in range(hyper_parameters.t_max)]
+
 
 if __name__ == "__main__":
 
@@ -168,7 +206,7 @@ if __name__ == "__main__":
                                    agent_name='GLOBAL',
                                    hyper_parameters=hyper_parameters,
                                    optimizer=shared_optimizer)
-    shared_optimizer.build_update(global_network.theta)
+    shared_optimizer.set_global_theta(global_network.theta) #.build_update(global_network.theta)
 
     agents = [A3CAgent(env_name, global_network, 'Agent_%d' % i, session, optimizer=shared_optimizer)
               for i in range(n_threads)]
