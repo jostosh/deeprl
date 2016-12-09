@@ -159,8 +159,8 @@ class A3CAgent(object):
 
             nloops += 1
             mean_duration = (nloops - 1) / float(nloops) * mean_duration + duration / float(nloops)
-            logger.info("Mean duration {}, or {} per hour".format(mean_duration,
-                                                                 3600 / mean_duration * n_threads))
+            #logger.info("Mean duration {}, or {} per hour".format(mean_duration,
+            #                                                     3600 / mean_duration * n_threads))
 
 
 def upper_bounds(v_t, r_t, v_end):
