@@ -175,7 +175,7 @@ def train(sess):
     combined_losses = [tf.div(tf.add_n([net.loss for net in chained_nets[:phase['n_steps']]]), phase['n_steps'])
                        for phase in phases]
     train_steps = [o.minimize(combined_loss) for o, combined_loss in zip(optimizers, combined_losses)]
-    sess.run(tf.initialize_all_variables())
+    sess.run(tf.global_variables_initializer())
 
     for i, phase, train_step in zip(range(len(phases)), phases, train_steps):
         iter = 0
