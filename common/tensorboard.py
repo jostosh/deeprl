@@ -33,7 +33,7 @@ def writer_new_event(hyper_parameters, session):
     :return:                    Returns a SummaryWriter object
     """
     # Get the logging dir
-    fulldir = get_log_dir()
+    fulldir = get_log_dir(hyper_parameters)
 
     logger.info("Writing TensorBoard logs to {}".format(fulldir))
     return tf.train.SummaryWriter(fulldir, session.graph)
