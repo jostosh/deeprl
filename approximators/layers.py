@@ -2,7 +2,8 @@ from tflearn.layers.recurrent import BasicLSTMCell, _rnn_template
 import tensorflow as tf
 
 from tensorflow.python.ops.rnn_cell import RNNCell, _get_concat_variable, LSTMStateTuple
-from tensorflow.python.ops.rnn import rnn
+from tensorflow.python.ops.rnn import rnn, dynamic_rnn
+from tensorflow.python.ops.rnn_cell import BasicLSTMCell as tfLSTMCell
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import clip_ops
 from tensorflow.python.ops import init_ops
@@ -250,16 +251,16 @@ def pack_sequence(sequence):
 def custom_lstm(incoming, n_units, activation=tf.nn.tanh, forget_bias=1.0, initial_state=None, scope=None,
                 name="LSTM", sequence_length=None):
 
-    with tf.name_scope(name):
-        cell = LSTMCell(n_units, forget_bias=forget_bias, activation=activation, name=name)
+    #with tf.name_scope(name) as scope:
+    with tf.variable_scope(name) as vs:
+        cell = tfLSTMCell(n_units, forget_bias=forget_bias, activation=activation)#LSTMCell(n_units, forget_bias=forget_bias, activation=activation, name=name)
+        o, state = dynamic_rnn(cell, incoming, initial_state=initial_state, sequence_length=sequence_length, scope=vs)
+        #o.scope = vs
+        vs.reuse_variables()
+        o.W = tf.get_variable('BasicLSTMCell/Linear/Matrix')#cell.W
+        o.b = tf.get_variable('BasicLSTMCell/Linear/Bias')#cell.b
 
-        o, state = rnn(cell, unpack_sequence(incoming), initial_state=initial_state, sequence_length=sequence_length,
-                       scope=scope)
-        o = pack_sequence(o)
-
-    o.scope = scope
-    o.W = cell.W
-    o.b = cell.b
+        print(o.W, o.b)
 
     return o, state
 
