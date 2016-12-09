@@ -156,14 +156,12 @@ class ActorCriticNN(object):
         net, scope = self._nips_hidden_layers(return_scope=True)
 
         with tf.name_scope(scope) as scope:
-            net = tflearn.reshape(net, [1, self.t_max, 256], "ReshapedLSTMInput")
+            net = tflearn.reshape(net, [1, -1, 256], "ReshapedLSTMInput")
             net, state = custom_lstm(net, 256, initial_state=self.initial_state, name='LSTM4_{}'.format(self.agent_name),
                                      sequence_length=self.n_steps)
             self._add_trainable(net)
-            net = tflearn.reshape(net, [self.t_max, 256], name="ReshapedLSTMOutput")
+            net = tflearn.reshape(net, [-1, 256], name="ReshapedLSTMOutput")
             self.lstm_state_variable = state
-
-
 
             #logger.info(tflearn.get_layer_variables_by_name('LSTM4_{}'.format(self.agent_name)))
 
@@ -248,7 +246,7 @@ class ActorCriticNN(object):
         with tf.name_scope('ForwardInputs') as scope:
             self.forward_input_scope = scope
             if self.recurrent:
-                self.inputs = tf.placeholder(tf.float32, [self.t_max] + input_shape)
+                self.inputs = tf.placeholder(tf.float32, [None] + input_shape)
             else:
                 self.inputs = tf.placeholder(tf.float32, [None] + input_shape)
         logger.info('Building network: {}'.format(self.model_name))
@@ -324,7 +322,8 @@ class ActorCriticNN(object):
 
     def build_param_update(self):
         with tf.name_scope("ParamUpdate"):
-            self.local_gradients = [tf.clip_by_norm(grad, 40.0) for grad in tf.gradients(self.loss, self.theta)]
+            #self.local_gradients = [tf.clip_by_norm(grad, 40.0) for grad in tf.gradients(self.loss, self.theta)]
+            self.minimize = self.optimizer.build_update_from_vars(self.theta, self.loss)
 
     def build_loss(self):
         """
@@ -368,6 +367,7 @@ class ActorCriticNN(object):
 
         # We can combine the policy loss and the value loss in a single expression
         with tf.name_scope("CombinedLoss"):
+            '''
             if self.recurrent:
                 # In case of a recurrent implementation, we need to mask the the losses that are not in the sequence
                 with tf.name_scope("SequenceMasking"):
@@ -380,6 +380,8 @@ class ActorCriticNN(object):
                     # Multiply the losses with the mask
                     pi_loss = tf.mul(seq_mask, pi_loss, name='MaskedPiLoss')
                     value_loss = tf.mul(seq_mask, value_loss, name='MaskedValueLoss')
+            '''
+
 
             # Add losses and use a factor 0.5 for the value loss as suggested by Mnih
             self.loss = tf.reduce_mean(pi_loss + 0.5 * value_loss, name='Loss')
@@ -454,33 +456,34 @@ class ActorCriticNN(object):
             # First we need to pad the sequences we got
             n_pad = self.t_max - n_steps
             pad1d = np.zeros(n_pad)
-            n_step_return   = np.concatenate([n_step_return, pad1d]).reshape((self.t_max, 1))
-            actions         = np.concatenate([actions, pad1d])
-            values          = np.concatenate([values, pad1d]).reshape((self.t_max, 1))
-            states          = np.concatenate([states, np.zeros((self.t_max - n_steps,) + states[0].shape)])
+            #n_step_return   = np.concatenate([n_step_return, pad1d]).reshape((self.t_max, 1))
+            #actions         = np.concatenate([actions, pad1d])
+            #values          = np.concatenate([values, pad1d]).reshape((self.t_max, 1))
+            #states          = np.concatenate([states, np.zeros((self.t_max - n_steps,) + states[0].shape)])
 
             fdict = {
-                self.n_step_returns: n_step_return.reshape((self.t_max, 1)),
+                self.n_step_returns: n_step_return.reshape(n_steps, 1), #((self.t_max, 1)),
                 self.actions: actions,
                 self.inputs: states,
-                self.advantage_no_grad: (n_step_return - values).reshape((self.t_max, 1)),
+                self.advantage_no_grad: (n_step_return - values).reshape((n_steps, 1)), #((self.t_max, 1)),
                 self.initial_state: self.lstm_first_state_since_update,
-                self.n_steps: [n_steps]
+                self.n_steps: [n_steps],
+                self.optimizer.learning_rate: lr
             }
             if self.frame_prediction:
                 fdict.update({self.frame_target: states[1:] + [last_state]})
 
             # Now we update our parameters AND we take the lstm_state
             gradients, summaries, self.lstm_state_numeric = session.run([
-                self.local_gradients,
+                self.minimize,
                 self.merged_summaries,
                 self.lstm_state_variable
             ],
                 feed_dict=fdict
             )
-            fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
-            fdict[self.optimizer.learning_rate] = lr
-            session.run(self.optimizer.minimize, feed_dict=fdict)
+            #fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
+            #fdict[self.optimizer.learning_rate] = lr
+            #session.run(self.optimizer.minimize, feed_dict=fdict)
             # We also need to remember the LSTM state for the next backward pass
             self.lstm_first_state_since_update = deepcopy(self.lstm_state_numeric)
         else:
@@ -488,22 +491,24 @@ class ActorCriticNN(object):
                 self.n_step_returns: n_step_return.reshape((n_steps, 1)),
                 self.actions: actions,
                 self.inputs: states,
-                self.advantage_no_grad: (n_step_return - values).reshape((n_steps, 1))
+                self.advantage_no_grad: (n_step_return - values).reshape((n_steps, 1)),
+                self.optimizer.learning_rate: lr
             }
             if self.frame_prediction:
                 fdict.update({self.frame_target: states[1:] + [last_state]})
 
             # Update the parameters
             gradients, summaries = session.run([
-                self.local_gradients,
-                self.merged_summaries
+                #self.local_gradients,
+                self.minimize,
+                self.merged_summaries,
             ],
                 feed_dict=fdict
             )
 
-            fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
-            fdict[self.optimizer.learning_rate] = lr
-            session.run(self.optimizer.minimize, feed_dict=fdict)
+            #fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
+            #fdict[self.optimizer.learning_rate] = lr
+            #session.run(self.optimizer.minimize, feed_dict=fdict)
 
         return summaries
         #writer.add_summary(summaries, t)
