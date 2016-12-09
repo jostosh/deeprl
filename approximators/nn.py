@@ -384,7 +384,7 @@ class ActorCriticNN(object):
 
 
             # Add losses and use a factor 0.5 for the value loss as suggested by Mnih
-            self.loss = tf.reduce_mean(pi_loss + 0.5 * value_loss, name='Loss')
+            self.loss = tf.reduce_sum(pi_loss + 0.5 * value_loss, name='Loss')
 
             # Add TensorBoard summaries
             self.summaries.append(tf.summary.scalar('{}/Loss'.format(self.agent_name), self.loss))
