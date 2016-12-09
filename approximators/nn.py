@@ -126,12 +126,15 @@ class ActorCriticNN(object):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers'):
-            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1')
+            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1', weight_decay=0.0,
+                                  bias_init=tf.constant_initializer(0.1), padding='valid')
             self._add_trainable(net)
-            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='linear', name='Conv2')
+            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='linear', name='Conv2', weight_decay=0.0,
+                                  bias_init=tf.constant_initializer(0.1), padding='valid')
             self._add_trainable(net)
             net = spatialsoftmax(net)
-            net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
+            net = tflearn.fully_connected(net, 256, activation='relu', name='FC3', weight_decay=0.0,
+                                          bias_init=tf.constant_initializer(0.1))
             self._add_trainable(net)
 
         return net
