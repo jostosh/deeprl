@@ -37,12 +37,11 @@ class RMSPropCustom(object):
         self.global_theta = theta
         self._init_from_prototype(theta)
 
-
     def build_update_from_vars(self, theta, loss):
         assert self.global_theta and self.g_moving_average
 
         with tf.name_scope("GradientInput"):
-            grads = tf.gradients(loss, theta) #[tf.placeholder(tf.float32, shape=var.get_shape().as_list()) for var in theta]
+            grads = [tf.clip_by_norm(grad, 40.0) for grad in tf.gradients(loss, theta)]
 
         with tf.name_scope("MovingAverageGradientUpdate"):
             g_update = [tf.assign(g, self.decay * g + (1 - self.decay) * tf.square(d_t), use_locking=False)
