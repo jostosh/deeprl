@@ -15,7 +15,7 @@ from tensorflow.python.ops.math_ops import sigmoid
 from tensorflow.python.ops.math_ops import tanh
 
 from tensorflow.python.platform import tf_logging as logging
-
+import tflearn
 
 def spatialsoftmax(incoming, epsilon=0.01):
     # Get the incoming dimensions (should be a 4D tensor)
@@ -263,6 +263,101 @@ def custom_lstm(incoming, n_units, activation=tf.nn.tanh, forget_bias=1.0, initi
         print(o.W, o.b)
 
     return o, state
+
+
+def soft_weight_sharing(incoming, n_centroids, n_filters, filter_size, strides, activation, name='SoftWeightConv',
+                        scope=None, reuse=False, local_normalization=True, centroids_trainable=False):
+    """
+    Defines a soft weight sharing layer. The soft weight sharing is accomplished by performing multiple convolutions
+    which are then combined by a local weighting locally depends on the distance to the 'centroid' of each convolution.
+    The centroids are located in between 0 and 1.
+    Parameters:
+        :param incoming:        Incoming 4D tensor
+        :param n_centroids:     Number of centroids (i.e. the number of 'sub'-convolutions to perform
+        :param n_filters:       The number of filters for each convolution
+        :param filter_size:     The filter size (assumed to be square)
+        :param strides:         The filter stride
+        :param activation:      Activation function
+        :param name:            The name of this layer
+        :param scope:           An optional scope
+        :param reuse:           Whether or not to reuse variables here
+        :param local_normalization: If True, the distance weighting is locally normalized which serves as a sort of
+                    lateral inhibition between competing sub-convolutions. The normalization is divisive.
+        :param centroids_trainable: If True, the centroids are trainable. Note that they are concatenated with the
+                    conv layers' `b's for compatibility with other tflearn layers
+
+    Return values:
+        :return: A 4D Tensor with similar dimensionality as a normal conv_2d's output
+    """
+
+    try:
+        vscope = tf.variable_scope(scope, default_name=name, values=[incoming],
+                                   reuse=reuse)
+    except Exception:
+        vscope = tf.variable_op_scope([incoming], scope, name, reuse=reuse)
+
+    with vscope as scope:
+        name = scope.name
+        with tf.name_scope("SubConvolutions"):
+            convs = [tflearn.conv_2d(incoming, nb_filter=n_filters, filter_size=filter_size, strides=strides, padding='valid',
+                                     weight_decay=0., name='SubConv{}'.format(i), activation='linear')
+                     for i in range(n_centroids)]
+            stacked_convs = tf.stack(convs, axis=4, name='StackedConvs')
+
+        assert convs
+        _, m, n, k = convs[0].get_shape().as_list()
+
+        with tf.name_scope("DistanceWeighting"):
+            # First define the x-coordinates per cell. We exploit the TensorFlow's broadcast mechanisms by using
+            # single-sized dimensions
+            # TODO maybe the linspace should be between 0 and a with a < 1 to make the trainable centroids stable enough
+            y_coordinates = tf.reshape(tf.linspace(0., 1., m), [1, m, 1, 1, 1])
+            x_coordinates = tf.reshape(tf.linspace(0., 1., n), [1, 1, n, 1, 1])
+
+            # Define the centroids variables
+            centroids_x = tf.Variable(tf.random_uniform([n_centroids], minval=0, maxval=1),
+                                      trainable=centroids_trainable)
+            centroids_y = tf.Variable(tf.random_uniform([n_centroids], minval=0, maxval=1),
+                                      trainable=centroids_trainable)
+
+            # Define the distance of each cell w.r.t. the centroids. We can easily accomplish this through broadcasting
+            # i.e. x_diff2 will have shape [1, 1, n, 1, c] with n as above and c the number of centroids. Similarly,
+            # y_diff2 will have shape [1, m, 1, 1, c]
+            x_diff2 = tf.square(tf.reshape(centroids_x, [1, 1, 1, 1, n_centroids]) - x_coordinates, name='xDiffSquared')
+            y_diff2 = tf.square(tf.reshape(centroids_y, [1, 1, 1, 1, n_centroids]) - y_coordinates, name='yDiffSquared')
+
+            # Again, we use broadcasting. The result is of shape [1, m, n, 1, c]
+            euclidian_dist = tf.sqrt(x_diff2 + y_diff2, name="Euclidean")
+
+            # Optionally, we will perform local normalization such that the weight coefficients add up to 1 for each
+            # spatial cell.
+            if local_normalization:
+                # Add up the distances locally
+                total_distance_per_cell = tf.reduce_sum(euclidian_dist, axis=4, keep_dims=True)
+                # Now divide
+                euclidian_dist = tf.div(euclidian_dist, total_distance_per_cell, name='NormalizedEuclidean')
+
+        with tf.name_scope("SoftWeightSharing"):
+            # Compute the distance-weighted output
+            dist_weighted = tf.mul(euclidian_dist, stacked_convs, name='DistanceWeighted')
+
+            # Apply non-linearity
+            out = activation(tf.reduce_sum(dist_weighted, axis=4), name='Output')
+
+            # Set the variables
+            out.W = tf.concat(3, [conv.W for conv in convs], name='W_concat')
+            out.b = tf.concat(0, [conv.b for conv in convs] + [centroids_x, centroids_y], name='b_concatAndCentroids')
+
+            # Add to collection for tflearn functionality
+            tf.add_to_collection(tf.GraphKeys.LAYER_VARIABLES + '/' + name, out.W)
+            tf.add_to_collection(tf.GraphKeys.LAYER_VARIABLES + '/' + name, out.b)
+            tf.add_to_collection(tf.GraphKeys.ACTIVATIONS + '/' + name, out)
+
+    # Add to collection for tflearn functionality
+    tf.add_to_collection(tf.GraphKeys.LAYER_TENSOR + '/' + name, out)
+    return out
+
+
 
 
 def lstm(incoming, n_units, activation='tanh', inner_activation='sigmoid',
