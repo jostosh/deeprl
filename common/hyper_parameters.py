@@ -26,7 +26,8 @@ config1 = {
     'render': False,
     'pwv': False,
     'frame_prediction': False,
-    'logdir': os.path.expanduser("~/tensorflowlogs/mpi")
+    'logdir': os.path.expanduser("~/tensorflowlogs/mpi"),
+    'residual_prediction': False
 }
 
 
@@ -80,4 +81,5 @@ class HyperParameters(object):
         self.policy_weighted_val = params.pwv
         self.frame_prediction = params.frame_prediction
         self.logdir = params.logdir
+        self.residual_prediction = params.residual_prediction
 

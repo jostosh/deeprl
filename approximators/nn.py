@@ -38,12 +38,19 @@ class ActorCriticNN(object):
         self.input_shape = hyper_parameters.input_shape
         self.policy_weighted_val = hyper_parameters.policy_weighted_val
         self.frame_prediction = hyper_parameters.frame_prediction
+        self.residual_prediction = hyper_parameters.residual_prediction
+        self.layers = {}
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
         with tf.name_scope(agent_name):
             self.build_network(num_actions, hyper_parameters.input_shape)
+
             with tf.name_scope('Loss'):
                 self.build_loss()
+
+            if self.frame_prediction:
+                with tf.name_scope('FramePrediction'):
+                    self.build_frame_predictor()
 
             if global_network and global_network != 'mpi':
                 # If this NN has a global copy
@@ -53,23 +60,26 @@ class ActorCriticNN(object):
             if global_network == 'mpi':
                 self.build_param_update()
 
-            if self.frame_prediction:
-                with tf.name_scope('FramePrediction'):
-                    self.build_frame_predictor()
 
         self.merged_summaries = tf.summary.merge(self.summaries)#tf.merge_summary(self.summaries)
 
-    def _nips_hidden_layers(self, return_scope=False):
+    def _nips_hidden_layers(self):
         with tf.name_scope(self.forward_input_scope):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers') as scope:
-            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1', weight_decay=0.0,
+            # Add first convolutional layer
+            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='linear', name='Conv1', weight_decay=0.0,
                                   bias_init=tf.constant_initializer(0.1), padding='valid')
             self._add_trainable(net)
-            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name='Conv2', weight_decay=0.0,
+            net = tf.nn.relu(net, 'Conv1Relu')
+
+            # Add second convolutional layer
+            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='linear', name='Conv2', weight_decay=0.0,
                                   bias_init=tf.constant_initializer(0.1), padding='valid')
             self._add_trainable(net)
+            net = tf.nn.relu(net, 'Conv2Relu')
+
             net = tflearn.flatten(net)
             net = tflearn.fully_connected(net, 256, activation='relu', name='FC3', weight_decay=0.0,
                                           bias_init=tf.constant_initializer(0.1))
@@ -115,19 +125,12 @@ class ActorCriticNN(object):
         :return:                The feedforward model (last hidden layer) as a graph node
         """
         with tf.name_scope('Inputs'):
-            '''
-            net = self.inputs #tf.transpose(self.inputs, [0, 2, 3, 1])
-            net = tflearn.reshape(net, (-1, self.input_shape[-2], self.input_shape[-1], 1))
-            #logger.info(net)
-            net = tflearn.conv_2d(net, 1, 3, strides=2, activation='linear', name='Downsampling')
-            #logger.info(net)
-            net = tflearn.reshape(net, (-1, self.input_shape[0], 105, 80))
-            '''
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers'):
-            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1', weight_decay=0.0,
+            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='linear', name='Conv1', weight_decay=0.0,
                                   bias_init=tf.constant_initializer(0.1), padding='valid')
+            net = tf.nn.relu(net, 'Conv1Relu')
             self._add_trainable(net)
             net = tflearn.conv_2d(net, 64, 4, strides=2, activation='linear', name='Conv2', weight_decay=0.0,
                                   bias_init=tf.constant_initializer(0.1), padding='valid')
@@ -156,7 +159,7 @@ class ActorCriticNN(object):
             )
             self.n_steps = tf.placeholder(tf.int32, shape=[1])
 
-        net, scope = self._nips_hidden_layers(return_scope=True)
+        net, scope = self._nips_hidden_layers()
 
         with tf.name_scope(scope) as scope:
             net = tflearn.reshape(net, [1, -1, 256], "ReshapedLSTMInput")
@@ -228,10 +231,12 @@ class ActorCriticNN(object):
             self.reset_lstm_state()
 
     def _add_trainable(self, layer, name=None):
+        self.layers[layer.name] = layer
         if name:
             self.theta += tflearn.get_layer_variables_by_name(name)
         else:
-            self.theta += [layer.W, layer.b]
+            self.theta += [layer.W] + ([layer.b] if layer.b else [])
+        #logger.info('{}: {}'.format(layer.name, [t.name for t in self.theta]))
 
     def _small_fcn(self):
         """
@@ -249,9 +254,9 @@ class ActorCriticNN(object):
         with tf.name_scope('ForwardInputs') as scope:
             self.forward_input_scope = scope
             if self.recurrent:
-                self.inputs = tf.placeholder(tf.float32, [None] + input_shape)
+                self.inputs = tf.placeholder(tf.float32, [None] + input_shape, name="StateInput")
             else:
-                self.inputs = tf.placeholder(tf.float32, [None] + input_shape)
+                self.inputs = tf.placeholder(tf.float32, [None] + input_shape, name="StateInput")
         logger.info('Building network: {}'.format(self.model_name))
 
         self.theta = []
@@ -286,37 +291,56 @@ class ActorCriticNN(object):
         self.hidden_head = net
 
     def build_frame_predictor(self):
-        def decoding_network(incoming, conv1, conv2):
-            net = tflearn.reshape(incoming, [-1] + conv2.get_shape().as_list()[1:])
-            logger.info('Decoding input shape: {}'.format(net.get_shape()))
-            logger.info("Shape conv1 {}".format(conv1.get_shape().as_list()[1:]))
-            logger.info("Shape conv2 {}".format(conv2.get_shape().as_list()[1:]))
-            net = tflearn.conv_2d_transpose(net, 32, 4, strides=2, activation='relu',
+        def decoding_network(self, incoming, conv1, conv2):
+            # First we reshape the embedding into a volume with the shape of conv2
+            net = tflearn.reshape(incoming, [-1] + conv2.get_shape().as_list()[1:], 'TransformationReshaped')
+            if self.residual_prediction:
+                net += conv2
+            net = tf.nn.relu(net, 'TransformationRelu')
+
+            # Then we perform a conv_2d_transpose (this is sometimes referred to as a DeConvolution layer)
+            net = tflearn.conv_2d_transpose(net, 32, 4, strides=2, activation='linear',
                                             output_shape=conv1.get_shape().as_list()[1:],
-                                            weight_decay=0., padding='valid')
-            logger.info("input shape {}".format(self.input_shape))
-            net = tflearn.conv_2d_transpose(net, self.input_shape[0], 8, strides=4, activation='linear',
-                                            output_shape=[84, 84, 4], padding='valid', weight_decay=0.)
+                                            weight_decay=0., padding='valid', name='DeConv2')
+            self._add_trainable(net)
+            if self.residual_prediction:
+                net += conv1
+            net = tf.nn.relu(net, name='DeConv2Relu')
+
+
+            # Then we do the latter again
+            # todo I guess it does not help to predict the full next state, it should only predict the new frame
+            net = tflearn.conv_2d_transpose(net, 1, 8, strides=4, activation='linear',
+                                            output_shape=[84, 84, 1], padding='valid', weight_decay=0., name='DeConv1')
+            self._add_trainable(net)
+            net = tf.nn.relu(net, name='DeConv1Relu')
             return net
 
+        # Embed those actions
         action_one_hot = tflearn.one_hot_encoding(self.actions, self.num_actions)
-
         action_embedding = tflearn.fully_connected(action_one_hot, 256, weight_decay=0.0, bias=False,
-                                                   name='ActionEmbedding', restore=False)
-        encoding = tflearn.fully_connected(self.hidden_head, 256, weight_decay=0.0, bias=False,
-                                           name='EncodingEmbedding', restore=False)
+                                                   name='ActionEmbedding', activation='linear')
+        self._add_trainable(action_embedding)
 
-        conv1 = tflearn.get_layer_by_name('Conv1'.format(self.agent_name))
-        conv2 = tflearn.get_layer_by_name('Conv2'.format(self.agent_name))
+        # Embed the hidden layer head
+        encoding = tflearn.fully_connected(self.hidden_head, 256, weight_decay=0.0, bias=False,
+                                           name='EncodingEmbedding', activation='linear')
+        self._add_trainable(encoding)
+
+        # We will use the linear conv activation of conv1 and conv2 and inject those in their mirrored decoding layers
+        conv1 = self.layers["{}/HiddenLayers/Conv1/BiasAdd:0".format(self.agent_name)]
+        conv2 = self.layers["{}/HiddenLayers/Conv2/BiasAdd:0".format(self.agent_name)]
+
+        # Now we can compute the 'transformation layer' which we will be put into the decoding stream
         transformation = tflearn.fully_connected(tf.mul(action_embedding, encoding),
                                                  np.prod(conv2.get_shape().as_list()[1:]), weight_decay=0.0,
-                                                 activation='relu', name='Transformation', restore=False)
+                                                 activation='linear', name='Transformation')
+        self._add_trainable(transformation)
 
-        self.predicted_frame = tf.transpose(decoding_network(transformation, conv1, conv2), [0, 3, 1, 2]) + self.inputs
-        self.frame_target = tf.placeholder(tf.float32, [None] + self.input_shape)
-        self.loss += tf.reduce_mean((self.frame_target - self.predicted_frame) ** 2)  # tf.nn.l2_loss(self.target - self.output)
-
-
+        self.predicted_frame = tf.transpose(decoding_network(self, transformation, conv1, conv2), [0, 3, 1, 2]) \
+                               + self.inputs[:, -1:, :, :]
+        self.frame_target = tf.placeholder(tf.float32, [None, 1] + self.input_shape[1:])
+        self.loss += tf.reduce_mean((self.frame_target - self.predicted_frame) ** 2)
 
     def build_param_sync(self):
         with tf.name_scope("ParamSynchronization"):
@@ -325,7 +349,6 @@ class ActorCriticNN(object):
 
     def build_param_update(self):
         with tf.name_scope("ParamUpdate"):
-            #self.local_gradients = [tf.clip_by_norm(grad, 40.0) for grad in tf.gradients(self.loss, self.theta)]
             self.minimize = self.optimizer.build_update_from_vars(self.theta, self.loss)
 
     def build_loss(self):
@@ -370,21 +393,6 @@ class ActorCriticNN(object):
 
         # We can combine the policy loss and the value loss in a single expression
         with tf.name_scope("CombinedLoss"):
-            '''
-            if self.recurrent:
-                # In case of a recurrent implementation, we need to mask the the losses that are not in the sequence
-                with tf.name_scope("SequenceMasking"):
-                    # Get the sequence mask
-                    seq_mask = tflearn.reshape(
-                        sequence_mask(self.n_steps, maxlen=self.t_max, dtype=tf.float32),
-                        new_shape=(self.t_max, 1),
-                        name='SequenceMaskLoss'
-                    )
-                    # Multiply the losses with the mask
-                    pi_loss = tf.mul(seq_mask, pi_loss, name='MaskedPiLoss')
-                    value_loss = tf.mul(seq_mask, value_loss, name='MaskedValueLoss')
-            '''
-
 
             # Add losses and use a factor 0.5 for the value loss as suggested by Mnih
             self.loss = tf.reduce_sum(pi_loss + 0.5 * value_loss, name='Loss')
@@ -456,13 +464,6 @@ class ActorCriticNN(object):
         n_steps = len(n_step_return)
 
         if self.recurrent:
-            # First we need to pad the sequences we got
-            n_pad = self.t_max - n_steps
-            pad1d = np.zeros(n_pad)
-            #n_step_return   = np.concatenate([n_step_return, pad1d]).reshape((self.t_max, 1))
-            #actions         = np.concatenate([actions, pad1d])
-            #values          = np.concatenate([values, pad1d]).reshape((self.t_max, 1))
-            #states          = np.concatenate([states, np.zeros((self.t_max - n_steps,) + states[0].shape)])
 
             fdict = {
                 self.n_step_returns: n_step_return.reshape(n_steps, 1), #((self.t_max, 1)),
@@ -474,7 +475,7 @@ class ActorCriticNN(object):
                 self.optimizer.learning_rate: lr
             }
             if self.frame_prediction:
-                fdict.update({self.frame_target: states[1:] + [last_state]})
+                fdict.update({self.frame_target: [s[-1:, :, :] for s in states[1:]] + [last_state[-1:, :, :]]})
 
             # Now we update our parameters AND we take the lstm_state
             gradients, summaries, self.lstm_state_numeric = session.run([
@@ -484,9 +485,7 @@ class ActorCriticNN(object):
             ],
                 feed_dict=fdict
             )
-            #fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
-            #fdict[self.optimizer.learning_rate] = lr
-            #session.run(self.optimizer.minimize, feed_dict=fdict)
+
             # We also need to remember the LSTM state for the next backward pass
             self.lstm_first_state_since_update = deepcopy(self.lstm_state_numeric)
         else:
@@ -498,7 +497,9 @@ class ActorCriticNN(object):
                 self.optimizer.learning_rate: lr
             }
             if self.frame_prediction:
-                fdict.update({self.frame_target: states[1:] + [last_state]})
+
+
+                fdict.update({self.frame_target: [s[-1:, :, :] for s in states[1:]] + [last_state[-1:, :, :]]})
 
             # Update the parameters
             gradients, summaries = session.run([
@@ -508,10 +509,6 @@ class ActorCriticNN(object):
             ],
                 feed_dict=fdict
             )
-
-            #fdict = {opt_grad: grad for opt_grad, grad in zip(self.optimizer.gradients, gradients)}
-            #fdict[self.optimizer.learning_rate] = lr
-            #session.run(self.optimizer.minimize, feed_dict=fdict)
 
         return summaries
         #writer.add_summary(summaries, t)
@@ -548,7 +545,7 @@ class ActorCriticNN(object):
                 self.n_steps: [n_steps]
             }
             if self.frame_prediction:
-                fdict.update({self.frame_target: states[1:] + [last_state]})
+                fdict.update({self.frame_target: [s[-1, :, :] for s in states[1:] + [last_state]]})
 
             # Now we update our parameters AND we take the lstm_state
             gradients, summaries, self.lstm_state_numeric = session.run([
