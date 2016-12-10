@@ -8,8 +8,13 @@ LOGDIRBASE = "/data/s2098407/tensorflowlogs/{}".format(VERSION) #"{}/tensorflowl
 
 def get_log_dir(hyper_parameters):
     path = os.path.join(LOGDIRBASE, hyper_parameters.env, hyper_parameters.model)
-    # Check if base directory exists, if not create it
-    os.makedirs(path, exist_ok=True)
+
+    try:
+        # Check if base directory exists, if not create it
+        os.makedirs(path, exist_ok=True)
+    except PermissionError as e:
+        path = os.path.join(expanduser('~'), 'tensorflowlogs', VERSION, hyper_parameters.env, hyper_parameters.model) # "{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
+        os.makedirs(path, exist_ok=True)
 
     # Check the current directories in there
     current_dirs = sorted([o for o in os.listdir(path) if os.path.isdir(os.path.join(path, o))])
