@@ -131,6 +131,7 @@ class A3CAgent(object):
                 n_step_target = rewards[i] + hyper_parameters.gamma * n_step_target
                 n_step_targets[i] = n_step_target
 
+
             # Now update the global approximator's parameters
             summaries = self.local_network.update_params(n_step_targets[:batch_len],
                                                          actions[:batch_len],
@@ -213,7 +214,7 @@ if __name__ == "__main__":
 
     writer = writer_new_event(hyper_parameters, session)
     
-    session.run(tf.initialize_all_variables())
+    session.run(tf.global_variables_initializer())
     for agent in agents:
         agent.train()
 
