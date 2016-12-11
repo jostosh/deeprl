@@ -11,4 +11,4 @@
 
 module load Python/3.5.1-foss-2016a
 
-srun python mproj/deeprl/rlmethods/a3c.py --model a3c_lstm --n_threads 12 --clip_rewards --env $1
+srun python mproj/deeprl/rlmethods/a3c.py --model a3c_lstm --n_threads 12 --clip_rewards $*
