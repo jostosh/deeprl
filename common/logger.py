@@ -13,7 +13,9 @@ def get_log_dir(hyper_parameters):
         # Check if base directory exists, if not create it
         os.makedirs(path, exist_ok=True)
     except PermissionError as e:
-        path = os.path.join(expanduser('~'), 'tensorflowlogs', VERSION, hyper_parameters.env, hyper_parameters.model) # "{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
+        path = os.path.join(expanduser('~'), 'tensorflowlogs', VERSION, hyper_parameters.env, hyper_parameters.model,
+                            'prediction={}'.format(hyper_parameters.frame_prediction),
+                            'residuals={}'.format(hyper_parameters.residual_prediction)) # "{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
         os.makedirs(path, exist_ok=True)
 
     # Check the current directories in there
