@@ -144,7 +144,8 @@ class A3CAgent(object):
             writer.add_summary(summaries, self.t)
 
             if terminal_state:
-                logger.info('Terminal state reached (episode {}, reward {}): resetting state'.format(self.n_episodes, epr))
+                logger.info('Terminal state reached (episode {}, reward {}, T {}): resetting state'.format(
+                    self.n_episodes, epr, T))
 
                 writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr), T)
                 self.n_episodes += 1
