@@ -13,6 +13,8 @@ from tensorflow.python.ops import variable_scope as vs
 
 from tensorflow.python.ops.math_ops import sigmoid
 from tensorflow.python.ops.math_ops import tanh
+import scipy.ndimage as spimage
+import numpy as np
 
 from tensorflow.python.platform import tf_logging as logging
 import tflearn
@@ -265,8 +267,48 @@ def custom_lstm(incoming, n_units, activation=tf.nn.tanh, forget_bias=1.0, initi
     return o, state
 
 
-def soft_weight_sharing(incoming, n_centroids, n_filters, filter_size, strides, activation, name='SoftWeightConv',
-                        scope=None, reuse=False, local_normalization=True, centroids_trainable=False):
+def fully_connected_weight_sharing(incoming, axis_len, filter_size, dimensionality='cubic', activation_fn=tf.nn.relu,
+                                   weight_decay=0.0, name='FullyConnectedWeightSharing'):
+
+    if dimensionality == 'cubic':
+        n_units = axis_len ** 3
+        shape = [-1] + 3 * [axis_len] + [1]
+    elif dimensionality == 'square':
+        n_units = axis_len ** 2
+        shape = [-1] + 2 * [axis_len] + [1]
+    else:
+        raise ValueError("Unknown dimensionality {} for {}, possible options are 'cubic' "
+                         "and 'square'.".format(dimensionality, name))
+
+    fc_act = tflearn.layers.fully_connected(incoming, n_units, activation='linear', weight_decay=weight_decay,
+                                            bias=False)
+    fc_reshaped = tf.reshape(fc_act, shape, name='FC_reshaped')
+
+    if dimensionality == 'square':
+        filter = spimage.filters.gaussian_filter(np.ones((filter_size, filter_size)),
+                                                 sigma=1.0, mode='constant')
+        filter /= np.sum(filter)
+        filter_tensor = tf.constant(filter.reshape((filter_size, filter_size, 1, 1)),
+                                    dtype=tf.float32, name='FilterTensor')
+        fc_locally_weighted = tf.nn.conv2d(fc_reshaped, filter_tensor, [1] * 4, padding='SAME')
+    else:
+        filter = spimage.filters.gaussian_filter(np.ones((filter_size, filter_size, filter_size)),
+                                                 sigma=1.0, mode='constant')
+        filter /= np.sum(filter)
+        filter_tensor = tf.constant(filter.reshape((filter_size, filter_size, filter_size, 1, 1)),
+                                    dtype=tf.float32, name='FilterTensor')
+        fc_locally_weighted = tf.nn.conv3d(fc_reshaped, filter_tensor, [1] * 5, padding='SAME')
+
+    bias = tf.Variable(np.zeros(n_units, dtype='float32'))
+    o = activation_fn(tf.nn.bias_add(tf.reshape(fc_locally_weighted, [-1, n_units]), bias))
+    o.W = fc_act.W
+    o.b = bias
+
+    return o
+
+
+def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, strides, activation, name='SoftWeightConv',
+                           scope=None, reuse=False, local_normalization=True, centroids_trainable=False, scaling=1.0):
     """
     Defines a soft weight sharing layer. The soft weight sharing is accomplished by performing multiple convolutions
     which are then combined by a local weighting locally depends on the distance to the 'centroid' of each convolution.
@@ -311,13 +353,13 @@ def soft_weight_sharing(incoming, n_centroids, n_filters, filter_size, strides, 
             # First define the x-coordinates per cell. We exploit the TensorFlow's broadcast mechanisms by using
             # single-sized dimensions
             # TODO maybe the linspace should be between 0 and a with a < 1 to make the trainable centroids stable enough
-            y_coordinates = tf.reshape(tf.linspace(0., 1., m), [1, m, 1, 1, 1])
-            x_coordinates = tf.reshape(tf.linspace(0., 1., n), [1, 1, n, 1, 1])
+            y_coordinates = tf.reshape(tf.linspace(0., scaling, m), [1, m, 1, 1, 1])
+            x_coordinates = tf.reshape(tf.linspace(0., scaling, n), [1, 1, n, 1, 1])
 
             # Define the centroids variables
-            centroids_x = tf.Variable(tf.random_uniform([n_centroids], minval=0, maxval=1),
+            centroids_x = tf.Variable(tf.random_uniform([n_centroids], minval=0, maxval=scaling),
                                       trainable=centroids_trainable)
-            centroids_y = tf.Variable(tf.random_uniform([n_centroids], minval=0, maxval=1),
+            centroids_y = tf.Variable(tf.random_uniform([n_centroids], minval=0, maxval=scaling),
                                       trainable=centroids_trainable)
 
             # Define the distance of each cell w.r.t. the centroids. We can easily accomplish this through broadcasting
@@ -352,6 +394,37 @@ def soft_weight_sharing(incoming, n_centroids, n_filters, filter_size, strides, 
             tf.add_to_collection(tf.GraphKeys.LAYER_VARIABLES + '/' + name, out.W)
             tf.add_to_collection(tf.GraphKeys.LAYER_VARIABLES + '/' + name, out.b)
             tf.add_to_collection(tf.GraphKeys.ACTIVATIONS + '/' + name, out)
+
+        with tf.name_scope("Summary"):
+            euclidian_dist_reshaped = tf.reshape(euclidian_dist, 4 * [1] + [m, n, n_centroids])
+            current_filter_shape = convs[0].W.get_shape().as_list()
+            weights_stacked = tf.reshape(tf.stack([conv.W for conv in convs], axis=4), current_filter_shape + [1, 1, n_centroids])
+            locally_weighted_kernels = tf.reduce_sum(tf.mul(euclidian_dist_reshaped, weights_stacked), axis=6)
+
+            in_out_kernel_spatial = tf.transpose(locally_weighted_kernels, [2, 3, 0, 1, 4, 5])
+            in_out_kernel_spatial_flattened = tf.pad(tf.reshape(in_out_kernel_spatial, [current_filter_shape[2],
+                                                                                        current_filter_shape[3],
+                                                                                        current_filter_shape[0],
+                                                                                        current_filter_shape[1],
+                                                                                        m * n], name='Flattening'),
+                                                     [[0, 0], [0, 0], [1, 0], [1, 0], [0, 0]])
+            current_filter_shape[0] += 1
+            current_filter_shape[1] += 1
+            in_out_spatial_f_kernel = tf.transpose(in_out_kernel_spatial_flattened, [0, 1, 4, 2, 3])
+            in_out_y_reshaped = tf.reshape(in_out_spatial_f_kernel, [current_filter_shape[2],
+                                                                     current_filter_shape[3],
+                                                                     n,
+                                                                     m * current_filter_shape[0],
+                                                                     current_filter_shape[1]])
+            in_out_y_switched = tf.transpose(in_out_y_reshaped, [0, 1, 2, 4, 3])
+            in_out_grid = tf.reshape(in_out_y_switched, [current_filter_shape[2],
+                                                         current_filter_shape[3],
+                                                         n * current_filter_shape[1],
+                                                         m * current_filter_shape[0]])
+            summary_image = tf.transpose(in_out_grid, [1, 3, 2, 0])
+
+            out.visual_summary = summary_image
+            out.W_list = [conv.W for conv in convs]
 
     # Add to collection for tflearn functionality
     tf.add_to_collection(tf.GraphKeys.LAYER_TENSOR + '/' + name, out)
