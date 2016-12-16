@@ -27,7 +27,8 @@ config1 = {
     'pwv': False,
     'frame_prediction': False,
     'logdir': os.path.expanduser("~/tensorflowlogs/mpi"),
-    'residual_prediction': False
+    'residual_prediction': False,
+    'evaluation_interval': 1e6
 }
 
 
@@ -82,4 +83,5 @@ class HyperParameters(object):
         self.frame_prediction = params.frame_prediction
         self.logdir = params.logdir
         self.residual_prediction = params.residual_prediction
+        self.evaluation_interval = params.evaluation_interval
 

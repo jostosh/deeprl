@@ -40,6 +40,7 @@ class ActorCriticNN(object):
         self.frame_prediction = hyper_parameters.frame_prediction
         self.residual_prediction = hyper_parameters.residual_prediction
         self.layers = {}
+        self.embedding_layer = None
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
         with tf.name_scope(agent_name):
@@ -60,8 +61,8 @@ class ActorCriticNN(object):
             if global_network == 'mpi':
                 self.build_param_update()
 
-
         self.merged_summaries = tf.summary.merge(self.summaries)#tf.merge_summary(self.summaries)
+
 
     def _nips_hidden_layers(self):
         with tf.name_scope(self.forward_input_scope):
@@ -84,6 +85,7 @@ class ActorCriticNN(object):
             net = tflearn.fully_connected(net, 256, activation='relu', name='FC3', weight_decay=0.0,
                                           bias_init=tf.constant_initializer(0.1))
             self._add_trainable(net)
+            self.embedding_layer = net
 
         return net, scope
 
@@ -168,6 +170,7 @@ class ActorCriticNN(object):
             self._add_trainable(net)
             net = tflearn.reshape(net, [-1, 256], name="ReshapedLSTMOutput")
             self.lstm_state_variable = state
+            self.embedding_layer = net
 
             #logger.info(tflearn.get_layer_variables_by_name('LSTM4_{}'.format(self.agent_name)))
 
@@ -247,6 +250,7 @@ class ActorCriticNN(object):
         with tf.name_scope('HiddenLayers'):
             net = tflearn.fully_connected(self.inputs, 128, activation='tanh', name='FC1')
             self._add_trainable(net)
+        self.embedding_layer = net
         return net
 
     def build_network(self, num_actions, input_shape):
@@ -272,7 +276,6 @@ class ActorCriticNN(object):
         else:
             net = self._small_fcn()
 
-        logger.info(net)
 
         with tf.name_scope("Outputs"):
             with tf.name_scope("Policy"):
@@ -288,6 +291,10 @@ class ActorCriticNN(object):
                     self.value = tflearn.fully_connected(net, 1, activation='linear', name='v_s')
                     self._add_trainable(self.value)
 
+        if self.agent_name == 'GLOBAL':
+            logger.info("Layer overview:")
+            for key in self.layers.keys():
+                logger.info('\t' + key)
         self.hidden_head = net
 
     def build_frame_predictor(self):
@@ -451,6 +458,14 @@ class ActorCriticNN(object):
         action = np.random.choice(self.num_actions, p=pi[0])
         return value[0][0], action
 
+    def get_embedding(self, state, session):
+        assert self.embedding_layer is not None, "No embedding layer was configured for TensorBoard embeddings"
+        if self.recurrent:
+            return session.run(self.embedding_layer, feed_dict={self.inputs: [state],
+                                                                self.initial_state: self.lstm_state_numeric,
+                                                                self.n_steps: [1]})
+        return session.run(self.embedding_layer, feed_dict={self.inputs: [state]})
+
     def update_params(self, n_step_return, actions, states, values, learning_rate_var, lr, last_state, session):
         """
         Updates the parameters of the global network
@@ -512,8 +527,6 @@ class ActorCriticNN(object):
 
         return summaries
         #writer.add_summary(summaries, t)
-
-
 
     def compute_delta(self, n_step_return, actions, states, values, learning_rate_var, lr, last_state, session):
         """
