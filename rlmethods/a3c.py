@@ -62,7 +62,7 @@ class A3CAgent(object):
 
         It executes the actor-critic method with asynchronous updates and n-step returns in a forward view
         """
-        global T, current_lr, lr_step
+        global current_lr, lr_step
         # Initialize the reward, action and observation arrays
         rewards = np.zeros(hyper_parameters.t_max, dtype='float')
         actions = np.zeros(hyper_parameters.t_max, dtype='int')
@@ -79,6 +79,9 @@ class A3CAgent(object):
         mean_duration = 0
 
         total_duration = 0.
+
+        T = session.run(T_var)
+        last_checkpoint = T
 
         # Main loop, execute this while T < T_max
         while T < hyper_parameters.T_max:
@@ -108,7 +111,7 @@ class A3CAgent(object):
                 self.last_state, rewards[i], terminal_state, info = self.env.step(actions[i])
                 # Increment time counters
                 self.t += 1
-                T += 1
+                T = session.run(global_step)
                 current_lr -= lr_step
 
                 epr += rewards[i]
@@ -161,9 +164,14 @@ class A3CAgent(object):
 
             nloops += 1
             mean_duration = (nloops - 1) / float(nloops) * mean_duration + duration / float(nloops)
-            #logger.info("Mean duration {}, or {} per hour".format(mean_duration,
-            #                                                     3600 / mean_duration * n_threads))
+            logger.debug("Mean duration {}, or {} per hour".format(mean_duration,
+                                                                   3600 / mean_duration * n_threads))
 
+            if T - last_checkpoint > 1e6 and self.agent_name == 'Agent_0':
+                last_checkpoint = T / int(1e5) * int(1e5)                   # round to the nearest 1e6
+                logger.info("STORING WEIGHTS at {}".format(weights_path))
+                saver.save(session, weights_path)
+                logger.info("STORED WEIGHTS!")
 
 def upper_bounds(v_t, r_t, v_end):
     T = len(r_t)
@@ -183,7 +191,9 @@ def upper_bounds(v_t, r_t, v_end):
 if __name__ == "__main__":
 
     hyper_parameters = HyperParameters(parse_cmd_args())
-    T = 1
+    T_var = tf.Variable(0, name='T')
+    global_step = tf.assign_add(T_var, 1)
+
     lr_step = hyper_parameters.learning_rate / hyper_parameters.T_max
     current_lr = hyper_parameters.learning_rate
 
@@ -214,13 +224,17 @@ if __name__ == "__main__":
               for i in range(n_threads)]
 
     writer = writer_new_event(hyper_parameters, session)
+
+    saver = tf.train.Saver(global_network.theta + shared_optimizer.g_moving_average + [T_var])
+    weights_path = os.path.join(writer.get_logdir(), 'weights/model.ckpt')
+    os.makedirs(os.path.dirname(weights_path), exist_ok=True)
     
     session.run(tf.global_variables_initializer())
     for agent in agents:
         agent.train()
 
     if hyper_parameters.render:
-        while T < hyper_parameters.T_max:
+        while session.run(T_var) < hyper_parameters.T_max:
             for a in agents:
                 a.env.env.render()
                 time.sleep(0.02 / hyper_parameters.n_threads)
