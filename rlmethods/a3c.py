@@ -139,7 +139,6 @@ class A3CAgent(object):
                 n_step_target = rewards[i] + hyperparameters.gamma * n_step_target
                 n_step_targets[i] = n_step_target
 
-
             # Now update the global approximator's parameters
             summaries = self.local_network.update_params(n_step_targets[:batch_len],
                                                          actions[:batch_len],
@@ -149,15 +148,16 @@ class A3CAgent(object):
                                                          current_lr,
                                                          self.last_state,
                                                          session)
-            writer.add_summary(summaries, self.t)
+            if summaries:
+                writer.add_summary(summaries, self.t)
 
             if terminal_state:
                 logger.info('Terminal state reached (episode {}, reward {}, T {}): resetting state'.format(
                     self.n_episodes, epr, T))
 
-                writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr), T)
+                writer.add_summary(make_summary_from_python_var('{}/Score'.format(self.agent_name), epr), T)
                 self.n_episodes += 1
-                self.last_state = self.env.reset()
+                self.last_state = self.env.reset_random()
                 epr = 0
                 self.local_network.reset()
 
@@ -174,7 +174,7 @@ class A3CAgent(object):
 
             if T - last_checkpoint > hyperparameters.evaluation_interval \
                     and self.agent_name == 'Agent_0':
-                self.evaluate(5)
+                self.evaluate(50)
                 last_checkpoint = T / int(hyperparameters.evaluation_interval / 10) * \
                                   int(hyperparameters.evaluation_interval / 10) # round to the nearest 1e6
                 logger.info("Storing weights at {}".format(weights_path))
@@ -193,8 +193,9 @@ class A3CAgent(object):
 
         episode_idx = 0
         self.synchronize_thread_parameters()
-        self.last_state = self.env.reset()
+        self.last_state = self.env.reset_random()
         self.local_network.reset()
+        self.env.set_test()
         returns = np.zeros(num_episodes)
 
         t = 0
@@ -208,7 +209,7 @@ class A3CAgent(object):
             returns[episode_idx] += reward
 
             if terminal:
-                self.last_state = self.env.reset()
+                self.last_state = self.env.reset_random()
                 self.local_network.reset()
                 episode_idx += 1
 
@@ -236,7 +237,7 @@ class A3CAgent(object):
         writer.add_summary(make_summary_from_python_var('Evaluation/Score', np.mean(returns)),
                            self.train_episode)
         self.train_episode += 1
-
+        self.env.set_training()
 
 def upper_bounds(v_t, r_t, v_end):
     T = len(r_t)
@@ -265,13 +266,10 @@ if __name__ == "__main__":
     env_name = hyperparameters.env
     n_threads = hyperparameters.n_threads
 
+    session = tf.Session()
     global_env = get_env(env_name)
     num_actions = global_env.num_actions()
 
-    session = tf.Session(config=tf.ConfigProto(
-        allow_soft_placement=True,
-        inter_op_parallelism_threads=hyperparameters.n_threads,
-        intra_op_parallelism_threads=hyperparameters.n_threads))
     learning_rate_ph = tf.placeholder(tf.float32)
 
     shared_optimizer = RMSPropCustom(session,
@@ -303,7 +301,6 @@ if __name__ == "__main__":
     embedding.sprite.image_path = os.path.join(writer.get_logdir(), 'embedding_sprite.png')
     embedding.sprite.single_image_dim.extend([160, 210])
     projector.visualize_embeddings(writer, embedding_config)
-
 
     saver = tf.train.Saver(global_network.theta + shared_optimizer.g_moving_average + [T_var, embedding_var])
     weights_path = os.path.join(writer.get_logdir(), 'model.ckpt')
