@@ -308,7 +308,8 @@ def fully_connected_weight_sharing(incoming, axis_len, filter_size, dimensionali
 
 
 def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, strides, activation, name='SoftWeightConv',
-                           scope=None, reuse=False, local_normalization=True, centroids_trainable=False, scaling=1.0):
+                           scope=None, reuse=False, local_normalization=True, centroids_trainable=False, scaling=1.0,
+                           distance_fn='EXP'):
     """
     Defines a soft weight sharing layer. The soft weight sharing is accomplished by performing multiple convolutions
     which are then combined by a local weighting locally depends on the distance to the 'centroid' of each convolution.
@@ -327,6 +328,10 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
                     lateral inhibition between competing sub-convolutions. The normalization is divisive.
         :param centroids_trainable: If True, the centroids are trainable. Note that they are concatenated with the
                     conv layers' `b's for compatibility with other tflearn layers
+        :param scaling          The scaling factor for the centroids. A scaling factor of 1.0 means that the centroids
+                    will be initialized in the range of (0, 1.0)
+        :param distance_fn      The distance function that is used to compute the spatial distances of cells w.r.t. the
+                                kernel centroids
 
     Return values:
         :return: A 4D Tensor with similar dimensionality as a normal conv_2d's output
@@ -341,12 +346,11 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
     with vscope as scope:
         name = scope.name
         with tf.name_scope("SubConvolutions"):
-            convs = [tflearn.conv_2d(incoming, nb_filter=n_filters, filter_size=filter_size, strides=strides, padding='valid',
-                                     weight_decay=0., name='SubConv{}'.format(i), activation='linear')
+            convs = [tflearn.conv_2d(incoming, nb_filter=n_filters, filter_size=filter_size, strides=strides,
+                                     padding='valid', weight_decay=0., name='SubConv{}'.format(i), activation='linear')
                      for i in range(n_centroids)]
             stacked_convs = tf.stack(convs, axis=4, name='StackedConvs')
 
-        assert convs
         _, m, n, k = convs[0].get_shape().as_list()
 
         with tf.name_scope("DistanceWeighting"):
@@ -357,19 +361,29 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
             x_coordinates = tf.reshape(tf.linspace(0., scaling, n), [1, 1, n, 1, 1])
 
             # Define the centroids variables
-            centroids_x = tf.Variable(tf.random_uniform([n_centroids], minval=0, maxval=scaling),
+            '''centroids_x = tf.Variable(tf.random_uniform([n_centroids], minval=0, maxval=scaling),
                                       trainable=centroids_trainable)
             centroids_y = tf.Variable(tf.random_uniform([n_centroids], minval=0, maxval=scaling),
                                       trainable=centroids_trainable)
+            '''
+            centroids_x = tf.Variable(np.asarray([.5, .5], dtype='float32'), trainable=centroids_trainable)
+            centroids_y = tf.Variable(np.asarray([0, 1], dtype='float32'), trainable=centroids_trainable)
 
             # Define the distance of each cell w.r.t. the centroids. We can easily accomplish this through broadcasting
             # i.e. x_diff2 will have shape [1, 1, n, 1, c] with n as above and c the number of centroids. Similarly,
             # y_diff2 will have shape [1, m, 1, 1, c]
-            x_diff2 = tf.square(tf.reshape(centroids_x, [1, 1, 1, 1, n_centroids]) - x_coordinates, name='xDiffSquared')
-            y_diff2 = tf.square(tf.reshape(centroids_y, [1, 1, 1, 1, n_centroids]) - y_coordinates, name='yDiffSquared')
+            x_diff2 = tf.square(tf.reshape(centroids_x, [1, 1, 1, 1, n_centroids]) - x_coordinates,
+                                name='xDiffSquared')
+            y_diff2 = tf.square(tf.reshape(centroids_y, [1, 1, 1, 1, n_centroids]) - y_coordinates,
+                                name='yDiffSquared')
+
+            if distance_fn == 'EXP':
+                sigma = tf.Variable(tf.random_uniform([n_centroids], minval=0, maxval=scaling), name='Sigma',
+                                    trainable=centroids_trainable)
 
             # Again, we use broadcasting. The result is of shape [1, m, n, 1, c]
-            euclidian_dist = tf.sqrt(x_diff2 + y_diff2, name="Euclidean")
+            euclidian_dist = np.sqrt(2) - tf.sqrt(x_diff2 + y_diff2, name="Euclidean") if distance_fn == 'EUCLIDEAN' \
+                else tf.exp(-tf.div((x_diff2 + y_diff2), tf.reshape(sigma ** 2, [1, 1, 1, 1, n_centroids])), 'Exp')
 
             # Optionally, we will perform local normalization such that the weight coefficients add up to 1 for each
             # spatial cell.
@@ -378,6 +392,7 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
                 total_distance_per_cell = tf.reduce_sum(euclidian_dist, axis=4, keep_dims=True)
                 # Now divide
                 euclidian_dist = tf.div(euclidian_dist, total_distance_per_cell, name='NormalizedEuclidean')
+
 
         with tf.name_scope("SoftWeightSharing"):
             # Compute the distance-weighted output
@@ -396,7 +411,9 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
             tf.add_to_collection(tf.GraphKeys.ACTIVATIONS + '/' + name, out)
 
         with tf.name_scope("Summary"):
-            euclidian_dist_reshaped = tf.reshape(euclidian_dist, 4 * [1] + [m, n, n_centroids])
+            euclidean_downsampled = euclidian_dist[:, ::3, ::3, :, :]
+            _, m, n, _, _ = euclidean_downsampled.get_shape().as_list()
+            euclidian_dist_reshaped = tf.reshape(euclidean_downsampled, 4 * [1] + [m, n, n_centroids])
             current_filter_shape = convs[0].W.get_shape().as_list()
             weights_stacked = tf.reshape(tf.stack([conv.W for conv in convs], axis=4), current_filter_shape + [1, 1, n_centroids])
             locally_weighted_kernels = tf.reduce_sum(tf.mul(euclidian_dist_reshaped, weights_stacked), axis=6)

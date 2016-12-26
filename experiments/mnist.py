@@ -35,21 +35,23 @@ testX = testX.reshape([-1, 28, 28, 1])
 # Building convolutional network
 network = input_data(shape=[None, 28, 28, 1], name='input')
 #network = conv_2d(network, 32, 3, activation='relu', regularizer="L2")
-network = spatial_weight_sharing(network, 2, 32, 7, 1, tf.nn.relu)
+network = spatial_weight_sharing(network, 2, 32, 7, 1, tf.nn.relu, centroids_trainable=False, scaling=1.,
+                                 distance_fn='EUCLIDEAN', local_normalization=False)
 visiual_summary = network.visual_summary
 bias = network.b
 W_list = network.W_list
 network = max_pool_2d(network, 2)
-network = local_response_normalization(network)
+#network = local_response_normalization(network)
 #network = conv_2d(network, 64, 3, activation='linear', regularizer="L2")
-network = spatial_weight_sharing(network, 2, 64, 3, 1, tf.nn.relu)
+network = spatial_weight_sharing(network, 2, 64, 3, 1, tf.nn.relu, centroids_trainable=False, scaling=1.,
+                                 distance_fn='EUCLIDEAN', local_normalization=False)
 network = max_pool_2d(network, 2)
-network = local_response_normalization(network)
+#network = local_response_normalization(network)
 #network = spatialsoftmax(network)
-network = fully_connected(network, 128, activation='tanh')
+network = fully_connected(network, 128, activation='relu')
 #network = fully_connected_weight_sharing(network, 11, 3, dimensionality='square')
 network = dropout(network, 0.8)
-network = fully_connected(network, 256, activation='tanh')
+network = fully_connected(network, 256, activation='relu')
 #network = fully_connected_weight_sharing(network, 15, 3, dimensionality='square')
 network = dropout(network, 0.8)
 network = fully_connected(network, 10, activation='softmax')
@@ -67,7 +69,7 @@ model = tflearn.DNN(network, tensorboard_verbose=1, tensorboard_dir='/home/jos/m
 
 
 
-model.fit({'input': X}, {'target': Y}, n_epoch=10,
+model.fit({'input': X}, {'target': Y}, n_epoch=5,
            validation_set=({'input': testX}, {'target': testY}),
            snapshot_step=100, show_metric=True, run_id='convnet_mnist')
 
@@ -81,6 +83,8 @@ for i in range(32):
 
     scipy.misc.imsave('mnist_logs/plain_filter{0}_0.png'.format(i), W0[:, :, 0, i])
     scipy.misc.imsave('mnist_logs/plain_filter{0}_1.png'.format(i), W1[:, :, 0, i])
+    #scipy.misc.imsave('mnist_logs/plain_filter{0}_2.png'.format(i), W2[:, :, 0, i])
+    #scipy.misc.imsave('mnist_logs/plain_filter{0}_3.png'.format(i), W3[:, :, 0, i])
 
 ax1 = plt.subplot2grid((9,9), (0,0), colspan=9, rowspan=8)
 ax1.imshow(model.session.run(visiual_summary)[0, :, :, 0], cmap='gray')
