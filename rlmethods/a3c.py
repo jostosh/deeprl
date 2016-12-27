@@ -213,7 +213,7 @@ class A3CAgent(object):
                 self.local_network.reset()
                 episode_idx += 1
 
-            if t % 10 == 0:
+            if t % 100 == 0:
                 embeddings.append(self.local_network.get_embedding(self.last_state, session))
                 embedding_images.append(self.env.env._get_image())
 
@@ -237,7 +237,7 @@ class A3CAgent(object):
         writer.add_summary(make_summary_from_python_var('Evaluation/Score', np.mean(returns)),
                            self.train_episode)
         self.train_episode += 1
-        self.env.set_training()
+        self.env.set_train()
 
 def upper_bounds(v_t, r_t, v_end):
     T = len(r_t)
