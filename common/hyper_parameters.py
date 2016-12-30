@@ -21,7 +21,7 @@ config1 = {
     'model': ModelNames.A3C_FF,
     'n_threads': 8,
     'action_repeat': 4,
-    'clip_rewards': False,
+    'clip_rewards': True,
     'clip_advantage': False,
     'render': False,
     'pwv': False,
