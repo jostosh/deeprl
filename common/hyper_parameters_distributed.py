@@ -30,7 +30,8 @@ config1 = {
     'log_dir': os.path.expanduser('~') + '/tensorflowlogs',
     'pwv': False,
     'frame_prediction': False,
-    'port0': 46666
+    'port0': 46666,
+    'residual_prediction': False,
 }
 
 
@@ -87,4 +88,5 @@ class HyperParameters(object):
         self.policy_weighted_val = params.pwv
         self.frame_prediction = params.frame_prediction
         self.port0 = params.port0
+        self.residual_prediction = params.residual_prediction
 

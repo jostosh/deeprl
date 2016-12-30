@@ -30,11 +30,11 @@ class A3CAgent(object):
                     #       output_shape=hyper_parameters.input_shape[1:])
         self.num_actions = self.env.num_actions()
 
-        self.local_network = ActorCriticNN(num_actions=self.num_actions,
-                                           agent_name=agent_name,
-                                           optimizer=optimizer,
-                                           hyper_parameters=hyper_parameters,
-                                           global_network=global_network)
+        self.local_network = global_network #ActorCriticNN(num_actions=self.num_actions,
+                                           #agent_name=agent_name,
+                                           #optimizer=optimizer,
+                                           #hyper_parameters=hyper_parameters,
+                                           #global_network=global_network)
 
         #self._train_thread = threading.Thread(target=self._train, name=agent_name)
         self.t = 1
@@ -86,7 +86,7 @@ class A3CAgent(object):
 
             # A new batch begins, reset the gradients and synchronize thread-specific parameters
             start = time.time()
-            self.synchronize_thread_parameters(session)
+            #self.synchronize_thread_parameters(session)
             end = time.time()
             #logger.debug("Time for param synchronization: {}".format((end - start)))
 
@@ -203,7 +203,6 @@ if __name__ == "__main__":
             with tf.device(tf.train.replica_device_setter(
                     worker_device="/job:worker/task:%d" % hyper_parameters.task_index,
                     cluster=cluster,
-                    ps_ops=[]
             )):
                 global_step = tf.Variable(0)
                 increment_step = global_step.assign_add(1, use_locking=False)
