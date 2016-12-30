@@ -213,9 +213,14 @@ class A3CAgent(object):
                 self.local_network.reset()
                 episode_idx += 1
 
-            if t % 100 == 0:
+            if t % 1 == 0:
                 embeddings.append(self.local_network.get_embedding(self.last_state, session))
                 embedding_images.append(self.env.env._get_image())
+
+                if len(embeddings) > 100:
+                    deletion_index = np.random.randint(100)
+                    del embeddings[deletion_index]
+                    del embedding_images[deletion_index]
 
             t += 1
 
