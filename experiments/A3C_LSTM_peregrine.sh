@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
-#SBATCH --job-name=A3C_LSTM_v08
+#SBATCH --job-name=A3C_LSTM_v09
 #SBATCH --mail-type ALL
 #SBATCH --mail-user jos.vandewolfshaar@gmail.com
 #SBATCH --output job-A3C_LSTM_v09-%j.log
