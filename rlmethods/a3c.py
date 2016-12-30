@@ -217,6 +217,8 @@ class A3CAgent(object):
                 embeddings.append(self.local_network.get_embedding(self.last_state, session))
                 embedding_images.append(self.env.env._get_image())
 
+            t += 1
+
         zipped_embeddings = list(zip(embeddings, embedding_images))
         shuffle(zipped_embeddings)
         embeddings, embedding_images = zip(*zipped_embeddings[:100])
