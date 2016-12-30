@@ -30,11 +30,12 @@ class A3CAgent(object):
                     #       output_shape=hyper_parameters.input_shape[1:])
         self.num_actions = self.env.num_actions()
 
-        self.local_network = global_network #ActorCriticNN(num_actions=self.num_actions,
-                                           #agent_name=agent_name,
-                                           #optimizer=optimizer,
-                                           #hyper_parameters=hyper_parameters,
-                                           #global_network=global_network)
+        self.local_network = ActorCriticNN(num_actions=self.num_actions,
+                                           agent_name=agent_name,
+                                           optimizer=optimizer,
+                                           hyper_parameters=hyper_parameters,
+                                           global_network=global_network,
+                                           distributed=True)
 
         #self._train_thread = threading.Thread(target=self._train, name=agent_name)
         self.t = 1
@@ -129,21 +130,15 @@ class A3CAgent(object):
             #logger.debug("Time per step: {}".format((end - start) / batch_len))
 
             start = time.time()
-            # Forward view of n-step returns, start from i == t_max - 1 and go to i == 0
-            for i in reversed(range(batch_len)):
-                # Straightforward accumulation of rewards
-                n_step_target = rewards[i] + hyper_parameters.gamma * n_step_target
-                n_step_targets[i] = n_step_target
 
             # Now update the global approximator's parameters
-            summaries = self.local_network.update_params(n_step_targets[:batch_len],
-                                                         actions[:batch_len],
+            summaries = self.local_network.update_params(actions[:batch_len],
                                                          states[:batch_len],
-                                                         values[:batch_len],
-                                                         learning_rate_ph,
                                                          current_lr,
                                                          self.last_state,
-                                                         session)
+                                                         session,
+                                                         rewards[:batch_len],
+                                                         n_step_target)
             if is_chief:
                 sv.summary_computed(sess=session, summary=summaries)
 
@@ -216,7 +211,8 @@ if __name__ == "__main__":
                 global_network = ActorCriticNN(num_actions=num_actions,
                                                agent_name='GLOBAL',
                                                hyper_parameters=hyper_parameters,
-                                               optimizer=shared_optimizer)
+                                               optimizer=shared_optimizer,
+                                               distributed=True)
                 shared_optimizer.set_global_theta(global_network.theta)  # .build_update(global_network.theta)
 
                 env = get_env(env_name, frames_per_state=hyper_parameters.frames_per_state, output_shape=hyper_parameters.input_shape[1:])

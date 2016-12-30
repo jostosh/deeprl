@@ -1,16 +1,12 @@
 import tensorflow as tf
 import tflearn
 import numpy as np
-
 from deeprl.common.logger import logger
-#from tflearn.layers import lstm
-
 from deeprl.approximators.layers import lstm, spatialsoftmax, custom_lstm
 from tensorflow.python.ops.rnn_cell import LSTMStateTuple
-
 from copy import deepcopy
-
 from deeprl.common.tensorflowutils import sequence_mask
+
 
 class ModelNames:
     A3C_FF      = 'a3c_ff'
@@ -23,7 +19,7 @@ class ModelNames:
 
 class ActorCriticNN(object):
 
-    def __init__(self, num_actions, agent_name, optimizer, hyper_parameters, global_network=None):
+    def __init__(self, num_actions, agent_name, optimizer, hyper_parameters, global_network=None, distributed=False):
         self.num_actions = num_actions
         self.optimizer = optimizer
         self.global_network = global_network
@@ -41,6 +37,8 @@ class ActorCriticNN(object):
         self.residual_prediction = hyper_parameters.residual_prediction
         self.layers = {}
         self.embedding_layer = None
+        self.gamma = hyper_parameters.gamma
+        self.clip_rewards = hyper_parameters.clip_rewards
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
         with tf.name_scope(agent_name):
@@ -62,7 +60,7 @@ class ActorCriticNN(object):
 
             if global_network == 'mpi':
                 self.build_param_update()
-
+        self.reset()
         self.merged_summaries = tf.summary.merge(self.summaries)#tf.merge_summary(self.summaries)
 
     def _nips_hidden_layers(self):
@@ -176,7 +174,7 @@ class ActorCriticNN(object):
 
             #logger.info(tflearn.get_layer_variables_by_name('LSTM4_{}'.format(self.agent_name)))
 
-        self.reset_lstm_state()
+        #self.reset_lstm_state()
         return net
 
     def _a3c_lstm_ss(self):
@@ -218,7 +216,7 @@ class ActorCriticNN(object):
             self.lstm_state_variable = state
             self.embedding_layer = net
 
-        self.reset_lstm_state()
+        #self.reset_lstm_state()
         return net
 
     def reset_lstm_state(self):
@@ -251,7 +249,7 @@ class ActorCriticNN(object):
         :return:                The network as a graph node
         """
         with tf.name_scope('HiddenLayers'):
-            net = tflearn.fully_connected(self.inputs, 128, activation='tanh', name='FC1')
+            net = tflearn.fully_connected(self.inputs, 256, activation='tanh', name='FC1')
             self._add_trainable(net)
         self.embedding_layer = net
         return net
@@ -374,22 +372,32 @@ class ActorCriticNN(object):
         """
 
         with tf.name_scope('BackwardInputs'):
-            # The n_step_return is an array of length n (where n is the batch size)
-            self.n_step_returns = tf.placeholder(tf.float32, [None, 1], name='NStepReturns')
             # The actions attribute is an array of length n
             self.actions = tf.placeholder(tf.int32, [None], name='Actions')
-            # The advantage function requires a
-            self.advantage_no_grad = tf.placeholder(tf.float32, [None, 1], name='TDErrors')
+            # Rewards
+            self.rewards = tf.placeholder(tf.float32, [None], name='Rewards')
+            self.initial_return = tf.placeholder(tf.float32, name='InitialReturn')
+
+        with tf.name_scope("Advantage_n-step"):
+            def reward_fn(n_step_t, reward):
+                return n_step_t * self.gamma + reward
+
+            rewards = tf.clip_by_value(self.rewards, -.1, 1.) if self.clip_rewards else self.rewards
+            n_step_returns = tf.scan(reward_fn, tf.reverse_v2(rewards, [0]),
+                                     initializer=self.initial_return)
+            advantage = tf.reshape(tf.reverse_v2(n_step_returns, [0]), [-1, 1]) - self.value
 
         # The advantage is simply the estimated value minus the bootstrapped returns
-        advantage = self.n_step_returns - self.value
+        # advantage = self.n_step_returns - self.value
         # advantage_no_grad = self.n_step_returns - tf.stop_gradient(self.value)
 
+        '''
         if self.clip_advantage:
             # I empirically found that it might help to clip the advantage that is used for the policy loss. This might
             # improve stability and consistency of the gradients
             logger.info("Clipping advantage in graph")
             self.advantage_no_grad = tf.clip_by_value(self.advantage_no_grad, -1., 1., name="ClippedAdvantage")
+        '''
 
         with tf.name_scope("PolicyLoss"):
             # action matrix is n x a where each row corresponds to a time step and each column to an action
@@ -398,11 +406,10 @@ class ActorCriticNN(object):
             log_pi = tf.log(tf.clip_by_value(self.pi, 1e-20, 1.0), name="LogPi")
             # The entropy is added to encourage exploration
             entropy = -tf.reshape(tf.reduce_sum(log_pi * self.pi, reduction_indices=1), (-1, 1), name="Entropy")
-
             # Define the loss for the policy (minus is needed to perform *negative* gradient descent == gradient ascent)
             pi_loss = tf.neg(
                 tflearn.reshape(tf.reduce_sum(action_mask * log_pi, reduction_indices=1), (-1, 1))
-                * self.advantage_no_grad
+                * tf.stop_gradient(advantage) #self.advantage_no_grad
                 + self.beta * entropy, name='PiLoss')
 
         with tf.name_scope("ValueLoss"):
@@ -425,8 +432,22 @@ class ActorCriticNN(object):
         :param state: The input state
         :return: State's policy
         """
-        pi = session.run(self.pi, feed_dict={self.inputs: [state]})[0]
-        return np.random.choice(self.num_actions, p=pi)
+        if self.recurrent:
+            pi, self.lstm_state_numeric = session.run(
+                [
+                    self.pi, self.lstm_state_variable
+                ],
+                feed_dict={
+                    self.inputs: [state],
+                    self.initial_state: self.lstm_state_numeric,
+                    self.n_steps: [1]
+                }
+            )
+        else:
+            pi = session.run(self.pi, feed_dict={self.inputs: [state]})
+
+        action = np.random.choice(self.num_actions, p=pi[0])
+        return action
 
     def get_value(self, state, session):
         """
@@ -438,7 +459,7 @@ class ActorCriticNN(object):
             # If we use a recurrent model
             return session.run(self.value,
                                     feed_dict={
-                                        self.inputs: [state] + (self.t_max-1) * [np.zeros_like(state)],
+                                        self.inputs: [state],
                                         self.initial_state: self.lstm_state_numeric,
                                         self.n_steps: [1]
                                     })[0][0]
@@ -455,7 +476,7 @@ class ActorCriticNN(object):
                     self.value, self.pi, self.lstm_state_variable
                 ],
                 feed_dict={
-                    self.inputs: [state] + (self.t_max-1) * [np.zeros_like(state)],
+                    self.inputs: [state],
                     self.initial_state: self.lstm_state_numeric,
                     self.n_steps: [1]
                 }
@@ -476,62 +497,49 @@ class ActorCriticNN(object):
                                                                 self.n_steps: [1]})
         return session.run(self.embedding_layer, feed_dict={self.inputs: [state]})
 
-    def update_params(self, n_step_return, actions, states, values, learning_rate_var, lr, last_state, session):
+    def update_params(self, actions, states, lr, last_state, session, rewards, initial_return):
         """
         Updates the parameters of the global network
-        :param n_step_return:       n-step returns
         :param actions:             array of actions
         :param states:              array of states
-        :param values:              array of values
-        :param learning_rate_var:   learning rate placeholder,
         :param lr:                  actual learning rate
         """
-        n_steps = len(n_step_return)
+        n_steps = len(actions)
 
         if self.recurrent:
 
             fdict = {
-                self.n_step_returns: n_step_return.reshape(n_steps, 1), #((self.t_max, 1)),
                 self.actions: actions,
                 self.inputs: states,
-                self.advantage_no_grad: (n_step_return - values).reshape((n_steps, 1)), #((self.t_max, 1)),
                 self.initial_state: self.lstm_first_state_since_update,
                 self.n_steps: [n_steps],
-                self.optimizer.learning_rate: lr
+                self.optimizer.learning_rate: lr,
+                self.initial_return: initial_return,
+                self.rewards: rewards
             }
             if self.frame_prediction:
                 fdict.update({self.frame_target: [s[-1:, :, :] for s in states[1:]] + [last_state[-1:, :, :]]})
 
             # Now we update our parameters AND we take the lstm_state
-            gradients, self.lstm_state_numeric = session.run([
-                self.minimize,
-                #self.merged_summaries,
-                self.lstm_state_variable
-            ],
-                feed_dict=fdict
-            )
+            _, self.lstm_state_numeric = session.run([self.minimize, self.lstm_state_variable], feed_dict=fdict)
 
             # We also need to remember the LSTM state for the next backward pass
             self.lstm_first_state_since_update = deepcopy(self.lstm_state_numeric)
         else:
             fdict = {
-                self.n_step_returns: n_step_return.reshape((n_steps, 1)),
                 self.actions: actions,
                 self.inputs: states,
-                self.advantage_no_grad: (n_step_return - values).reshape((n_steps, 1)),
-                self.optimizer.learning_rate: lr
+                self.optimizer.learning_rate: lr,
+                self.initial_return: initial_return,
+                self.rewards: rewards
             }
             if self.frame_prediction:
                 fdict.update({self.frame_target: [s[-1:, :, :] for s in states[1:]] + [last_state[-1:, :, :]]})
 
             # Update the parameters
-            gradients = session.run([
-                #self.local_gradients,
-                self.minimize,
-                #self.merged_summaries,
-            ],
-                feed_dict=fdict
-            )
+            session.run([self.minimize], feed_dict=fdict)
+
+            #logger.info("Numeric n-step advantage: {}, tf: {}".format((n_step_return - values)[:10], ret[:10].flatten()))
 
         return None #summaries
         #writer.add_summary(summaries, t)

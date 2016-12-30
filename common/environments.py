@@ -30,6 +30,14 @@ class ClassicControl(object):
     def num_actions(self):
         return self.env.action_space.n
 
+    def set_train(self):
+        self.is_training = True
+
+    def set_test(self):
+        self.is_training = False
+
+    def reset_random(self):
+        return self.reset()
 
 class AtariEnvironment(object):
 
