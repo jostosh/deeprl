@@ -169,7 +169,7 @@ class A3CAgent(object):
 
             nloops += 1
             mean_duration = (nloops - 1) / float(nloops) * mean_duration + duration / float(nloops)
-            logger.debug("Mean duration {}, or {} per hour".format(mean_duration,
+            logger.info("Mean duration {}, or {} per hour".format(mean_duration,
                                                                    3600 / mean_duration * n_threads))
 
             if T - last_checkpoint > hyperparameters.evaluation_interval \
