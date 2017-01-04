@@ -71,6 +71,7 @@ class A3CAgent(object):
         global current_lr, lr_step
         # Initialize the reward, action and observation arrays
         rewards = np.zeros(hyperparameters.t_max, dtype='float')
+        values = np.zeros(hyperparameters.t_max, dtype='float')
         actions = np.zeros(hyperparameters.t_max, dtype='int')
         states = np.zeros((hyperparameters.t_max,) + self.env.state_shape(), dtype='float')
 
@@ -107,7 +108,7 @@ class A3CAgent(object):
                 states[i] = self.last_state
                 # Get the corresponding value and action. This is done simultaneously such that the approximators only
                 # has to perform a single forward pass.
-                actions[i] = self.local_network.get_action(self.last_state, session)#.get_value_and_action(self.last_state, session)
+                values[i], actions[i] = self.local_network.get_value_and_action(self.last_state, session)
                 # Perform step in environment and obtain rewards and observations
                 self.last_state, rewards[i], terminal_state, info = self.env.step(actions[i])
                 # Increment time counters
@@ -119,6 +120,15 @@ class A3CAgent(object):
             # Initialize the n-step return
             n_step_target = 0 if terminal_state else self.local_network.get_value(self.last_state, session)
             batch_len = self.t - t_start
+
+            '''
+            lower_limits = []
+            for j in range(batch_len):
+                current_max = -np.inf
+                for k in range(j, batch_len):
+                    current_max = max(current_max, rewards[j:k] * (hyperparameters.gamma ** np.arange(k)) +
+                                      hyperparameters.gamma ** (k+1) * (n_step_target if k == batch_len else values[k+1]))
+            '''
 
             # Now update the global approximator's parameters
             summaries = self.local_network.update_params(actions[:batch_len],
@@ -152,8 +162,7 @@ class A3CAgent(object):
             if T - last_checkpoint > hyperparameters.evaluation_interval \
                     and self.agent_name == 'Agent_0':
                 self.evaluate(50)
-                last_checkpoint = T / int(hyperparameters.evaluation_interval / 10) * \
-                                  int(hyperparameters.evaluation_interval / 10) # round to the nearest 1e6
+                last_checkpoint = T // (hyperparameters.evaluation_interval / 10) * (hyperparameters.evaluation_interval / 10) # round to the nearest 1e6
                 logger.info("Storing weights at {}".format(weights_path))
                 saver.save(session, weights_path, global_step=global_step)
                 logger.info("Stored weights!")
@@ -222,6 +231,7 @@ class A3CAgent(object):
                            self.train_episode)
         self.train_episode += 1
         self.env.set_train()
+
 
 def upper_bounds(v_t, r_t, v_end):
     T = len(r_t)

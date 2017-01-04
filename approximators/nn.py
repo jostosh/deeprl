@@ -29,7 +29,7 @@ class ActorCriticNN(object):
         self.agent_name = agent_name
         self.model_name = hyper_parameters.model
         self.clip_advantage = hyper_parameters.clip_advantage
-        self.recurrent = self.model_name in [ModelNames.A3C_LSTM]
+        self.recurrent = self.model_name in [ModelNames.A3C_LSTM, ModelNames.A3C_LSTM_SS]
         self.t_max = hyper_parameters.t_max
         self.input_shape = hyper_parameters.input_shape
         self.policy_weighted_val = hyper_parameters.policy_weighted_val
@@ -386,6 +386,7 @@ class ActorCriticNN(object):
             n_step_returns = tf.scan(reward_fn, tf.reverse_v2(rewards, [0]),
                                      initializer=self.initial_return)
             advantage = tf.reshape(tf.reverse_v2(n_step_returns, [0]), [-1, 1]) - self.value
+
 
         # The advantage is simply the estimated value minus the bootstrapped returns
         # advantage = self.n_step_returns - self.value
