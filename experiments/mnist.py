@@ -35,17 +35,17 @@ testX = testX.reshape([-1, 28, 28, 1])
 # Building convolutional network
 network = input_data(shape=[None, 28, 28, 1], name='input')
 #network = conv_2d(network, 32, 3, activation='relu', regularizer="L2")
-network = spatial_weight_sharing(network, 2, 32, 7, 1, tf.nn.relu, centroids_trainable=False, scaling=1.,
-                                 distance_fn='EUCLIDEAN', local_normalization=False)
+network = spatial_weight_sharing(network, [2, 2], 24, 7, 1, tf.nn.relu, centroids_trainable=False, scaling=1,
+                                 distance_fn='EXP', local_normalization=True, sigma_trainable=False)
 visiual_summary = network.visual_summary
 bias = network.b
 W_list = network.W_list
 network = max_pool_2d(network, 2)
 #network = local_response_normalization(network)
 #network = conv_2d(network, 64, 3, activation='linear', regularizer="L2")
-network = spatial_weight_sharing(network, 2, 64, 3, 1, tf.nn.relu, centroids_trainable=False, scaling=1.,
-                                 distance_fn='EUCLIDEAN', local_normalization=False)
-network = max_pool_2d(network, 2)
+#network = spatial_weight_sharing(network, [3, 3], 48, 3, 1, tf.nn.relu, centroids_trainable=True, scaling=.001,
+#                                 distance_fn='EXP', local_normalization=True, sigma_trainable=True)
+#network = max_pool_2d(network, 2)
 #network = local_response_normalization(network)
 #network = spatialsoftmax(network)
 network = fully_connected(network, 128, activation='relu')
@@ -65,8 +65,7 @@ for x in col:
 
 # Training
 
-model = tflearn.DNN(network, tensorboard_verbose=1, tensorboard_dir='/home/jos/mproj/deeprl/experiments/mnist_logs')
-
+model = tflearn.DNN(network, tensorboard_verbose=0, tensorboard_dir='/home/jos/mproj/deeprl/experiments/mnist_logs')
 
 
 model.fit({'input': X}, {'target': Y}, n_epoch=5,
@@ -75,14 +74,18 @@ model.fit({'input': X}, {'target': Y}, n_epoch=5,
 
 #image_sum = tf.summary.image("SpatialWeightSharingFilters", visiual_summary)
 weighted_filters = model.session.run(visiual_summary)
-W0, W1 = model.session.run(W_list)
+Ws = model.session.run(W_list)
+print("Biases: \n{}\n".format(model.session.run(bias)[-9*2:-9]))
+print("Sigmas: \n{}\n".format(model.session.run(bias)[-9:]))
 for i in range(32):
     #image = Image.fromarray(weighted_filters[i, :, :, 0]).convert('RGB')
     #image.save('mnist_logs/weighted_filters{0}.png'.format(i), format='png')
     scipy.misc.imsave('mnist_logs/weighted_filters{0}.png'.format(i), weighted_filters[i, :, :, 0])
 
-    scipy.misc.imsave('mnist_logs/plain_filter{0}_0.png'.format(i), W0[:, :, 0, i])
-    scipy.misc.imsave('mnist_logs/plain_filter{0}_1.png'.format(i), W1[:, :, 0, i])
+    for j, W in enumerate(Ws):
+        scipy.misc.imsave('mnist_logs/plain_filter{0}_{1}.png'.format(i, j), W[:, :, 0, i])
+    #scipy.misc.imsave('mnist_logs/plain_filter{0}_0.png'.format(i), W0[:, :, 0, i])
+    #scipy.misc.imsave('mnist_logs/plain_filter{0}_1.png'.format(i), W1[:, :, 0, i])
     #scipy.misc.imsave('mnist_logs/plain_filter{0}_2.png'.format(i), W2[:, :, 0, i])
     #scipy.misc.imsave('mnist_logs/plain_filter{0}_3.png'.format(i), W3[:, :, 0, i])
 
