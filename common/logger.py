@@ -3,20 +3,28 @@ from os.path import expanduser
 import os
 
 VERSION = 'v0.9.4'
-LOGDIRBASE = "/data/s2098407/tensorflowlogs/{}".format(VERSION) #"{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
+LOGDIRBASE = "/scratch/jvdw/tensorflowlogs/{}".format(VERSION) #"{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
 
 
 def get_log_dir(hyper_parameters):
-    path = os.path.join(LOGDIRBASE, hyper_parameters.env, hyper_parameters.model)
-
     try:
+        path = os.path.join(LOGDIRBASE,
+                            hyper_parameters.env,
+                            hyper_parameters.model,
+                            'prediction={}'.format(hyper_parameters.frame_prediction),
+                            'residuals={}'.format(hyper_parameters.residual_prediction)
+                            )
         # Check if base directory exists, if not create it
         os.makedirs(path, exist_ok=True)
-    except PermissionError as e:
-        path = os.path.join(expanduser('~'), 'tensorflowlogs', VERSION, hyper_parameters.env, hyper_parameters.model,
+    except PermissionError as e: # "{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
+        path = os.path.join(os.path.expanduser("~"),
+                            "tensorflowlogs",
+                            hyper_parameters.env,
+                            hyper_parameters.model,
                             'prediction={}'.format(hyper_parameters.frame_prediction),
-                            'residuals={}'.format(hyper_parameters.residual_prediction)) # "{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
-        os.makedirs(path, exist_ok=True)
+                            'residuals={}'.format(hyper_parameters.residual_prediction)
+                            )
+        os.makedirs(path.replace("/data/s2098407", os.path.expanduser("~")), exist_ok=True)
 
     # Check the current directories in there
     current_dirs = sorted([o for o in os.listdir(path) if os.path.isdir(os.path.join(path, o))])
