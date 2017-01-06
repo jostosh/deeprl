@@ -28,7 +28,7 @@ config1 = {
     'frame_prediction': False,
     'logdir': os.path.expanduser("~/tensorflowlogs/mpi"),
     'residual_prediction': False,
-    'evaluation_interval': 1e6
+    'evaluation_interval': 1000000
 }
 
 
