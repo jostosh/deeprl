@@ -83,7 +83,7 @@ class A3CAgent(object):
         total_duration = 0.
 
         T = session.run(T_var)
-        last_checkpoint = T
+        last_checkpoint = T - hyperparameters.evaluation_interval
 
         # Main loop, execute this while T < T_max
         while T < hyperparameters.T_max:
