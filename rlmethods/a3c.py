@@ -164,7 +164,7 @@ class A3CAgent(object):
                 self.evaluate(50)
                 last_checkpoint = T // (hyperparameters.evaluation_interval / 10) * (hyperparameters.evaluation_interval / 10) # round to the nearest 1e6
                 logger.info("Storing weights at {}".format(weights_path))
-                saver.save(session, weights_path, global_step=global_step)
+                saver.save(session, weights_path, global_step=T_var)
                 logger.info("Stored weights!")
 
     def evaluate(self, num_episodes):
@@ -213,22 +213,31 @@ class A3CAgent(object):
         zipped_embeddings = list(zip(embeddings, embedding_images))
         shuffle(zipped_embeddings)
         embeddings, embedding_images = zip(*zipped_embeddings[:100])
+        embeddings = list(embeddings)
+        embedding_images = list(embedding_images)
 
         frame_height = 210
         frame_width = 160
         sprite_image = np.empty((10 * frame_height, 10 * frame_width, 3))
 
-        image_index = 0
-        for i in range(0, sprite_image.shape[0], frame_height):
-            for j in range(0, sprite_image.shape[1], frame_width):
-                sprite_image[i:i+frame_height, j:j+frame_width, :] = embedding_images[image_index]
-                image_index += 1
+        def create_sprite_im():
+            image_index = 0
+            for i in range(0, sprite_image.shape[0], frame_height):
+                for j in range(0, sprite_image.shape[1], frame_width):
+                    print("(i, j) = ({}, {}), len(images) = {}".format(i, j, len(embedding_images)))
+                    sprite_image[i:i+frame_height, j:j+frame_width, :] = embedding_images[image_index]
+                    image_index += 1
+                    if image_index == len(embedding_images):
+                        return
+        create_sprite_im()
+
+        if len(embedding_images) < 100:
+            embeddings += (100 - len(embedding_images)) * [np.zeros_like(embeddings[0])]
 
         scipy.misc.imsave(os.path.join(writer.get_logdir(), 'embedding_sprite.png'), sprite_image)
         session.run(embedding_assign, feed_dict={embedding_placeholder: np.concatenate(embeddings, axis=0)})
         logger.info("Mean score {}".format(np.mean(returns)))
-        writer.add_summary(make_summary_from_python_var('Evaluation/Score', np.mean(returns)),
-                           self.train_episode)
+        writer.add_summary(make_summary_from_python_var('Evaluation/Score', np.mean(returns)), self.train_episode)
         self.train_episode += 1
         self.env.set_train()
 
