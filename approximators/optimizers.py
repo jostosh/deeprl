@@ -21,7 +21,8 @@ class RMSPropCustom(object):
             self.gradients = [tf.placeholder(tf.float32, shape=var.get_shape().as_list()) for var in theta]
 
         with tf.name_scope("MovingAverageGradient"):
-            self.g_moving_average = [tf.Variable(tf.zeros(shape=var.get_shape().as_list(), dtype=tf.float32)) for var in theta]
+            self.g_moving_average = [tf.Variable(tf.zeros(shape=var.get_shape().as_list(), dtype=tf.float32))
+                                     for var in theta]
             self.g_update = [tf.assign(g, self.decay * g + (1 - self.decay) * tf.square(d_t), use_locking=False)
                              for g, d_t in zip(self.g_moving_average, self.gradients)]
         with tf.name_scope("RMSPropMinimize"):
@@ -42,6 +43,11 @@ class RMSPropCustom(object):
 
         with tf.name_scope("GradientInput"):
             grads = [tf.clip_by_norm(grad, 40.0) for grad in tf.gradients(loss, theta)]
+
+        return self.build_update_from_grads(grads)
+
+    def build_update_from_grads(self, grads):
+        print(type(self.g_moving_average), type(grads))
 
         with tf.name_scope("MovingAverageGradientUpdate"):
             g_update = [tf.assign(g, self.decay * g + (1 - self.decay) * tf.square(d_t), use_locking=False)
