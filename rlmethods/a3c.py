@@ -84,6 +84,7 @@ class A3CAgent(object):
 
         T = session.run(T_var)
         last_checkpoint = T - hyperparameters.evaluation_interval
+        n_updates = 0
 
         # Main loop, execute this while T < T_max
         while T < hyperparameters.T_max:
@@ -121,6 +122,9 @@ class A3CAgent(object):
             n_step_target = 0 if terminal_state else self.local_network.get_value(self.last_state, session)
             batch_len = self.t - t_start
 
+            # Count the number of updates
+            n_updates += 1
+
             '''
             lower_limits = []
             for j in range(batch_len):
@@ -142,26 +146,27 @@ class A3CAgent(object):
                 writer.add_summary(summaries, self.t)
 
             if terminal_state:
-                logger.info('Terminal state reached (episode {}, reward {}, T {}): resetting state'.format(
-                    self.n_episodes, epr, T))
+                if n_updates % 5 == 0:
+                    logger.info('Terminal state reached (episode {}, reward {}, T {}): resetting state'.format(
+                        self.n_episodes, epr, T))
 
-                #writer.add_summary(make_summary_from_python_var('{}/Score'.format(self.agent_name), epr), T)
                 self.n_episodes += 1
                 self.last_state = self.env.reset_random()
                 epr = 0
                 self.local_network.reset()
 
-            duration = (time.time() - t0) / batch_len
             total_duration += time.time() - t0
+            mean_duration = total_duration / self.t
 
-            nloops += 1
-            mean_duration = (nloops - 1) / float(nloops) * mean_duration + duration / float(nloops)
-            logger.debug("Mean duration {}, or {} per hour".format(mean_duration,
-                                                                   3600 / mean_duration * n_threads))
+            if self.agent_name == "Agent_1" and n_updates % 50 == 0:
+                logger.info("Steps per second: {}, steps per hour: {}".format(1 / mean_duration * n_threads,
+                                                                           3600 / mean_duration * n_threads))
 
             if T - last_checkpoint > hyperparameters.evaluation_interval \
                     and self.agent_name == 'Agent_0':
-                self.evaluate(50)
+
+                if hyperparameters.env != 'CartPole-v0':
+                    self.evaluate(50)
                 last_checkpoint = T // (hyperparameters.evaluation_interval / 10) * (hyperparameters.evaluation_interval / 10) # round to the nearest 1e6
                 logger.info("Storing weights at {}".format(weights_path))
                 saver.save(session, weights_path, global_step=T_var)
@@ -270,6 +275,7 @@ if __name__ == "__main__":
     n_threads = hyperparameters.n_threads
 
     session = tf.Session()
+
     global_env = get_env(env_name)
     num_actions = global_env.num_actions()
 
@@ -318,6 +324,9 @@ if __name__ == "__main__":
             for a in agents:
                 a.env.env.render()
                 time.sleep(0.02 / hyperparameters.n_threads)
+
+    for agent in agents:
+        agent._train_thread.join()
 
 
 
