@@ -39,6 +39,7 @@ class ActorCriticNN(object):
         self.embedding_layer = None
         self.gamma = hyper_parameters.gamma
         self.clip_rewards = hyper_parameters.clip_rewards
+        self.optimality_tightening = hyper_parameters.optimality_tightening
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
         with tf.name_scope(agent_name):
@@ -415,6 +416,12 @@ class ActorCriticNN(object):
 
         with tf.name_scope("ValueLoss"):
             value_loss = tf.square(advantage)
+            if self.optimality_tightening:
+                self.upper_limits = tf.placeholder(tf.float32, [None], name='UpperLimits')
+                self.lower_limits = tf.placeholder(tf.float32, [None], name='LowerLimits')
+                value_loss += 4 * (tf.nn.relu(tf.reshape(self.lower_limits, [-1, 1]) - self.value) ** 2 +
+                                   tf.nn.relu(self.value - tf.reshape(self.upper_limits, [-1, 1])) ** 2)
+                value_loss /= 5
 
         # We can combine the policy loss and the value loss in a single expression
         with tf.name_scope("CombinedLoss"):
@@ -498,7 +505,8 @@ class ActorCriticNN(object):
                                                                 self.n_steps: [1]})
         return session.run(self.embedding_layer, feed_dict={self.inputs: [state]})
 
-    def update_params(self, actions, states, lr, last_state, session, rewards, initial_return):
+    def update_params(self, actions, states, lr, last_state, session, rewards, initial_return,
+                      upper_limits=None, lower_limits=None):
         """
         Updates the parameters of the global network
         :param actions:             array of actions
@@ -520,6 +528,8 @@ class ActorCriticNN(object):
             }
             if self.frame_prediction:
                 fdict.update({self.frame_target: [s[-1:, :, :] for s in states[1:]] + [last_state[-1:, :, :]]})
+            if upper_limits and lower_limits:
+                fdict.update({self.upper_limits: upper_limits, self.lower_limits: lower_limits})
 
             # Now we update our parameters AND we take the lstm_state
             _, self.lstm_state_numeric = session.run([self.minimize, self.lstm_state_variable], feed_dict=fdict)
@@ -536,11 +546,11 @@ class ActorCriticNN(object):
             }
             if self.frame_prediction:
                 fdict.update({self.frame_target: [s[-1:, :, :] for s in states[1:]] + [last_state[-1:, :, :]]})
+            if upper_limits and lower_limits:
+                fdict.update({self.upper_limits: upper_limits, self.lower_limits: lower_limits})
 
             # Update the parameters
             session.run([self.minimize], feed_dict=fdict)
-
-            #logger.info("Numeric n-step advantage: {}, tf: {}".format((n_step_return - values)[:10], ret[:10].flatten()))
 
         return None #summaries
         #writer.add_summary(summaries, t)

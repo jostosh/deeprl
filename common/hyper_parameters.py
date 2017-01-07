@@ -2,13 +2,13 @@ import argparse
 from deeprl.approximators.nn import ModelNames
 import os
 """
-For some important parameter settings checkout:
+For some important parameter settings check out:
 https://github.com/muupan/async-rl/wiki
 """
 
 config1 = {
     'T_max': 80e6,
-    't_max': 5,
+    't_max': 20,
     'gamma': 0.99,
     'learning_rate': 7e-4,
     'rms_decay': 0.99,
@@ -28,7 +28,8 @@ config1 = {
     'frame_prediction': False,
     'logdir': os.path.expanduser("~/tensorflowlogs/mpi"),
     'residual_prediction': False,
-    'evaluation_interval': 1000000
+    'evaluation_interval': 1000000,
+    'optimality_tightening': False
 }
 
 
@@ -84,4 +85,5 @@ class HyperParameters(object):
         self.logdir = params.logdir
         self.residual_prediction = params.residual_prediction
         self.evaluation_interval = params.evaluation_interval
+        self.optimality_tightening = True
 

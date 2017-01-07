@@ -71,7 +71,7 @@ class A3CAgent(object):
         global current_lr, lr_step
         # Initialize the reward, action and observation arrays
         rewards = np.zeros(hyperparameters.t_max, dtype='float')
-        values = np.zeros(hyperparameters.t_max, dtype='float')
+        values = np.zeros(hyperparameters.t_max + 1, dtype='float')
         actions = np.zeros(hyperparameters.t_max, dtype='int')
         states = np.zeros((hyperparameters.t_max,) + self.env.state_shape(), dtype='float')
 
@@ -121,18 +121,31 @@ class A3CAgent(object):
             # Initialize the n-step return
             n_step_target = 0 if terminal_state else self.local_network.get_value(self.last_state, session)
             batch_len = self.t - t_start
+            values[batch_len] = n_step_target
 
             # Count the number of updates
             n_updates += 1
 
-            '''
-            lower_limits = []
-            for j in range(batch_len):
-                current_max = -np.inf
-                for k in range(j, batch_len):
-                    current_max = max(current_max, rewards[j:k] * (hyperparameters.gamma ** np.arange(k)) +
-                                      hyperparameters.gamma ** (k+1) * (n_step_target if k == batch_len else values[k+1]))
-            '''
+            if hyperparameters.optimality_tightening:
+                lower_limits = []
+                for j in range(batch_len):
+                    current_max = -np.inf
+                    for k in range(batch_len - j):
+                        current_max = max(current_max,
+                                          np.sum(rewards[j:j + k + 1] * (hyperparameters.gamma ** np.arange(k + 1))) +
+                                          hyperparameters.gamma ** (k + 1) * values[j + k + 1])
+                    lower_limits.append(current_max)
+
+                upper_limits = []
+                for j in range(batch_len):
+                    current_min = np.inf
+                    for k in range(j):
+                        current_min = min(current_min, np.sum(rewards[j - k - 1:j] *
+                                                              (hyperparameters.gamma ** np.arange(-k-1, 0))) +
+                                          hyperparameters.gamma ** (-k - 1) * values[j - k - 1])
+                    upper_limits.append(current_min)
+            else:
+                lower_limits = upper_limits = None
 
             # Now update the global approximator's parameters
             summaries = self.local_network.update_params(actions[:batch_len],
@@ -141,7 +154,10 @@ class A3CAgent(object):
                                                          self.last_state,
                                                          session,
                                                          rewards[:batch_len],
-                                                         n_step_target)
+                                                         n_step_target,
+                                                         upper_limits=upper_limits,
+                                                         lower_limits=lower_limits)
+
             if summaries:
                 writer.add_summary(summaries, self.t)
 
@@ -162,9 +178,7 @@ class A3CAgent(object):
                 logger.info("Steps per second: {}, steps per hour: {}".format(1 / mean_duration * n_threads,
                                                                            3600 / mean_duration * n_threads))
 
-            if T - last_checkpoint > hyperparameters.evaluation_interval \
-                    and self.agent_name == 'Agent_0':
-
+            if T - last_checkpoint > hyperparameters.evaluation_interval and self.agent_name == 'Agent_0':
                 if hyperparameters.env != 'CartPole-v0':
                     self.evaluate(50)
                 last_checkpoint = T // (hyperparameters.evaluation_interval / 10) * (hyperparameters.evaluation_interval / 10) # round to the nearest 1e6
@@ -229,7 +243,6 @@ class A3CAgent(object):
             image_index = 0
             for i in range(0, sprite_image.shape[0], frame_height):
                 for j in range(0, sprite_image.shape[1], frame_width):
-                    print("(i, j) = ({}, {}), len(images) = {}".format(i, j, len(embedding_images)))
                     sprite_image[i:i+frame_height, j:j+frame_width, :] = embedding_images[image_index]
                     image_index += 1
                     if image_index == len(embedding_images):
@@ -243,6 +256,7 @@ class A3CAgent(object):
         session.run(embedding_assign, feed_dict={embedding_placeholder: np.concatenate(embeddings, axis=0)})
         logger.info("Mean score {}".format(np.mean(returns)))
         writer.add_summary(make_summary_from_python_var('Evaluation/Score', np.mean(returns)), self.train_episode)
+        writer.flush()
         self.train_episode += 1
         self.env.set_train()
 
