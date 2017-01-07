@@ -3,7 +3,7 @@ from os.path import expanduser
 import os
 
 VERSION = 'v0.9.4'
-LOGDIRBASE = "/scratch-shared/jvdw/tensorflowlogs/{}".format(VERSION) #"{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
+LOGDIRBASE = "/home/jvdw/tensorflowlogs/{}".format(VERSION) #"{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
 
 
 def get_log_dir(hyper_parameters):
@@ -19,6 +19,7 @@ def get_log_dir(hyper_parameters):
     except PermissionError as e: # "{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
         path = os.path.join(os.path.expanduser("~"),
                             "tensorflowlogs",
+                            VERSION,
                             hyper_parameters.env,
                             hyper_parameters.model,
                             'prediction={}'.format(hyper_parameters.frame_prediction),
