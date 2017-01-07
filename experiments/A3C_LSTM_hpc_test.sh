@@ -15,4 +15,6 @@ module load cuda/7.5.18
 module load cudnn/7.5-v5
 module load gcc/4.9.2
 
+export PYTHONPATH="$PYTHONPATH:/home/jvdw/mproj"
+
 srun python3 $HOME/mproj/deeprl/rlmethods/a3c.py --model a3c_lstm --n_threads 16 --clip_rewards $*
