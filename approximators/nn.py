@@ -193,10 +193,7 @@ class ActorCriticNN(object):
                 self.initial_state_c,
                 self.initial_state_h
             )
-        with tf.name_scope('SequenceMasking'):
-            self.n_steps = tf.placeholder(tf.int32, shape=[])
-            seq_mask = tf.reshape(sequence_mask([self.n_steps], maxlen=self.t_max, dtype=tf.float32),
-                                  [1, self.t_max, 1], name='SequenceMask')
+            self.n_steps = tf.placeholder(tf.int32, shape=[1])
         with tf.name_scope('ForwardInputs'):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
         with tf.name_scope('HiddenLayers'):
@@ -208,16 +205,15 @@ class ActorCriticNN(object):
             net = spatialsoftmax(net)
             net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
             self._add_trainable(net)
-            net = tf.mul(tflearn.reshape(net, [1, self.t_max, 256]), seq_mask, name='MaskedSequence')  # tf.expand_dims(net, 1)
-            net, state = lstm(net, 256, initial_state=self.initial_state, return_state=True,
-                              name='LSTM4', dynamic=True, return_seq=True)
+            net = tflearn.reshape(net, [1, -1, 256], "ReshapedLSTMInput")
+            net, state = custom_lstm(net, 256, initial_state=self.initial_state,
+                                     name='LSTM4_{}'.format(self.agent_name),
+                                     sequence_length=self.n_steps)
             #logger.info(net._op.__dict__)
             self._add_trainable(net)
-            #net = tflearn.reshape(net, [-1, 256])
+            net = tflearn.reshape(net, [-1, 256], name="ReshapedLSTMOutput")
             self.lstm_state_variable = state
             self.embedding_layer = net
-
-        #self.reset_lstm_state()
         return net
 
     def reset_lstm_state(self):
@@ -272,6 +268,8 @@ class ActorCriticNN(object):
             net = self._a3c_lstm()
         elif self.model_name == ModelNames.A3C_FF_SS:
             net = self._a3c_ff_ss()
+        elif self.model_name == ModelNames.A3C_LSTM_SS:
+            net = self._a3c_lstm_ss()
         else:
             net = self._small_fcn()
 
