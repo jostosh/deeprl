@@ -34,8 +34,7 @@ class A3CAgent(object):
                                            agent_name=agent_name,
                                            optimizer=optimizer,
                                            hyper_parameters=hyper_parameters,
-                                           global_network=global_network,
-                                           distributed=True)
+                                           global_network=global_network)
 
         #self._train_thread = threading.Thread(target=self._train, name=agent_name)
         self.t = 1
@@ -86,9 +85,7 @@ class A3CAgent(object):
             t0 = time.time()
 
             # A new batch begins, reset the gradients and synchronize thread-specific parameters
-            start = time.time()
             #self.synchronize_thread_parameters(session)
-            end = time.time()
             #logger.debug("Time for param synchronization: {}".format((end - start)))
 
 
@@ -118,18 +115,10 @@ class A3CAgent(object):
                 epr += rewards[i]
                 step = session.run(increment_step)
 
-            if hyper_parameters.clip_rewards:
-                # Reward clipping helps to stabilize training
-                rewards = np.clip(rewards, -1.0, 1.0)
-
             # Initialize the n-step return
             n_step_target = 0 if terminal_state else self.local_network.get_value(self.last_state, session)
 
             batch_len = self.t - t_start
-            end = time.time()
-            #logger.debug("Time per step: {}".format((end - start) / batch_len))
-
-            start = time.time()
 
             # Now update the global approximator's parameters
             summaries = self.local_network.update_params(actions[:batch_len],
@@ -139,8 +128,8 @@ class A3CAgent(object):
                                                          session,
                                                          rewards[:batch_len],
                                                          n_step_target)
-            if is_chief:
-                sv.summary_computed(sess=session, summary=summaries)
+            #if is_chief:
+            #    sv.summary_computed(sess=session, summary=summaries)
 
             end = time.time()
             #writer.add_summary(summaries, self.t)
@@ -151,8 +140,8 @@ class A3CAgent(object):
                             .format(self.n_episodes, step, epr, hyper_parameters.task_index))
 
 
-                if is_chief:
-                    sv.summary_computed(sess=session, summary=make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr))
+                #if is_chief:
+                #    sv.summary_computed(sess=session, summary=make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr))
                 #writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr), T)
                 self.n_episodes += 1
                 self.last_state = self.env.reset()
@@ -161,24 +150,27 @@ class A3CAgent(object):
             end = time.time()
             #logger.debug("Time for episode reset: {}".format((end - start)))
 
-            duration = (time.time() - t0) / batch_len
             total_duration += time.time() - t0
 
             nloops += 1
-            mean_duration = (nloops - 1) / float(nloops) * mean_duration + duration / float(nloops)
+            mean_duration = total_duration / self.t
             # if rank == 1 and (self.t / 10) % 10 == 0:
-            logger.info("Mean duration {}, or {} per hour".format(mean_duration,
-                                                                  3600 / mean_duration * (len(workers))))
+            if self.n_episodes % 10 == 0:
+                logger.info("Steps per second: {}, steps per hour: {}".format(1 / mean_duration * len(workers),
+                                                                              3600 / mean_duration * len(workers)))
 
 
 if __name__ == "__main__":
     hyper_parameters = HyperParameters(parse_cmd_args())
-    parameter_servers = ["localhost:{}".format(hyper_parameters.port0), "localhost:{}".format(hyper_parameters.port0 + 1)]
+    parameter_servers = ["localhost:{}".format(hyper_parameters.port0)]
     workers = ["localhost:{}".format(str(hyper_parameters.port0 + len(parameter_servers) + i))
                for i in range(int(os.environ['SLURM_JOB_CPUS_PER_NODE']) - len(parameter_servers))]
     logger.info("We should have {} instances running".format(int(os.environ['SLURM_JOB_CPUS_PER_NODE'])))
     cluster = tf.train.ClusterSpec({"ps": parameter_servers, "worker": workers})
-    server = tf.train.Server(cluster, job_name=hyper_parameters.job_name, task_index=hyper_parameters.task_index)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5 / float(len(workers + parameter_servers)))
+    #server_def = tf.train.ServerDef(cluster=cluster.as_cluster_def(), default_session_)
+    server = tf.train.Server(cluster, job_name=hyper_parameters.job_name, task_index=hyper_parameters.task_index,
+                             config=tf.ConfigProto(gpu_options=gpu_options))
     if hyper_parameters.job_name == "ps":
         server.join()
     else:
@@ -199,6 +191,8 @@ if __name__ == "__main__":
                     worker_device="/job:worker/task:%d" % hyper_parameters.task_index,
                     cluster=cluster,
             )):
+            #with tf.device("/job:ps/task:0"):
+
                 global_step = tf.Variable(0)
                 increment_step = global_step.assign_add(1, use_locking=False)
                 learning_rate_ph = tf.placeholder(tf.float32)
@@ -211,10 +205,11 @@ if __name__ == "__main__":
                 global_network = ActorCriticNN(num_actions=num_actions,
                                                agent_name='GLOBAL',
                                                hyper_parameters=hyper_parameters,
-                                               optimizer=shared_optimizer,
-                                               distributed=True)
+                                               optimizer=shared_optimizer)
+            #with tf.device("/job:ps/task:1"):
                 shared_optimizer.set_global_theta(global_network.theta)  # .build_update(global_network.theta)
 
+            with tf.device("/job:worker/task:{}".format(hyper_parameters.task_index)):
                 env = get_env(env_name, frames_per_state=hyper_parameters.frames_per_state, output_shape=hyper_parameters.input_shape[1:])
                 agents = [A3CAgent(env, global_network, 'Agent_%d' % hyper_parameters.task_index, optimizer=shared_optimizer)]
                 #agents = []
@@ -223,10 +218,11 @@ if __name__ == "__main__":
                 #        agents.append(A3CAgent(env, global_network, 'Agent_%d' % i, optimizer=shared_optimizer))
 
                 init_op = tf.global_variables_initializer()
-                #writer = tf.summary.FileWriter(hyper_parameters.log_dir, graph=graph) #.train.SummaryWriter(hyper_parameters.log_dir)
-                #summary_op = tf.summary.merge_all()
+                    #writer = tf.summary.FileWriter(hyper_parameters.log_dir, graph=graph) #.train.SummaryWriter(hyper_parameters.log_dir)
+                    #summary_op = tf.summary.merge_all()
                 saver = tf.train.Saver()
 
+            '''
             sv = tf.train.Supervisor(is_chief=is_chief,
                                      global_step=global_step,
                                      summary_op=None, #summary_op,
@@ -235,11 +231,13 @@ if __name__ == "__main__":
                                      saver=saver,
                                      init_op=init_op,
                                      )
-
-            with sv.managed_session(server.target) as sess:
+            '''
+            with tf.Session(server.target) as sess:
                 #writer_new_event(hyper_parameters, sess)
+                sess.run(init_op)
                 #agents[hyper_parameters.task_index]._train(sess)
                 agents[0]._train(sess)
+                #tf.OptimizerOptions
 
 
         #sv.stop()
