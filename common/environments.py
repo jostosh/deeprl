@@ -53,9 +53,9 @@ class AtariEnvironment(object):
 
         self.is_training = True
 
-        self.env.ale.setInt(b'frame_skip', 4)
+        self.env.ale.setInt(b'frame_skip', 1)
         self.env.ale.setFloat(b'repeat_action_probability', 0.)
-        self.env.ale.setBool(b'color_averaging', True)
+        #self.env.ale.setBool(b'color_averaging', True)
         self.real_actions = self.env.ale.getMinimalActionSet()
         self._screen = np.empty((210, 160, 1), dtype=np.uint8)
         assert action_repeat > 0
@@ -119,6 +119,8 @@ class AtariEnvironment(object):
 
         reward = 0
         for i in range(self.action_repeat):
+            if i == self.action_repeat - 1:
+                self.env.ale.getScreenGrayscale(self.last_observation)
             reward += self.env.ale.act(self.real_actions[action])
 
         if self.env.ale.game_over() or (self.is_training and self.env.ale.lives() < lives):
@@ -126,7 +128,7 @@ class AtariEnvironment(object):
         self.env.ale.getScreenGrayscale(self._screen)
 
         preprocessed_observation = self._preprocess_observation(self._screen)
-        self.last_observation = self._screen.copy()
+        #self.last_observation = self._screen.copy()
         [self.state.append(preprocessed_observation) for _ in range(self.frames_per_state - len(self.state) + 1)]
 
         self.state = self.state[1:]
