@@ -19,7 +19,7 @@ class ModelNames:
 
 class ActorCriticNN(object):
 
-    def __init__(self, num_actions, agent_name, optimizer, hyper_parameters, global_network=None, distributed=False):
+    def __init__(self, num_actions, agent_name, optimizer, hyper_parameters, global_network=None):
         self.num_actions = num_actions
         self.optimizer = optimizer
         self.global_network = global_network
@@ -40,6 +40,7 @@ class ActorCriticNN(object):
         self.gamma = hyper_parameters.gamma
         self.clip_rewards = hyper_parameters.clip_rewards
         self.optimality_tightening = hyper_parameters.optimality_tightening
+        self.lstm_state_numeric = self.lstm_first_state_since_update = None
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
         with tf.name_scope(agent_name):
@@ -154,11 +155,9 @@ class ActorCriticNN(object):
         with tf.name_scope('LSTMInput'):
             # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
             # 'h' (256), which are both influencing the layer in the forward/backward pass.
-            self.initial_state_c = tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_c")
-            self.initial_state_h = tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_h")
             self.initial_state = LSTMStateTuple(
-                self.initial_state_c,
-                self.initial_state_h
+                tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_c"),
+                tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_h")
             )
             self.n_steps = tf.placeholder(tf.int32, shape=[1])
 
@@ -173,9 +172,6 @@ class ActorCriticNN(object):
             self.lstm_state_variable = state
             self.embedding_layer = net
 
-            #logger.info(tflearn.get_layer_variables_by_name('LSTM4_{}'.format(self.agent_name)))
-
-        #self.reset_lstm_state()
         return net
 
     def _a3c_lstm_ss(self):
@@ -187,11 +183,9 @@ class ActorCriticNN(object):
         with tf.name_scope('LSTMStateInput'):
             # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
             # 'h' (256), which are both influencing the layer in the forward/backward pass.
-            self.initial_state_c = tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_c")
-            self.initial_state_h = tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_h")
             self.initial_state = LSTMStateTuple(
-                self.initial_state_c,
-                self.initial_state_h
+                tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_c"),
+                tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_h")
             )
             self.n_steps = tf.placeholder(tf.int32, shape=[1])
         with tf.name_scope('ForwardInputs'):
@@ -201,7 +195,6 @@ class ActorCriticNN(object):
             self._add_trainable(net)
             net = tflearn.conv_2d(net, 64, 4, strides=2, activation='linear', name='Conv2', padding='valid', weight_decay=0.)
             self._add_trainable(net)
-            #net = tflearn.flatten(net)
             net = spatialsoftmax(net)
             net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
             self._add_trainable(net)
@@ -209,7 +202,6 @@ class ActorCriticNN(object):
             net, state = custom_lstm(net, 256, initial_state=self.initial_state,
                                      name='LSTM4_{}'.format(self.agent_name),
                                      sequence_length=self.n_steps)
-            #logger.info(net._op.__dict__)
             self._add_trainable(net)
             net = tflearn.reshape(net, [-1, 256], name="ReshapedLSTMOutput")
             self.lstm_state_variable = state
@@ -217,14 +209,21 @@ class ActorCriticNN(object):
         return net
 
     def reset_lstm_state(self):
-        self.lstm_state_numeric = LSTMStateTuple(
-            np.zeros([1, 256], dtype='float32'),
-            np.zeros([1, 256], dtype='float32')
-        )
-        self.lstm_first_state_since_update = LSTMStateTuple(
-            np.zeros([1, 256], dtype='float32'),
-            np.zeros([1, 256], dtype='float32')
-        )
+        if not self.lstm_state_numeric and not self.lstm_first_state_since_update:
+            self.lstm_state_numeric = LSTMStateTuple(
+                np.zeros([1, 256], dtype='float32'),
+                np.zeros([1, 256], dtype='float32')
+            )
+            self.lstm_first_state_since_update = LSTMStateTuple(
+                np.zeros([1, 256], dtype='float32'),
+                np.zeros([1, 256], dtype='float32')
+            )
+        else:
+            self.lstm_state_numeric.c.fill(0.)
+            self.lstm_state_numeric.h.fill(0.)
+
+            self.lstm_first_state_since_update.c.fill(0.)
+            self.lstm_first_state_since_update.h.fill(0.)
 
     def reset(self):
         if self.recurrent:
@@ -286,6 +285,7 @@ class ActorCriticNN(object):
                 else:
                     self.value = tflearn.fully_connected(net, 1, activation='linear', name='v_s')
                     self._add_trainable(self.value)
+                self.value = tflearn.reshape(self.value, [-1], 'FlattenedValue')
 
         if self.agent_name == 'GLOBAL':
             logger.info("Layer overview:")
@@ -358,8 +358,8 @@ class ActorCriticNN(object):
 
     def build_param_sync(self):
         with tf.name_scope("ParamSynchronization"):
-            self.param_sync = [tf.assign(local_theta, global_theta, use_locking=False)
-                               for local_theta, global_theta in zip(self.theta, self.global_network.theta)]
+            self.param_sync = tf.group(*[tf.assign(local_theta, global_theta, use_locking=False).op
+                                         for local_theta, global_theta in zip(self.theta, self.global_network.theta)])
 
     def build_param_update(self):
         with tf.name_scope("ParamUpdate"):
@@ -382,22 +382,8 @@ class ActorCriticNN(object):
                 return n_step_t * self.gamma + reward
 
             rewards = tf.clip_by_value(self.rewards, -.1, 1.) if self.clip_rewards else self.rewards
-            n_step_returns = tf.scan(reward_fn, tf.reverse_v2(rewards, [0]),
-                                     initializer=self.initial_return)
-            advantage = tf.reshape(tf.reverse_v2(n_step_returns, [0]), [-1, 1]) - self.value
-
-
-        # The advantage is simply the estimated value minus the bootstrapped returns
-        # advantage = self.n_step_returns - self.value
-        # advantage_no_grad = self.n_step_returns - tf.stop_gradient(self.value)
-
-        '''
-        if self.clip_advantage:
-            # I empirically found that it might help to clip the advantage that is used for the policy loss. This might
-            # improve stability and consistency of the gradients
-            logger.info("Clipping advantage in graph")
-            self.advantage_no_grad = tf.clip_by_value(self.advantage_no_grad, -1., 1., name="ClippedAdvantage")
-        '''
+            n_step_returns = tf.scan(reward_fn, tf.reverse_v2(rewards, [0]), initializer=self.initial_return)
+            advantage = tf.reverse_v2(n_step_returns, [0]) - self.value
 
         with tf.name_scope("PolicyLoss"):
             # action matrix is n x a where each row corresponds to a time step and each column to an action
@@ -405,11 +391,11 @@ class ActorCriticNN(object):
             # self.pi and log_pi are n x a matrices
             log_pi = tf.log(tf.clip_by_value(self.pi, 1e-20, 1.0), name="LogPi")
             # The entropy is added to encourage exploration
-            entropy = -tf.reshape(tf.reduce_sum(log_pi * self.pi, reduction_indices=1), (-1, 1), name="Entropy")
+            entropy = tf.neg(tf.reduce_sum(log_pi * self.pi, reduction_indices=1), name="Entropy")
             # Define the loss for the policy (minus is needed to perform *negative* gradient descent == gradient ascent)
             pi_loss = tf.neg(
-                tflearn.reshape(tf.reduce_sum(action_mask * log_pi, reduction_indices=1), (-1, 1))
-                * tf.stop_gradient(advantage) #self.advantage_no_grad
+                tf.reduce_sum(action_mask * log_pi, reduction_indices=1)
+                * tf.stop_gradient(advantage)
                 + self.beta * entropy, name='PiLoss')
 
         with tf.name_scope("ValueLoss"):
@@ -417,8 +403,8 @@ class ActorCriticNN(object):
             if self.optimality_tightening:
                 self.upper_limits = tf.placeholder(tf.float32, [None], name='UpperLimits')
                 self.lower_limits = tf.placeholder(tf.float32, [None], name='LowerLimits')
-                value_loss += 4 * (tf.nn.relu(tf.reshape(self.lower_limits, [-1, 1]) - self.value) ** 2 +
-                                   tf.nn.relu(self.value - tf.reshape(self.upper_limits, [-1, 1])) ** 2)
+                value_loss += 4 * (tf.nn.relu(self.lower_limits - self.value) ** 2 +
+                                   tf.nn.relu(self.value - self.upper_limits) ** 2)
                 value_loss /= 5
 
         # We can combine the policy loss and the value loss in a single expression
@@ -463,14 +449,11 @@ class ActorCriticNN(object):
         """
         if self.recurrent:
             # If we use a recurrent model
-            return session.run(self.value,
-                                    feed_dict={
-                                        self.inputs: [state],
-                                        self.initial_state: self.lstm_state_numeric,
-                                        self.n_steps: [1]
-                                    })[0][0]
+            return session.run(self.value, feed_dict={self.inputs: [state], self.initial_state: self.lstm_state_numeric,
+                                                      self.n_steps: [1]}
+                               )[0]#[0]
 
-        return session.run(self.value, feed_dict={self.inputs: [state]})[0][0]
+        return session.run(self.value, feed_dict={self.inputs: [state]})[0]#[0]
 
     def get_value_and_action(self, state, session):
         """
@@ -493,7 +476,7 @@ class ActorCriticNN(object):
                 feed_dict={self.inputs: [state]})
 
         action = np.random.choice(self.num_actions, p=pi[0])
-        return value[0][0], action
+        return value[0], action
 
     def get_embedding(self, state, session):
         assert self.embedding_layer is not None, "No embedding layer was configured for TensorBoard embeddings"
@@ -550,69 +533,5 @@ class ActorCriticNN(object):
             # Update the parameters
             session.run([self.minimize], feed_dict=fdict)
 
-        return None #summaries
-        #writer.add_summary(summaries, t)
+        return None
 
-    def compute_delta(self, n_step_return, actions, states, values, learning_rate_var, lr, last_state, session):
-        """
-        Updates the parameters of the global network
-        :param n_step_return:       n-step returns
-        :param actions:             array of actions
-        :param states:              array of states
-        :param values:              array of values
-        :param learning_rate_var:   learning rate placeholder,
-        :param lr:                  actual learning rate
-        """
-        n_steps = len(n_step_return)
-
-        if self.recurrent:
-            # First we need to pad the sequences we got
-            n_pad = self.t_max - n_steps
-            pad1d = np.zeros(n_pad)
-            n_step_return   = np.concatenate([n_step_return, pad1d]).reshape((self.t_max, 1))
-            actions         = np.concatenate([actions, pad1d])
-            values          = np.concatenate([values, pad1d]).reshape((self.t_max, 1))
-            states          = np.concatenate([states, np.zeros((self.t_max - n_steps,) + states[0].shape)])
-
-            fdict = {
-                self.n_step_returns: n_step_return.reshape((self.t_max, 1)),
-                self.actions: actions,
-                self.inputs: states,
-                self.advantage_no_grad: (n_step_return - values).reshape((self.t_max, 1)),
-                self.initial_state: self.lstm_first_state_since_update,
-                self.n_steps: [n_steps]
-            }
-            if self.frame_prediction:
-                fdict.update({self.frame_target: [s[-1, :, :] for s in states[1:] + [last_state]]})
-
-            # Now we update our parameters AND we take the lstm_state
-            gradients, summaries, self.lstm_state_numeric = session.run([
-                self.local_gradients,
-                self.merged_summaries,
-                self.lstm_state_variable
-            ],
-                feed_dict=fdict
-            )
-            # We also need to remember the LSTM state for the next backward pass
-            self.lstm_first_state_since_update = deepcopy(self.lstm_state_numeric)
-        else:
-            fdict = {
-                self.n_step_returns: n_step_return.reshape((n_steps, 1)),
-                self.actions: actions,
-                self.inputs: states,
-                self.advantage_no_grad: (n_step_return - values).reshape((n_steps, 1))
-            }
-            if self.frame_prediction:
-                fdict.update({self.frame_target: states[1:] + [last_state]})
-
-            # Update the parameters
-            gradients, summaries = session.run([
-                self.local_gradients,
-                self.merged_summaries
-            ],
-                feed_dict=fdict
-            )
-
-
-        return summaries, gradients
-        #writer.add_summary(summaries, t)
