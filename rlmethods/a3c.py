@@ -109,7 +109,10 @@ class A3CAgent(object):
                 states[i] = self.last_state
                 # Get the corresponding value and action. This is done simultaneously such that the approximators only
                 # has to perform a single forward pass.
-                values[i], actions[i] = self.local_network.get_value_and_action(self.last_state, session)
+                if hyperparameters.optimality_tightening:
+                    values[i], actions[i] = self.local_network.get_value_and_action(self.last_state, session)
+                else:
+                    actions[i] = self.local_network.get_action(self.last_state, session)
                 # Perform step in environment and obtain rewards and observations
                 self.last_state, rewards[i], terminal_state, info = self.env.step(actions[i])
                 # Increment time counters
@@ -121,12 +124,12 @@ class A3CAgent(object):
             # Initialize the n-step return
             n_step_target = 0 if terminal_state else self.local_network.get_value(self.last_state, session)
             batch_len = self.t - t_start
-            values[batch_len] = n_step_target
 
             # Count the number of updates
             n_updates += 1
 
             if hyperparameters.optimality_tightening:
+                values[batch_len] = n_step_target
                 lower_limits = []
                 for j in range(batch_len):
                     current_max = -np.inf
