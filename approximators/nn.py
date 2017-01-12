@@ -280,8 +280,8 @@ class ActorCriticNN(object):
                 if self.policy_weighted_val:
                     q_val = tflearn.fully_connected(net, num_actions, activation='linear', weight_decay=0.)
                     self._add_trainable(q_val)
-                    self.value = tf.reshape(tf.reduce_sum(tf.mul(q_val, tf.stop_gradient(self.pi)),
-                                                          reduction_indices=1), (-1, 1), name='v_s')
+                    self.value = tf.reduce_sum(tf.mul(q_val, tf.stop_gradient(self.pi)),
+                                               reduction_indices=1, name='v_s')
                 else:
                     self.value = tflearn.fully_connected(net, 1, activation='linear', name='v_s')
                     self._add_trainable(self.value)
@@ -358,7 +358,7 @@ class ActorCriticNN(object):
 
     def build_param_sync(self):
         with tf.name_scope("ParamSynchronization"):
-            self.param_sync = tf.group(*[tf.assign(local_theta, global_theta, use_locking=False).op
+            self.param_sync = tf.group(*[tf.assign(local_theta, global_theta, use_locking=False)
                                          for local_theta, global_theta in zip(self.theta, self.global_network.theta)])
 
     def build_param_update(self):
@@ -382,8 +382,11 @@ class ActorCriticNN(object):
                 return n_step_t * self.gamma + reward
 
             rewards = tf.clip_by_value(self.rewards, -.1, 1.) if self.clip_rewards else self.rewards
-            n_step_returns = tf.scan(reward_fn, tf.reverse_v2(rewards, [0]), initializer=self.initial_return)
-            advantage = tf.reverse_v2(n_step_returns, [0]) - self.value
+            n_step_returns_rev = tf.scan(reward_fn, tf.reverse_v2(rewards, [0]), initializer=self.initial_return)
+            n_step_returns = tf.reverse_v2(n_step_returns_rev, [0])
+
+            advantage = n_step_returns - self.value
+            advantage_no_grad = n_step_returns - tf.stop_gradient(self.value)
 
         with tf.name_scope("PolicyLoss"):
             # action matrix is n x a where each row corresponds to a time step and each column to an action
@@ -394,12 +397,12 @@ class ActorCriticNN(object):
             entropy = tf.neg(tf.reduce_sum(log_pi * self.pi, reduction_indices=1), name="Entropy")
             # Define the loss for the policy (minus is needed to perform *negative* gradient descent == gradient ascent)
             pi_loss = tf.neg(
-                tf.reduce_sum(action_mask * log_pi, reduction_indices=1)
-                * tf.stop_gradient(advantage)
+                tf.reduce_sum(tf.mul(action_mask, log_pi), reduction_indices=1)
+                * advantage_no_grad
                 + self.beta * entropy, name='PiLoss')
 
         with tf.name_scope("ValueLoss"):
-            value_loss = tf.square(advantage)
+            value_loss = tf.nn.l2_loss(advantage)
             if self.optimality_tightening:
                 self.upper_limits = tf.placeholder(tf.float32, [None], name='UpperLimits')
                 self.lower_limits = tf.placeholder(tf.float32, [None], name='LowerLimits')
