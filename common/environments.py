@@ -84,7 +84,7 @@ class AtariEnvironment(object):
             return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
 
         # Remove Atari artifacts
-        preprocessed_observation = np.maximum(self.last_observation, observation)
+        preprocessed_observation = observation #np.maximum(self.last_observation, observation)
         # Convert to gray scale and resize
         return imresize(np.reshape(preprocessed_observation, (210, 160)), self.output_shape) / 255. #(84, 84))
 
@@ -119,8 +119,6 @@ class AtariEnvironment(object):
 
         reward = 0
         for i in range(self.action_repeat):
-            if i == self.action_repeat - 1:
-                self.env.ale.getScreenGrayscale(self.last_observation)
             reward += self.env.ale.act(self.real_actions[action])
 
         if self.env.ale.game_over() or (self.is_training and self.env.ale.lives() < lives):
