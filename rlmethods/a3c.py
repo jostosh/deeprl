@@ -175,11 +175,11 @@ class A3CAgent(object):
                 self.local_network.reset()
 
             total_duration += time.time() - t0
-            mean_duration = total_duration / self.t
+            mean_duration = total_duration / T
 
             if self.agent_name == "Agent_1" and n_updates % 50 == 0:
-                logger.info("Steps per second: {}, steps per hour: {}".format(1 / mean_duration * n_threads,
-                                                                           3600 / mean_duration * n_threads))
+                logger.info("Steps per second: {}, steps per hour: {}".format(1 / mean_duration,
+                                                                           3600 / mean_duration))
 
             if T - last_checkpoint > hyperparameters.evaluation_interval and self.agent_name == 'Agent_0':
                 if hyperparameters.env != 'CartPole-v0':
