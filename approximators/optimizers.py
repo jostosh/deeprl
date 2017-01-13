@@ -53,11 +53,11 @@ class RMSPropCustom(object):
         with tf.name_scope("GradientInput"):
             grads = [tf.clip_by_norm(grad, 40.0) for grad in tf.gradients(loss, theta)]
 
-        #return tf.group(*[training_ops.apply_rms_prop(
-        #    t, rms, m, self.learning_rate, self.decay_tensor, self.momentum_tensor,
-        #    self.epsilon_tensor, g, use_locking=False
-        #).op for t, rms, m, g in zip(self.global_theta, self.g_moving_average, self.mom, grads)], name="RMSPropUpdate")
-        return self.build_update_from_grads(grads)
+        return tf.group(*[training_ops.apply_rms_prop(
+            t, rms, m, self.learning_rate, self.decay_tensor, self.momentum_tensor,
+            self.epsilon_tensor, g, use_locking=False
+        ).op for t, rms, m, g in zip(self.global_theta, self.g_moving_average, self.mom, grads)], name="RMSPropUpdate")
+        #return self.build_update_from_grads(grads)
 
     def build_update_from_grads(self, grads):
 
