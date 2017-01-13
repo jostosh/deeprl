@@ -157,7 +157,7 @@ class AtariEnvironment(object):
         self.is_training = False
 
     def reset_random(self):
-        state = self.reset() if self.env.ale.lives() == 0 else self.state
+        state = self.reset()
 
         random_steps = np.random.randint(8)
         for i in range(random_steps):
