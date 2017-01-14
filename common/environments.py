@@ -88,7 +88,6 @@ class AtariEnvironment(object):
         # Convert to gray scale and resize
         return imresize(np.reshape(preprocessed_observation, (210, 160)), self.output_shape) / 255. #(84, 84))
 
-
     def step(self, action):
         step_reward = 0
         step_terminal = False
@@ -121,7 +120,7 @@ class AtariEnvironment(object):
         for i in range(self.action_repeat):
             reward += self.env.ale.act(self.real_actions[action])
 
-        if self.env.ale.game_over() or (self.is_training and self.env.ale.lives() < lives):
+        if self.env.ale.game_over(): #or (self.is_training and self.env.ale.lives() < lives):
             step_terminal = True
         self.env.ale.getScreenGrayscale(self._screen)
 
