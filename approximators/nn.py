@@ -2,10 +2,9 @@ import tensorflow as tf
 import tflearn
 import numpy as np
 from deeprl.common.logger import logger
-from deeprl.approximators.layers import lstm, spatialsoftmax, custom_lstm
+from deeprl.approximators.layers import spatialsoftmax, custom_lstm, convolutional_lstm
 from tensorflow.python.ops.rnn_cell import LSTMStateTuple
 from copy import deepcopy
-from deeprl.common.tensorflowutils import sequence_mask
 
 
 class ModelNames:
@@ -15,6 +14,7 @@ class ModelNames:
     A3C_LSTM    = 'a3c_lstm'
     A3C_FF_SS   = 'a3c_ff_ss'
     A3C_LSTM_SS = 'a3c_lstm_ss'
+    A3C_CONV_LSTM = 'a3c_conv_lstm'
 
 
 class ActorCriticNN(object):
@@ -29,7 +29,7 @@ class ActorCriticNN(object):
         self.agent_name = agent_name
         self.model_name = hyper_parameters.model
         self.clip_advantage = hyper_parameters.clip_advantage
-        self.recurrent = self.model_name in [ModelNames.A3C_LSTM, ModelNames.A3C_LSTM_SS]
+        self.recurrent = self.model_name in [ModelNames.A3C_LSTM, ModelNames.A3C_LSTM_SS, ModelNames.A3C_CONV_LSTM]
         self.t_max = hyper_parameters.t_max
         self.input_shape = hyper_parameters.input_shape
         self.policy_weighted_val = hyper_parameters.policy_weighted_val
@@ -41,6 +41,7 @@ class ActorCriticNN(object):
         self.clip_rewards = hyper_parameters.clip_rewards
         self.optimality_tightening = hyper_parameters.optimality_tightening
         self.lstm_state_numeric = self.lstm_first_state_since_update = None
+        #self.policy_quanization = hyper_parameters.policy_quantization
 
         # Build computational graphs for loss, synchronization of parameters and parameter updates
         with tf.name_scope(agent_name):
@@ -208,22 +209,66 @@ class ActorCriticNN(object):
             self.embedding_layer = net
         return net
 
-    def reset_lstm_state(self):
-        if not self.lstm_state_numeric and not self.lstm_first_state_since_update:
-            self.lstm_state_numeric = LSTMStateTuple(
-                np.zeros([1, 256], dtype='float32'),
-                np.zeros([1, 256], dtype='float32')
-            )
-            self.lstm_first_state_since_update = LSTMStateTuple(
-                np.zeros([1, 256], dtype='float32'),
-                np.zeros([1, 256], dtype='float32')
-            )
-        else:
-            self.lstm_state_numeric.c.fill(0.)
-            self.lstm_state_numeric.h.fill(0.)
+    def _a3c_conv_lstm(self):
+        """
+        This is an experimental architecture that uses convolutional LSTM layers.
+        """
+        with tf.name_scope('Inputs'):
+            net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
-            self.lstm_first_state_since_update.c.fill(0.)
-            self.lstm_first_state_since_update.h.fill(0.)
+        with tf.name_scope('LSTMInput'):
+            # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
+            # 'h' (256), which are both influencing the layer in the forward/backward pass.
+            #self.initial_state = LSTMStateTuple(
+            #    tf.placeholder(tf.float32, shape=[1, 9, 9, 64], name="InitialLSTMState_c"),
+            #    tf.placeholder(tf.float32, shape=[1, 9, 9, 64], name="InitialLSTMState_h")
+            #)
+            self.n_steps = tf.placeholder(tf.int32, shape=[1])
+
+        with tf.name_scope('HiddenLayers'):
+            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1', padding='valid',
+                                  weight_decay=0.)
+            self._add_trainable(net)
+            net = tf.reshape(net, [-1, 1] + net.get_shape().as_list()[1:])
+
+            net, new_state, self.initial_state = convolutional_lstm(net, outer_filter_size=4, num_features=64,
+                                                                    stride=2, inner_filter_size=3)
+            self.theta += net.W + [net.b]
+            #net, state = conv_lstm(net, 64, 4, stride=2, initial_state=self.initial_state, inner_filter_size=3,
+            #                       sequence_length=self.n_steps, name='ConvLSTM_{}'.format(self.agent_name))
+            #self._add_trainable(net)
+            net = tf.reshape(net, [-1, 9, 9, 64])
+            self.lstm_state_variable = new_state
+            net = tflearn.fully_connected(net, 256, activation='relu', name='FC3', weight_decay=0.0,
+                                          bias_init=tf.constant_initializer(0.1))
+            self.embedding_layer = net
+
+        return net
+
+    def reset_lstm_state(self):
+        if self.lstm_state_numeric is None and self.lstm_first_state_since_update is None:
+            if self.model_name == ModelNames.A3C_CONV_LSTM:
+                self.lstm_state_numeric = np.zeros(self.initial_state.get_shape().as_list())
+                self.lstm_first_state_since_update = np.zeros(self.initial_state.get_shape().as_list())
+            else:
+                self.lstm_state_numeric = LSTMStateTuple(
+                    np.zeros([1, 256], dtype='float32'),
+                    np.zeros([1, 256], dtype='float32')
+                )
+                self.lstm_first_state_since_update = LSTMStateTuple(
+                    np.zeros([1, 256], dtype='float32'),
+                    np.zeros([1, 256], dtype='float32')
+                )
+        else:
+            if self.model_name == ModelNames.A3C_CONV_LSTM:
+                self.lstm_first_state_since_update.fill(0.)
+                self.lstm_state_numeric.fill(0.)
+            else:
+                self.lstm_state_numeric.c.fill(0.)
+                self.lstm_state_numeric.h.fill(0.)
+
+                self.lstm_first_state_since_update.c.fill(0.)
+                self.lstm_first_state_since_update.h.fill(0.)
 
     def reset(self):
         if self.recurrent:
@@ -269,6 +314,8 @@ class ActorCriticNN(object):
             net = self._a3c_ff_ss()
         elif self.model_name == ModelNames.A3C_LSTM_SS:
             net = self._a3c_lstm_ss()
+        elif self.model_name == ModelNames.A3C_CONV_LSTM:
+            net = self._a3c_conv_lstm()
         else:
             net = self._small_fcn()
 
@@ -402,6 +449,7 @@ class ActorCriticNN(object):
                 + self.beta * entropy, name='PiLoss')
 
         with tf.name_scope("ValueLoss"):
+            # A3C originally uses a factor 0.5 for the value loss. The l2_loss() method already does this
             value_loss = tf.nn.l2_loss(advantage)
             if self.optimality_tightening:
                 self.upper_limits = tf.placeholder(tf.float32, [None], name='UpperLimits')
@@ -413,8 +461,8 @@ class ActorCriticNN(object):
         # We can combine the policy loss and the value loss in a single expression
         with tf.name_scope("CombinedLoss"):
 
-            # Add losses and use a factor 0.5 for the value loss as suggested by Mnih
-            self.loss = tf.reduce_sum(pi_loss + 0.5 * value_loss, name='Loss')
+            # Add losses and
+            self.loss = tf.reduce_sum(pi_loss + value_loss, name='Loss')
 
             # Add TensorBoard summaries
             self.summaries.append(tf.summary.scalar('{}/Loss'.format(self.agent_name), self.loss))
