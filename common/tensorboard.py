@@ -36,5 +36,5 @@ def writer_new_event(hyper_parameters, session):
     fulldir = get_log_dir(hyper_parameters)
 
     logger.info("Writing TensorBoard logs to {}".format(fulldir))
-    return tf.train.SummaryWriter(fulldir, session.graph)
+    return tf.summary.FileWriter(fulldir, session.graph)
 
