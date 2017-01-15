@@ -68,11 +68,11 @@ class A3CAgent(object):
 
         It executes the actor-critic method with asynchronous updates and n-step returns in a forward view
         """
-        global current_lr, lr_step
         # Initialize the reward, action and observation arrays
         rewards = np.zeros(hyperparameters.t_max, dtype='float')
         values = np.zeros(hyperparameters.t_max + 1, dtype='float')
         actions = np.zeros(hyperparameters.t_max, dtype='int')
+        n_step_targets = np.zeros(hyperparameters.t_max, dtype='float')
         states = np.zeros((hyperparameters.t_max,) + self.env.state_shape(), dtype='float')
 
         epr = 0
@@ -118,12 +118,18 @@ class A3CAgent(object):
                 # Increment time counters
                 self.t += 1
                 T = session.run(global_step)
-                current_lr -= lr_step
+                current_lr = hyperparameters.learning_rate - hyperparameters.learning_rate / hyperparameters.T_max * T
                 epr += rewards[i]
 
             # Initialize the n-step return
             n_step_target = 0 if terminal_state else self.local_network.get_value(self.last_state, session)
             batch_len = self.t - t_start
+
+            # Forward view of n-step returns, start from i == t_max - 1 and go to i == 0
+            for i in reversed(range(batch_len)):
+                # Straightforward accumulation of rewards
+                n_step_target = rewards[i] + hyperparameters.gamma * n_step_target
+                n_step_targets[i] = n_step_target
 
             # Count the number of updates
             n_updates += 1
@@ -156,8 +162,8 @@ class A3CAgent(object):
                                                          current_lr,
                                                          self.last_state,
                                                          session,
-                                                         rewards[:batch_len],
-                                                         n_step_target,
+                                                         values[:batch_len],
+                                                         n_step_targets[:batch_len],
                                                          upper_limits=upper_limits,
                                                          lower_limits=lower_limits)
 
@@ -166,8 +172,8 @@ class A3CAgent(object):
 
             if terminal_state:
                 if n_updates % 5 == 0:
-                    logger.info('Terminal state reached (episode {}, reward {}, T {}): resetting state'.format(
-                        self.n_episodes, epr, T))
+                    logger.info('Terminal state reached (episode {}, reward {}, lr {:.5f}, T {}): resetting state'.format(
+                        self.n_episodes, epr, current_lr, T))
 
                 self.n_episodes += 1
                 self.last_state = self.env.reset_random()
@@ -212,7 +218,7 @@ class A3CAgent(object):
         # Main loop, execute this while T < T_max
         while episode_idx < num_episodes:
             # Get action
-            _, action = self.local_network.get_value_and_action(self.last_state, session)
+            action = self.local_network.get_action(self.last_state, session)
             self.last_state, reward, terminal, info = self.env.step(action)
             returns[episode_idx] += reward
 
@@ -285,9 +291,6 @@ if __name__ == "__main__":
     T_var = tf.Variable(0, name='T')
     global_step = tf.assign_add(T_var, 1)
 
-    lr_step = hyperparameters.learning_rate / hyperparameters.T_max
-    current_lr = hyperparameters.learning_rate
-
     env_name = hyperparameters.env
     n_threads = hyperparameters.n_threads
 
@@ -332,7 +335,15 @@ if __name__ == "__main__":
     weights_path = os.path.join(writer.get_logdir(), 'model.ckpt')
     os.makedirs(os.path.dirname(weights_path), exist_ok=True)
 
-    session.run(tf.global_variables_initializer())
+    init = tf.global_variables_initializer()
+    session.run(init)
+    tf.train.write_graph(session.graph_def,
+                         "/home/jos/mproj/deeprl/graphs", '{}.pb'.format(hyperparameters.model),
+                         as_text=False)
+    tf.train.write_graph(session.graph_def,
+                         "/home/jos/mproj/deeprl/graphs", '{}.txt'.format(hyperparameters.model),
+                         as_text=True)
+
     for agent in agents:
         agent.train()
 

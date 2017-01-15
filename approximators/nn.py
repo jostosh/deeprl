@@ -421,19 +421,31 @@ class ActorCriticNN(object):
             # The actions attribute is an array of length n
             self.actions = tf.placeholder(tf.int32, [None], name='Actions')
             # Rewards
-            self.rewards = tf.placeholder(tf.float32, [None], name='Rewards')
-            self.initial_return = tf.placeholder(tf.float32, name='InitialReturn')
+            #self.rewards = tf.placeholder(tf.float32, [None], name='Rewards')
+            #self.initial_return = tf.placeholder(tf.float32, name='InitialReturn')
+            self.advantage_no_grad = tf.placeholder(tf.float32, [None], name="AdvantageNoGrad")
+            self.n_step_returns = tf.placeholder(tf.float32, [None], name='NStepReturns')
 
+        if self.clip_advantage:
+            # I empirically found that it might help to clip the advantage that is used for the policy loss. This might
+            # improve stability and consistency of the gradients
+            logger.info("Clipping advantage in graph")
+            self.advantage_no_grad = tf.clip_by_value(self.advantage_no_grad, -1., 1., name="ClippedAdvantage")
+
+        '''
         with tf.name_scope("Advantage_n-step"):
             def reward_fn(n_step_t, reward):
                 return n_step_t * self.gamma + reward
 
-            rewards = tf.clip_by_value(self.rewards, -.1, 1.) if self.clip_rewards else self.rewards
+            rewards = tf.clip_by_value(self.rewards, -1.0, 1.0) if self.clip_rewards else self.rewards
             n_step_returns_rev = tf.scan(reward_fn, tf.reverse_v2(rewards, [0]), initializer=self.initial_return)
             n_step_returns = tf.reverse_v2(n_step_returns_rev, [0])
 
+            logger.info(n_step_returns.get_shape())
+
             advantage = n_step_returns - self.value
             advantage_no_grad = n_step_returns - tf.stop_gradient(self.value)
+        '''
 
         with tf.name_scope("PolicyLoss"):
             # action matrix is n x a where each row corresponds to a time step and each column to an action
@@ -443,13 +455,14 @@ class ActorCriticNN(object):
             # The entropy is added to encourage exploration
             entropy = tf.neg(tf.reduce_sum(log_pi * self.pi, reduction_indices=1), name="Entropy")
             # Define the loss for the policy (minus is needed to perform *negative* gradient descent == gradient ascent)
-            pi_loss = tf.neg(
+            pi_loss = -tf.reduce_sum(
                 tf.reduce_sum(tf.mul(action_mask, log_pi), reduction_indices=1)
-                * advantage_no_grad
+                * self.advantage_no_grad
                 + self.beta * entropy, name='PiLoss')
 
         with tf.name_scope("ValueLoss"):
             # A3C originally uses a factor 0.5 for the value loss. The l2_loss() method already does this
+            advantage = self.n_step_returns - self.value
             value_loss = tf.nn.l2_loss(advantage)
             if self.optimality_tightening:
                 self.upper_limits = tf.placeholder(tf.float32, [None], name='UpperLimits')
@@ -462,7 +475,7 @@ class ActorCriticNN(object):
         with tf.name_scope("CombinedLoss"):
 
             # Add losses and
-            self.loss = tf.reduce_sum(pi_loss + value_loss, name='Loss')
+            self.loss = tf.add(pi_loss, value_loss, name='Loss')
 
             # Add TensorBoard summaries
             self.summaries.append(tf.summary.scalar('{}/Loss'.format(self.agent_name), self.loss))
@@ -500,9 +513,11 @@ class ActorCriticNN(object):
         """
         if self.recurrent:
             # If we use a recurrent model
-            return session.run(self.value, feed_dict={self.inputs: [state], self.initial_state: self.lstm_state_numeric,
+            v = session.run(self.value, feed_dict={self.inputs: [state], self.initial_state: self.lstm_state_numeric,
                                                       self.n_steps: [1]}
-                               )[0]#[0]
+                            )[0]#[0]
+
+            return v
 
         return session.run(self.value, feed_dict={self.inputs: [state]})[0]#[0]
 
@@ -537,7 +552,7 @@ class ActorCriticNN(object):
                                                                 self.n_steps: [1]})
         return session.run(self.embedding_layer, feed_dict={self.inputs: [state]})
 
-    def update_params(self, actions, states, lr, last_state, session, rewards, initial_return,
+    def update_params(self, actions, states, lr, last_state, session, n_step_returns, values,
                       upper_limits=None, lower_limits=None):
         """
         Updates the parameters of the global network
@@ -555,8 +570,8 @@ class ActorCriticNN(object):
                 self.initial_state: self.lstm_first_state_since_update,
                 self.n_steps: [n_steps],
                 self.optimizer.learning_rate: lr,
-                self.initial_return: initial_return,
-                self.rewards: rewards
+                self.n_step_returns: n_step_returns,
+                self.advantage_no_grad: n_step_returns - values
             }
             if self.frame_prediction:
                 fdict.update({self.frame_target: [s[-1:, :, :] for s in states[1:]] + [last_state[-1:, :, :]]})
@@ -573,8 +588,8 @@ class ActorCriticNN(object):
                 self.actions: actions,
                 self.inputs: states,
                 self.optimizer.learning_rate: lr,
-                self.initial_return: initial_return,
-                self.rewards: rewards
+                self.n_step_returns: n_step_returns,
+                self.advantage_no_grad: n_step_returns - values
             }
             if self.frame_prediction:
                 fdict.update({self.frame_target: [s[-1:, :, :] for s in states[1:]] + [last_state[-1:, :, :]]})
