@@ -121,6 +121,10 @@ class A3CAgent(object):
                 current_lr = hyperparameters.learning_rate - hyperparameters.learning_rate / hyperparameters.T_max * T
                 epr += rewards[i]
 
+            if hyperparameters.clip_rewards:
+                # Reward clipping helps to stabilize training
+                rewards = np.clip(rewards, -1.0, 1.0)
+
             # Initialize the n-step return
             n_step_target = 0 if terminal_state else self.local_network.get_value(self.last_state, session)
             batch_len = self.t - t_start
