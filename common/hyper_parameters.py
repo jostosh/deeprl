@@ -85,5 +85,5 @@ class HyperParameters(object):
         self.logdir = params.logdir
         self.residual_prediction = params.residual_prediction
         self.evaluation_interval = params.evaluation_interval
-        self.optimality_tightening = True
+        self.optimality_tightening = params.optimality_tightening
 
