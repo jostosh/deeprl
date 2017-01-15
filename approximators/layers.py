@@ -163,7 +163,7 @@ class BasicConvLSTMCell(ConvRNNCell):
 
 
 def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_filter_size=None, forget_bias=1.0,
-                       activation=tf.nn.tanh, padding='VALID'):
+                       activation=tf.nn.tanh, padding='VALID', inner_depthwise=False):
     n_input_features = incoming.get_shape().as_list()[-1]
 
     with tf.name_scope("ConvLSTM"):
@@ -174,7 +174,10 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_
                     [filter_size, filter_size, n_in_features, n_out_features]), name=name)
 
             W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, num_features * 4, name='Wh')
-            W_x_to_ijfo = get_conv_W(outer_filter_size, n_input_features, num_features * 4, name='Wx')
+            if inner_depthwise:
+                W_x_to_ijfo = get_conv_W(outer_filter_size, n_input_features, 4, name='Wx')
+            else:
+                W_x_to_ijfo = get_conv_W(outer_filter_size, n_input_features, num_features * 4, name='Wx')
 
             b = tf.Variable(tf.zeros(4 * num_features), dtype=tf.float32, name='Bias')
 
@@ -183,7 +186,10 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_
                 c, h = tf.split(3, 2, lstm_state)
 
                 conv_x = tf.nn.conv2d(x, W_x_to_ijfo, strides=[1, stride, stride, 1], padding=padding)
-                conv_h = tf.nn.conv2d(h, W_h_to_ijfo, strides=4 * [1], padding='SAME')
+                if inner_depthwise:
+                    conv_h = tf.nn.depthwise_conv2d(h, W_h_to_ijfo, strides=4 * [1], padding='SAME')
+                else:
+                    conv_h = tf.nn.conv2d(h, W_h_to_ijfo, strides=4 * [1], padding='SAME')
                 concat = tf.nn.bias_add(conv_x + conv_h, b)
 
                 # i = input_gate, j = new_input, f = forget_gate, o = output_gate
@@ -505,6 +511,7 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
             current_filter_shape = convs[0].W.get_shape().as_list()
             weights_stacked = tf.reshape(tf.stack([conv.W for conv in convs], axis=4), current_filter_shape + [1, 1, n_centroids])
             locally_weighted_kernels = tf.reduce_sum(tf.mul(euclidian_dist_reshaped, weights_stacked), axis=6)
+            locally_weighted_kernels -= tf.reduce_min(locally_weighted_kernels, axis=[4, 5], keep_dims=True)
 
             in_out_kernel_spatial = tf.transpose(locally_weighted_kernels, [2, 3, 0, 1, 4, 5])
             in_out_kernel_spatial_flattened = tf.pad(tf.reshape(in_out_kernel_spatial, [current_filter_shape[2],
