@@ -4,7 +4,7 @@ import numpy as np
 
 from deeprl.common.logger import logger
 from deeprl.approximators.nn import ActorCriticNN
-from deeprl.common.environments import get_env
+from deeprl.common.environments import get_env, AtariEnvironment
 from deeprl.common.hyper_parameters import *
 from deeprl.common.tensorboard import writer_new_event, make_summary_from_python_var
 from deeprl.approximators.optimizers import RMSPropCustom
@@ -192,7 +192,7 @@ class A3CAgent(object):
                                                                            3600 / mean_duration))
 
             if T - last_checkpoint > hyperparameters.evaluation_interval and self.agent_name == 'Agent_0':
-                if hyperparameters.env != 'CartPole-v0':
+                if isinstance(self.env, AtariEnvironment):
                     self.evaluate(50)
                 last_checkpoint = T // (hyperparameters.evaluation_interval / 10) * (hyperparameters.evaluation_interval / 10) # round to the nearest 1e6
                 logger.info("Storing weights at {}".format(weights_path))
@@ -324,7 +324,9 @@ if __name__ == "__main__":
     with open(os.path.join(writer.get_logdir(), 'hyper_parameters.pkl'), 'wb') as f:
         pickle.dump(hyperparameters.__dict__, f, pickle.HIGHEST_PROTOCOL)
 
-    embedding_var = tf.Variable(np.zeros([100, 256]), trainable=False,
+    embedding_length = global_network.embedding_layer.get_shape().as_list()[-1]
+
+    embedding_var = tf.Variable(np.zeros([100, embedding_length]), trainable=False,
                                 name='TensorBoardEmbeddings', dtype=tf.float32)
     embedding_placeholder = tf.placeholder(tf.float32, [None, global_network.embedding_layer.get_shape().as_list()[1]])
     embedding_assign = tf.assign(embedding_var, embedding_placeholder)
