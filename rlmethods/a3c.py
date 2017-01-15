@@ -343,12 +343,6 @@ if __name__ == "__main__":
 
     init = tf.global_variables_initializer()
     session.run(init)
-    tf.train.write_graph(session.graph_def,
-                         "/home/jos/mproj/deeprl/graphs", '{}.pb'.format(hyperparameters.model),
-                         as_text=False)
-    tf.train.write_graph(session.graph_def,
-                         "/home/jos/mproj/deeprl/graphs", '{}.txt'.format(hyperparameters.model),
-                         as_text=True)
 
     for agent in agents:
         agent.train()
