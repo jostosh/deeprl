@@ -290,7 +290,7 @@ class ActorCriticNN(object):
         :return:                The network as a graph node
         """
         with tf.name_scope('HiddenLayers'):
-            net = tflearn.fully_connected(self.inputs, 256, activation='tanh', name='FC1')
+            net = tflearn.fully_connected(self.inputs, 128, activation='tanh', name='FC1')
             self._add_trainable(net)
         self.embedding_layer = net
         return net
@@ -453,17 +453,15 @@ class ActorCriticNN(object):
             # self.pi and log_pi are n x a matrices
             log_pi = tf.log(tf.clip_by_value(self.pi, 1e-20, 1.0), name="LogPi")
             # The entropy is added to encourage exploration
-            entropy = tf.neg(tf.reduce_sum(log_pi * self.pi, reduction_indices=1), name="Entropy")
+            entropy = -tf.reduce_sum(log_pi * self.pi, reduction_indices=1, name="Entropy")
             # Define the loss for the policy (minus is needed to perform *negative* gradient descent == gradient ascent)
-            pi_loss = -tf.reduce_sum(
-                tf.reduce_sum(tf.mul(action_mask, log_pi), reduction_indices=1)
-                * self.advantage_no_grad
-                + self.beta * entropy, name='PiLoss')
+            pi_loss = -(tf.reduce_sum(tf.mul(action_mask, log_pi), reduction_indices=1) * self.advantage_no_grad
+                        + self.beta * entropy)
 
         with tf.name_scope("ValueLoss"):
             # A3C originally uses a factor 0.5 for the value loss. The l2_loss() method already does this
             advantage = self.n_step_returns - self.value
-            value_loss = tf.nn.l2_loss(advantage)
+            value_loss = tf.square(advantage)
             if self.optimality_tightening:
                 self.upper_limits = tf.placeholder(tf.float32, [None], name='UpperLimits')
                 self.lower_limits = tf.placeholder(tf.float32, [None], name='LowerLimits')
@@ -475,7 +473,7 @@ class ActorCriticNN(object):
         with tf.name_scope("CombinedLoss"):
 
             # Add losses and
-            self.loss = tf.add(pi_loss, value_loss, name='Loss')
+            self.loss = tf.reduce_sum(pi_loss + value_loss)
 
             # Add TensorBoard summaries
             self.summaries.append(tf.summary.scalar('{}/Loss'.format(self.agent_name), self.loss))
