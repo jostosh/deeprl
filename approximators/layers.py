@@ -173,11 +173,12 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_
                 return tf.Variable(tflearn.initializations.truncated_normal(
                     [filter_size, filter_size, n_in_features, n_out_features]), name=name)
 
-            W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, num_features * 4, name='Wh')
             if inner_depthwise:
-                W_x_to_ijfo = get_conv_W(outer_filter_size, n_input_features, 4, name='Wx')
+                W_h_to_ijfo = get_conv_W(outer_filter_size, num_features, 4, name='Wh')
             else:
-                W_x_to_ijfo = get_conv_W(outer_filter_size, n_input_features, num_features * 4, name='Wx')
+                W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, num_features * 4, name='Wh')
+
+            W_x_to_ijfo = get_conv_W(outer_filter_size, n_input_features, num_features * 4, name='Wx')
 
             b = tf.Variable(tf.zeros(4 * num_features), dtype=tf.float32, name='Bias')
 
@@ -421,12 +422,13 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
     with vscope as scope:
         name = scope.name
         with tf.name_scope("SubConvolutions"):
-            convs = [tflearn.conv_2d(incoming, nb_filter=n_filters, filter_size=filter_size, strides=strides,
-                                     padding=padding, weight_decay=0., name='SubConv{}'.format(i), activation='linear')
-                     for i in range(n_centroids if isinstance(n_centroids, int) else np.prod(n_centroids))]
-            stacked_convs = tf.stack(convs, axis=4, name='StackedConvs')
+            convs = tflearn.conv_2d(incoming, nb_filter=n_filters * np.prod(n_centroids), filter_size=filter_size,
+                                     strides=strides, padding=padding, weight_decay=0., name='Conv',
+                                     activation='linear')
+            stacked_convs = tf.reshape(convs, [-1] + convs.get_shape().as_list()[1:-1] + [n_filters, np.prod(n_centroids)],
+                                       name='StackedConvs')
 
-        _, m, n, k = convs[0].get_shape().as_list()
+        _, m, n, k, _ = stacked_convs.get_shape().as_list()
 
         with tf.name_scope("DistanceWeighting"):
             # First define the x-coordinates per cell. We exploit the TensorFlow's broadcast mechanisms by using
@@ -493,11 +495,10 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
             out = activation(tf.reduce_sum(dist_weighted, axis=4), name='Output')
 
             # Set the variables
-            out.W = tf.concat(3, [conv.W for conv in convs], name='W_concat')
-            out.b = tf.concat(0,
-                              [conv.b for conv in convs] +
-                              [centroids_x, centroids_y] +
-                              ([sigma] if distance_fn == 'EXP' and sigma_trainable else []), name='b_concatAndCentroids')
+            out.W = [convs.W]
+            out.b = tf.concat(0, [convs.b] + [centroids_x, centroids_y] +
+                              ([sigma] if distance_fn == 'EXP' and sigma_trainable else []),
+                              name='b_concatAndCentroids')
 
             # Add to collection for tflearn functionality
             tf.add_to_collection(tf.GraphKeys.LAYER_VARIABLES + '/' + name, out.W)
@@ -508,8 +509,9 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
             euclidean_downsampled = euclidian_dist[:, ::3, ::3, :, :]
             _, m, n, _, _ = euclidean_downsampled.get_shape().as_list()
             euclidian_dist_reshaped = tf.reshape(euclidean_downsampled, 4 * [1] + [m, n, n_centroids])
-            current_filter_shape = convs[0].W.get_shape().as_list()
-            weights_stacked = tf.reshape(tf.stack([conv.W for conv in convs], axis=4), current_filter_shape + [1, 1, n_centroids])
+            current_filter_shape = convs.W.get_shape().as_list()
+            current_filter_shape[-1] //= n_centroids
+            weights_stacked = tf.reshape(convs.W, current_filter_shape + [1, 1, n_centroids])
             locally_weighted_kernels = tf.reduce_sum(tf.mul(euclidian_dist_reshaped, weights_stacked), axis=6)
             locally_weighted_kernels -= tf.reduce_min(locally_weighted_kernels, axis=[4, 5], keep_dims=True)
 
@@ -536,7 +538,7 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
             summary_image = tf.transpose(in_out_grid, [1, 3, 2, 0])
 
             out.visual_summary = summary_image
-            out.W_list = [conv.W for conv in convs]
+            out.W_list = tf.split(3, n_centroids, convs.W)
 
     # Add to collection for tflearn functionality
     tf.add_to_collection(tf.GraphKeys.LAYER_TENSOR + '/' + name, out)
