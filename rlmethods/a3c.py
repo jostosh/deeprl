@@ -109,10 +109,7 @@ class A3CAgent(object):
                 states[i] = self.last_state
                 # Get the corresponding value and action. This is done simultaneously such that the approximators only
                 # has to perform a single forward pass.
-                if hyperparameters.optimality_tightening:
-                    values[i], actions[i] = self.local_network.get_value_and_action(self.last_state, session)
-                else:
-                    actions[i] = self.local_network.get_action(self.last_state, session)
+                values[i], actions[i] = self.local_network.get_value_and_action(self.last_state, session)
                 # Perform step in environment and obtain rewards and observations
                 self.last_state, rewards[i], terminal_state, info = self.env.step(actions[i])
                 # Increment time counters
@@ -161,13 +158,13 @@ class A3CAgent(object):
                 lower_limits = upper_limits = None
 
             # Now update the global approximator's parameters
-            summaries = self.local_network.update_params(actions[:batch_len],
-                                                         states[:batch_len],
-                                                         current_lr,
-                                                         self.last_state,
-                                                         session,
-                                                         values[:batch_len],
-                                                         n_step_targets[:batch_len],
+            summaries = self.local_network.update_params(actions=actions[:batch_len],
+                                                         states=states[:batch_len],
+                                                         lr=current_lr,
+                                                         last_state=self.last_state,
+                                                         session=session,
+                                                         n_step_returns=n_step_targets[:batch_len],
+                                                         values=values[:batch_len],
                                                          upper_limits=upper_limits,
                                                          lower_limits=lower_limits)
 

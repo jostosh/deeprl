@@ -232,7 +232,7 @@ class ActorCriticNN(object):
             net = tf.reshape(net, [-1, 1] + net.get_shape().as_list()[1:])
 
             net, new_state, self.initial_state = convolutional_lstm(net, outer_filter_size=4, num_features=64,
-                                                                    stride=2, inner_filter_size=3)
+                                                                    stride=2, inner_filter_size=5, inner_depthwise=True)
             self.theta += net.W + [net.b]
             #net, state = conv_lstm(net, 64, 4, stride=2, initial_state=self.initial_state, inner_filter_size=3,
             #                       sequence_length=self.n_steps, name='ConvLSTM_{}'.format(self.agent_name))
@@ -473,7 +473,7 @@ class ActorCriticNN(object):
         with tf.name_scope("CombinedLoss"):
 
             # Add losses and
-            self.loss = tf.reduce_sum(pi_loss + value_loss)
+            self.loss = tf.reduce_sum(pi_loss + 0.5 * value_loss)
 
             # Add TensorBoard summaries
             self.summaries.append(tf.summary.scalar('{}/Loss'.format(self.agent_name), self.loss))
