@@ -72,16 +72,14 @@ class ActorCriticNN(object):
 
         with tf.name_scope('HiddenLayers') as scope:
             # Add first convolutional layer
-            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='linear', name='Conv1', weight_decay=0.0,
+            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1', weight_decay=0.0,
                                   bias_init=tf.constant_initializer(0.1), padding='valid')
             self._add_trainable(net)
-            net = tf.nn.relu(net, name='Conv1Relu')
 
             # Add second convolutional layer
-            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='linear', name='Conv2', weight_decay=0.0,
+            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name='Conv2', weight_decay=0.0,
                                   bias_init=tf.constant_initializer(0.1), padding='valid')
             self._add_trainable(net)
-            net = tf.nn.relu(net, name='Conv2Relu')
 
             net = tflearn.flatten(net)
             net = tflearn.fully_connected(net, 256, activation='relu', name='FC3', weight_decay=0.0,
@@ -132,10 +130,9 @@ class ActorCriticNN(object):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers'):
-            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='linear', name='Conv1', weight_decay=0.0,
+            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1', weight_decay=0.0,
                                   bias_init=tf.constant_initializer(0.1), padding='valid')
             self._add_trainable(net)
-            net = tf.nn.relu(net, 'Conv1Relu')
             net = tflearn.conv_2d(net, 64, 4, strides=2, activation='linear', name='Conv2', weight_decay=0.0,
                                   bias_init=tf.constant_initializer(0.1), padding='valid')
             self._add_trainable(net)
@@ -196,7 +193,7 @@ class ActorCriticNN(object):
             self._add_trainable(net)
             net = tflearn.conv_2d(net, 64, 4, strides=2, activation='linear', name='Conv2', padding='valid', weight_decay=0.)
             self._add_trainable(net)
-            net = spatialsoftmax(net)
+            net = spatialsoftmax(net, epsilon=0.9)
             net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
             self._add_trainable(net)
             net = tflearn.reshape(net, [1, -1, 256], "ReshapedLSTMInput")
@@ -379,8 +376,8 @@ class ActorCriticNN(object):
             self._add_trainable(encoding)
 
             # We will use the linear conv activation of conv1 and conv2 and inject those in their mirrored decoding layers
-            conv1 = self.layers["{}/HiddenLayers/Conv1/BiasAdd:0".format(self.agent_name)]
-            conv2 = self.layers["{}/HiddenLayers/Conv2/BiasAdd:0".format(self.agent_name)]
+            conv1 = self.layers["{}/HiddenLayers/Conv1/Relu:0".format(self.agent_name)]
+            conv2 = self.layers["{}/HiddenLayers/Conv2/Relu:0".format(self.agent_name)]
 
             # Now we can compute the 'transformation layer' which we will be put into the decoding stream
             transformation = tflearn.fully_connected(tf.mul(action_embedding, encoding),
@@ -421,8 +418,6 @@ class ActorCriticNN(object):
             # The actions attribute is an array of length n
             self.actions = tf.placeholder(tf.int32, [None], name='Actions')
             # Rewards
-            #self.rewards = tf.placeholder(tf.float32, [None], name='Rewards')
-            #self.initial_return = tf.placeholder(tf.float32, name='InitialReturn')
             self.advantage_no_grad = tf.placeholder(tf.float32, [None], name="AdvantageNoGrad")
             self.n_step_returns = tf.placeholder(tf.float32, [None], name='NStepReturns')
 
@@ -431,21 +426,6 @@ class ActorCriticNN(object):
             # improve stability and consistency of the gradients
             logger.info("Clipping advantage in graph")
             self.advantage_no_grad = tf.clip_by_value(self.advantage_no_grad, -1., 1., name="ClippedAdvantage")
-
-        '''
-        with tf.name_scope("Advantage_n-step"):
-            def reward_fn(n_step_t, reward):
-                return n_step_t * self.gamma + reward
-
-            rewards = tf.clip_by_value(self.rewards, -1.0, 1.0) if self.clip_rewards else self.rewards
-            n_step_returns_rev = tf.scan(reward_fn, tf.reverse_v2(rewards, [0]), initializer=self.initial_return)
-            n_step_returns = tf.reverse_v2(n_step_returns_rev, [0])
-
-            logger.info(n_step_returns.get_shape())
-
-            advantage = n_step_returns - self.value
-            advantage_no_grad = n_step_returns - tf.stop_gradient(self.value)
-        '''
 
         with tf.name_scope("PolicyLoss"):
             # action matrix is n x a where each row corresponds to a time step and each column to an action
@@ -513,7 +493,7 @@ class ActorCriticNN(object):
             # If we use a recurrent model
             v = session.run(self.value, feed_dict={self.inputs: [state], self.initial_state: self.lstm_state_numeric,
                                                       self.n_steps: [1]}
-                            )[0]#[0]
+                            )[0]
 
             return v
 
