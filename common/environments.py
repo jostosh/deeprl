@@ -92,7 +92,7 @@ class AtariEnvironment(object):
         step_reward = 0
         step_terminal = False
 
-        lives = deepcopy(self.env.ale.lives())
+        #lives = deepcopy(self.env.ale.lives())
 
         '''
         for _ in range(self.action_repeat - 1):
@@ -158,9 +158,9 @@ class AtariEnvironment(object):
     def reset_random(self):
         state = self.reset()
 
-        random_steps = np.random.randint(8)
-        for i in range(random_steps):
-            action = np.random.randint(self.num_actions()) #self.env.action_space.sample()
-            state, _, _, _ = self.step(action)
+        #random_steps = np.random.randint(8)
+        #for i in range(random_steps):
+        #    action = np.random.randint(self.num_actions()) #self.env.action_space.sample()
+        #    state, _, _, _ = self.step(action)
 
         return state
