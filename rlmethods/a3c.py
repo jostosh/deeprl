@@ -13,6 +13,7 @@ import pickle
 from random import shuffle
 from tensorflow.contrib.tensorboard.plugins import projector
 import scipy.misc
+import subprocess
 from copy import deepcopy
 
 
@@ -46,12 +47,10 @@ class A3CAgent(object):
         self.n_episodes = 1
         self.train_episode = 0
 
-
     def train(self):
         """
         Starts a training thread
         """
-        logger.info('Starting training')
         self._train_thread.start()
 
     def synchronize_thread_parameters(self):
@@ -68,6 +67,7 @@ class A3CAgent(object):
 
         It executes the actor-critic method with asynchronous updates and n-step returns in a forward view
         """
+        logger.info('Starting training')
         # Initialize the reward, action and observation arrays
         rewards = np.zeros(hyperparameters.t_max, dtype='float')
         values = np.zeros(hyperparameters.t_max + 1, dtype='float')
@@ -76,10 +76,6 @@ class A3CAgent(object):
         states = np.zeros((hyperparameters.t_max,) + self.env.state_shape(), dtype='float')
 
         epr = 0
-
-        nloops = 0
-        mean_duration = 0
-
         total_duration = 0.
 
         T = session.run(T_var)
@@ -190,7 +186,8 @@ class A3CAgent(object):
 
             if T - last_checkpoint > hyperparameters.evaluation_interval and self.agent_name == 'Agent_0':
                 if isinstance(self.env, AtariEnvironment):
-                    self.evaluate(50)
+                    mean_score = self.evaluate(50)
+
                 last_checkpoint = T // (hyperparameters.evaluation_interval / 10) * (hyperparameters.evaluation_interval / 10) # round to the nearest 1e6
                 logger.info("Storing weights at {}".format(weights_path))
                 saver.save(session, weights_path, global_step=T_var)
@@ -270,6 +267,8 @@ class A3CAgent(object):
         self.train_episode += 1
         self.env.set_train()
 
+        return np.mean(returns)
+
 
 def upper_bounds(v_t, r_t, v_end):
     T = len(r_t)
@@ -319,6 +318,9 @@ if __name__ == "__main__":
     writer = writer_new_event(hyperparameters, session)
 
     with open(os.path.join(writer.get_logdir(), 'hyper_parameters.pkl'), 'wb') as f:
+        hp = hyperparameters.__dict__
+        os.chdir(os.path.expanduser("~") + "/mproj/deeprl")
+        hp.update({'git_description': subprocess.check_output(["git", "describe", "--always"]).decode('utf8').strip()})
         pickle.dump(hyperparameters.__dict__, f, pickle.HIGHEST_PROTOCOL)
 
     embedding_length = global_network.embedding_layer.get_shape().as_list()[-1]
