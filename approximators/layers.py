@@ -428,6 +428,8 @@ class BasicLSTMCell(RNNCell):
   def output_size(self):
     return self._num_units
 
+
+
   def __call__(self, inputs, state, scope=None):
     """Long short-term memory cell (LSTM)."""
     with tf.variable_scope(scope or type(self).__name__):  # "BasicLSTMCell"
@@ -488,7 +490,7 @@ def _linear(args, output_size, bias, bias_start=0.0, scope=None):
 
   # Now the computation.
   with tf.variable_scope(scope or "Linear"):
-    d = 1 / np.sqrt(output_size)
+    d = 1 / np.sqrt(output_size / 4)
     matrix = tf.get_variable(
         "Matrix", [total_arg_size, output_size], dtype=dtype,
         initializer=tf.random_uniform_initializer(minval=-d, maxval=d)
