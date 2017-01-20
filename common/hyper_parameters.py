@@ -1,6 +1,10 @@
 import argparse
 from deeprl.approximators.nn import ModelNames
 import os
+import numpy as np
+import itertools
+from deeprl.common.logger import logger
+
 """
 For some important parameter settings check out:
 https://github.com/muupan/async-rl/wiki
@@ -16,8 +20,7 @@ config1 = {
     'beta': 0.01,
     'frames_per_state': 4,
     'input_shape': '4,84,84',
-    'env': 'Breakout-v0',
-    'method': 'rlmethods',
+    'env': 'Pong-v0',
     'model': ModelNames.A3C_FF,
     'n_threads': 8,
     'action_repeat': 4,
@@ -29,8 +32,29 @@ config1 = {
     'logdir': os.path.expanduser("~/tensorflowlogs/mpi"),
     'residual_prediction': False,
     'evaluation_interval': 1000000,
-    'optimality_tightening': False
+    'optimality_tightening': False,
+    'param_sweep': "",
+    'score_at_10m': -10.,
+    'fplc': 0.001,
+    'otc': 1
 }
+
+param_sweep = {
+    'learning_rate': [5e-5, 1e-4, 3.5e-4, 7e-4, 1e-3],
+    'fplc': [1e-4, 1e-3, 1e-2],
+    'otc': [0.5, 1.0, 2.0]
+}
+
+
+def set_param_sweep(sweep_epoch, hp):
+    sweeping_parameters = sorted(hp.param_sweep.split(','))
+    all_combinations = itertools.product(*[param_sweep[p] for p in sweeping_parameters])
+
+    for pidx, p in enumerate(sweeping_parameters):
+        hp.__dict__[p] = all_combinations[sweep_epoch][pidx]
+
+    logger.info("Set new hyperparameters: {}".format(hp))
+
 
 
 def parse_cmd_args():
@@ -86,4 +110,8 @@ class HyperParameters(object):
         self.residual_prediction = params.residual_prediction
         self.evaluation_interval = params.evaluation_interval
         self.optimality_tightening = params.optimality_tightening
+        self.otc = params.otc
+        self.fplc = params.fplc
+        self.param_sweep = params.param_sweep
+        self.score_at_10m = params.score_at_10m
 
