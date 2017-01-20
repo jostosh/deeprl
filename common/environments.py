@@ -7,7 +7,8 @@ import tensorflow as tf
 
 def get_env(env, frames_per_state=4, output_shape=None, session=None):
     if env in ['Breakout-v0', 'Pong-v0', 'BeamRider-v0', 'Qbert-v0', 'SpaceInvaders-v0']:
-        return AtariEnvironment(env, frames_per_state, output_shape=output_shape, session=session)
+        return AtariEnvironment(env.replace('-', 'Deterministic-'), frames_per_state, output_shape=output_shape,
+                                session=session)
     return ClassicControl(env)
 
 
@@ -49,7 +50,7 @@ class AtariEnvironment(object):
         self.action_repeat = action_repeat
 
         self.output_shape = output_shape
-        #self.env.frameskip = 4
+        #self.env.frameskip = 1
 
         self.is_training = True
 
@@ -84,7 +85,7 @@ class AtariEnvironment(object):
             return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
 
         # Remove Atari artifacts
-        preprocessed_observation = observation #np.maximum(self.last_observation, observation)
+        preprocessed_observation = np.maximum(self.last_observation, observation)
         # Convert to gray scale and resize
         return imresize(np.reshape(preprocessed_observation, (210, 160)), self.output_shape) / 255. #(84, 84))
 
@@ -118,6 +119,8 @@ class AtariEnvironment(object):
 
         reward = 0
         for i in range(self.action_repeat):
+            if i == self.action_repeat - 1:
+                self.env.ale.getScreenGrayscale(self.last_observation)
             reward += self.env.ale.act(self.real_actions[action])
 
         if self.env.ale.game_over(): #or (self.is_training and self.env.ale.lives() < lives):
@@ -128,7 +131,7 @@ class AtariEnvironment(object):
         #self.last_observation = self._screen.copy()
         [self.state.append(preprocessed_observation) for _ in range(self.frames_per_state - len(self.state) + 1)]
 
-        self.state = self.state[1:]
+        self.state = self.state[-self.frames_per_state:]
 
         return np.copy(self.state), reward, step_terminal, None
 
