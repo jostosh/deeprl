@@ -1,11 +1,12 @@
-from tflearn.layers.recurrent import BasicLSTMCell, _rnn_template
+#from tflearn.layers.recurrent import BasicLSTMCell, _rnn_template
 import tensorflow as tf
 
 from tensorflow.python.ops.rnn_cell import RNNCell, _get_concat_variable, LSTMStateTuple
 from tensorflow.python.ops.rnn import rnn, dynamic_rnn
-from tensorflow.python.ops.rnn_cell import BasicLSTMCell as tfLSTMCell
+#from tensorflow.python.ops.rnn_cell import BasicLSTMCell as tfLSTMCell
 import scipy.ndimage as spimage
 import numpy as np
+from tensorflow.python.util import nest
 
 from tensorflow.python.platform import tf_logging as logging
 import tflearn
@@ -38,140 +39,39 @@ def policy_quantization(incoming, n_prototypes, advantage):
     return winning_prototypes, policy_quantization_loss
 
 
-class ConvRNNCell(RNNCell):
-    """Abstract object representing an Convolutional RNN cell.
-    """
+def conv_layer(incoming, n_filters, filter_size, stride, activation, name):
+    _, kh, kw, input_channels = incoming.get_shape().as_list()
+    d = 1.0 / np.sqrt(filter_size * filter_size * input_channels)
+    weight_init = tf.random_uniform([filter_size, filter_size, input_channels, n_filters], minval=-d, maxval=d)
+    bias_init   = tf.random_uniform([n_filters], minval=-d, maxval=d)
 
-    def __call__(self, inputs, state, scope=None):
-        """Run this RNN cell on inputs, starting from the given state.
-        """
-        raise NotImplementedError("Abstract method")
-
-    @property
-    def state_size(self):
-        """size(s) of state(s) used by this cell.
-        """
-        raise NotImplementedError("Abstract method")
-
-    @property
-    def output_size(self):
-        """Integer or TensorShape: size of outputs produced by this cell."""
-        raise NotImplementedError("Abstract method")
-
-    def zero_state(self, batch_size, dtype):
-        """Return zero-filled state tensor(s).
-        Args:
-          batch_size: int, float, or unit Tensor representing the batch size.
-          dtype: the data type to use for the state.
-        Returns:
-          tensor of shape '[batch_size x shape[0] x shape[1] x num_features]
-          filled with zeros
-        """
-
-        shape = self.shape
-        num_features = self.num_features
-        zeros = tf.zeros([batch_size, shape[0], shape[1], num_features * 2])
-        return zeros
+    return tflearn.conv_2d(incoming=incoming, nb_filter=n_filters, filter_size=filter_size, strides=stride,
+                           padding='valid', activation=activation, weights_init=weight_init, bias_init=bias_init,
+                           weight_decay=0.0, name=name)
 
 
-class BasicConvLSTMCell(ConvRNNCell):
-    """Basic Conv LSTM recurrent network cell. The
-    """
+def fc_layer(incoming, n_out, activation, name):
+    _, n_in = incoming.get_shape().as_list()
+    d = 1.0 / np.sqrt(n_in)
+    weights_init = tf.random_uniform([n_in, n_out], minval=-d, maxval=d)
+    bias_init = tf.random_uniform([n_out], minval=-d, maxval=d)
 
-    def __init__(self, shape, outer_filter_size, num_features, strides, inner_filter_size=None, forget_bias=1.0,
-                 input_size=None, state_is_tuple=False, activation=tf.nn.tanh, padding='VALID'):
-        """Initialize the basic Conv LSTM cell.
-        Args:
-          shape: int tuple thats the height and width of the cell
-          filter_size: int tuple thats the height and width of the filter
-          num_features: int thats the depth of the cell
-          forget_bias: float, The bias added to forget gates (see above).
-          input_size: Deprecated and unused.
-          state_is_tuple: If True, accepted and returned states are 2-tuples of
-            the `c_state` and `m_state`.  If False, they are concatenated
-            along the column axis.  The latter behavior will soon be deprecated.
-          activation: Activation function of the inner states.
-        """
-        # if not state_is_tuple:
-        # logging.warn("%s: Using a concatenated state is slower and will soon be "
-        #             "deprecated.  Use state_is_tuple=True.", self)
-        if input_size is not None:
-            logging.warn("%s: The input_size parameter is deprecated.", self)
-        self.shape = shape
-        self.inner_filter_size = inner_filter_size
-        self.outer_filter_size = outer_filter_size
-        self.num_features = num_features
-        self.strides = strides
-        self.padding = padding
-        self._forget_bias = forget_bias
-        self._state_is_tuple = state_is_tuple
-        self._activation = activation
-        self._num_units = np.prod(shape) * num_features
-
-    @property
-    def state_size(self):
-        return (LSTMStateTuple(self._num_units, self._num_units)
-                if self._state_is_tuple else 2 * self._num_units)
-
-    @property
-    def output_size(self):
-        return self._num_units
-
-    def __call__(self, inputs, state, scope=None):
-        """Long short-term memory cell (LSTM)."""
-        with tf.variable_scope(scope or type(self).__name__):  # "BasicConvLSTMCell"
-            # Parameters of gates are concatenated into one multiply for efficiency.
-
-            if self._state_is_tuple:
-                c, h = state
-            else:
-                c, h = tf.split(3, 2, state)
-
-            if not self.inner_filter_size:
-                concat = _conv_linear([inputs, h], self.outer_filter_size, self.num_features * 4, True)
-
-            else:
-                n_input_features = inputs.get_shape().as_list()[-1]
-
-                def get_conv_W(filter_size, n_in_features, n_out_features):
-                    return tf.Variable(tflearn.initializations.truncated_normal(
-                        [filter_size, filter_size, n_in_features, n_out_features]))
-                W_h_to_ijfo = get_conv_W(self.inner_filter_size, self.num_features, self.num_features * 4)
-                W_x_to_ijfo = get_conv_W(self.outer_filter_size, n_input_features, self.num_features * 4)
-                W_all = tf.concat(0, [tf.reshape(W_h_to_ijfo, [-1]), tf.reshape(W_x_to_ijfo, [-1])], name='Matrix')
-
-                b = tf.Variable(np.concatenate([np.zeros(2 * self.num_features), np.ones(self.num_features),
-                                                np.zeros(self.num_features)]), dtype=tf.float32, name='Bias')
-
-                conv_x = tf.nn.conv2d(inputs, W_x_to_ijfo, strides=[1, self.strides, self.strides, 1],
-                                      padding=self.padding)
-                conv_h = tf.nn.conv2d(h, W_h_to_ijfo, strides=4 * [1], padding='SAME')
-                concat = tf.nn.bias_add(conv_x + conv_h, b)
-
-            # i = input_gate, j = new_input, f = forget_gate, o = output_gate
-            i, j, f, o = tf.split(3, 4, concat)
-
-            new_c = (c * tf.nn.sigmoid(f + self._forget_bias) + tf.nn.sigmoid(i) *
-                     self._activation(j))
-            new_h = self._activation(new_c) * tf.nn.sigmoid(o)
-
-            if self._state_is_tuple:
-                new_state = LSTMStateTuple(new_c, new_h)
-            else:
-                new_state = tf.concat(3, [new_c, new_h])
-            return new_h, new_state
+    return tflearn.fully_connected(incoming=incoming, n_units=n_out, activation=activation, weights_init=weights_init,
+                                   bias_init=bias_init, weight_decay=0.0, name=name)
 
 
 def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_filter_size=None, forget_bias=1.0,
                        activation=tf.nn.tanh, padding='VALID', inner_depthwise=False):
-    n_input_features = incoming.get_shape().as_list()[-1]
+    _, kh, kw, n_input_features = incoming.get_shape().as_list()
 
     with tf.name_scope("ConvLSTM"):
 
         with tf.name_scope("ConvLSTMWeights"):
             def get_conv_W(filter_size, n_in_features, n_out_features, name):
-                return tf.Variable(tflearn.initializations.truncated_normal(
-                    [filter_size, filter_size, n_in_features, n_out_features]), name=name)
+                d = 1.0 / np.sqrt(filter_size * filter_size * n_in_features)
+                weight_init = tf.random_uniform([filter_size, filter_size, n_in_features, n_out_features],
+                                                minval=-d, maxval=d)
+                return tf.Variable(weight_init, name=name)
 
             if inner_depthwise:
                 W_h_to_ijfo = get_conv_W(outer_filter_size, num_features, 4, name='Wh')
@@ -180,7 +80,9 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_
 
             W_x_to_ijfo = get_conv_W(outer_filter_size, n_input_features, num_features * 4, name='Wx')
 
-            b = tf.Variable(tf.zeros(4 * num_features), dtype=tf.float32, name='Bias')
+            d = 1.0 / np.sqrt(outer_filter_size * outer_filter_size * n_input_features)
+            bias_init = tf.random_uniform([4 * num_features], minval=-d, maxval=d)
+            b = tf.Variable(bias_init, dtype=tf.float32, name='Bias')
 
         def lstm_step(lstm_state, x):
             with tf.name_scope("ConvLSTMStep"):
@@ -208,7 +110,6 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_
             state_shape = [1, (h - outer_filter_size + n_pad) // stride + 1, (w - outer_filter_size + n_pad) // stride + 1,
                            2 * num_features]
             output_shape = [-1] + state_shape[1:]
-            print(state_shape)
 
             initial_state = tf.placeholder(tf.float32, state_shape)
             new_state = tf.reshape(tf.scan(lstm_step, incoming, initializer=initial_state), output_shape)
@@ -219,51 +120,6 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_
             outputs.b = b
 
         return outputs, new_state[-1:], initial_state
-
-
-def _conv_linear(args, filter_size, num_features, bias, strides, bias_start=0.0, scope=None):
-    """convolution:
-    Args:
-      args: a 4D Tensor or a list of 4D, batch x n, Tensors.
-      filter_size: int tuple of filter height and width.
-      num_features: int, number of features.
-      bias_start: starting value to initialize the bias; 0 by default.
-      scope: VariableScope for the created subgraph; defaults to "Linear".
-    Returns:
-      A 4D Tensor with shape [batch h w num_features]
-    Raises:
-      ValueError: if some of the arguments has unspecified or wrong shape.
-    """
-
-    # Calculate the total size of arguments on dimension 1.
-    total_arg_size_depth = 0
-    shapes = [a.get_shape().as_list() for a in args]
-    for shape in shapes:
-        if len(shape) != 4:
-            raise ValueError("Linear is expecting 4D arguments: %s" % str(shapes))
-        if not shape[3]:
-            raise ValueError("Linear expects shape[4] of arguments: %s" % str(shapes))
-        else:
-            total_arg_size_depth += shape[3]
-
-    dtype = [a.dtype for a in args][0]
-
-    # Now the computation.
-    with tf.variable_scope(scope or "Conv"):
-        matrix = tf.get_variable(
-            "Matrix", [filter_size[0], filter_size[1], total_arg_size_depth, num_features], dtype=dtype)
-        if len(args) == 1:
-            res = tf.nn.conv2d(args[0], matrix, strides=strides, padding='SAME')
-        else:
-            res = tf.nn.conv2d(tf.concat(3, args), matrix, strides=[1, 1, 1, 1], padding='SAME')
-        if not bias:
-            return res
-        bias_term = tf.get_variable(
-            "Bias", [num_features],
-            dtype=dtype,
-            initializer=tf.constant_initializer(
-                bias_start, dtype=dtype))
-    return res + bias_term
 
 
 def spatialsoftmax(incoming, epsilon=0.01):
@@ -301,36 +157,17 @@ def spatialsoftmax(incoming, epsilon=0.01):
 def custom_lstm(incoming, n_units, activation=tf.nn.tanh, forget_bias=1.0, initial_state=None, scope=None,
                 name="LSTM", sequence_length=None):
 
+    _, _, in_dim = incoming.get_shape().as_list()
+    d = 1.0 / np.sqrt(in_dim)
+
     #with tf.name_scope(name) as scope:
     with tf.variable_scope(name) as vs:
-        cell = tfLSTMCell(n_units, forget_bias=forget_bias, activation=activation)#LSTMCell(n_units, forget_bias=forget_bias, activation=activation, name=name)
+        cell = BasicLSTMCell(n_units, forget_bias=forget_bias, activation=activation)#LSTMCell(n_units, forget_bias=forget_bias, activation=activation, name=name)
         o, state = dynamic_rnn(cell, incoming, initial_state=initial_state, sequence_length=sequence_length, scope=vs)
         #o.scope = vs
         vs.reuse_variables()
         o.W = tf.get_variable('BasicLSTMCell/Linear/Matrix')#cell.W
         o.b = tf.get_variable('BasicLSTMCell/Linear/Bias')#cell.b
-
-    return o, state
-
-
-def conv_lstm(incoming, n_filters, outer_filter_size, stride, inner_filter_size=None, activation=tf.nn.tanh,
-              initial_state=None, scope=None, name="LSTM", sequence_length=None, padding='VALID'):
-
-    #with tf.name_scope(name) as scope:
-    with tf.variable_scope(name) as vs:
-        _, _, h, w, _ = incoming.get_shape().as_list()
-        n_pad = 2 * (outer_filter_size // 2) if padding == 'SAME' else 0
-        state_shape = [(h - outer_filter_size + n_pad) / stride + 1,
-                       (w - outer_filter_size + n_pad) / stride + 1]
-
-        cell = BasicConvLSTMCell(state_shape, outer_filter_size, n_filters, stride, inner_filter_size=inner_filter_size,
-                                 state_is_tuple=True, activation=activation)#tfLSTMCell(n_units, forget_bias=forget_bias, activation=activation)#LSTMCell(n_units, forget_bias=forget_bias, activation=activation, name=name)
-        o, state = dynamic_rnn(cell, incoming, initial_state=initial_state, sequence_length=sequence_length, scope=vs,
-                               time_major=True)
-        #o.scope = vs
-        vs.reuse_variables()
-        o.W = tf.get_variable('BasicConvLSTMCell/Linear/Matrix')#cell.W
-        o.b = tf.get_variable('BasicConvLSTMCell/Linear/Bias')#cell.b
 
     return o, state
 
@@ -545,84 +382,125 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
     return out
 
 
-def lstm(incoming, n_units, activation='tanh', inner_activation='sigmoid',
-         dropout=None, bias=True, weights_init=None, forget_bias=1.0,
-         return_seq=False, return_state=False, initial_state=None,
-         dynamic=False, trainable=True, restore=True, reuse=False,
-         scope=None, name="LSTM"):
-    """ LSTM.
+class BasicLSTMCell(RNNCell):
+  """Basic LSTM recurrent network cell.
 
-    Long Short Term Memory Recurrent Layer.
+  The implementation is based on: http://arxiv.org/abs/1409.2329.
 
-    Input:
-        3-D Tensor [samples, timesteps, input dim].
+  We add forget_bias (default: 1) to the biases of the forget gate in order to
+  reduce the scale of forgetting in the beginning of the training.
 
-    Output:
-        if `return_seq`: 3-D Tensor [samples, timesteps, output dim].
-        else: 2-D Tensor [samples, output dim].
+  It does not allow cell clipping, a projection layer, and does not
+  use peep-hole connections: it is the basic baseline.
 
-    Arguments:
-        incoming: `Tensor`. Incoming 3-D Tensor.
-        n_units: `int`, number of units for this layer.
-        activation: `str` (name) or `function` (returning a `Tensor`).
-            Activation applied to this layer (see tflearn.activations).
-            Default: 'tanh'.
-        inner_activation: `str` (name) or `function` (returning a `Tensor`).
-            LSTM inner activation. Default: 'sigmoid'.
-        dropout: `tuple` of `float`: (input_keep_prob, output_keep_prob). The
-            input and output keep probability.
-        bias: `bool`. If True, a bias is used.
-        weights_init: `str` (name) or `Tensor`. Weights initialization.
-            (See tflearn.initializations).
-        forget_bias: `float`. Bias of the forget gate. Default: 1.0.
-        return_seq: `bool`. If True, returns the full sequence instead of
-            last sequence output only.
-        return_state: `bool`. If True, returns a tuple with output and
-            states: (output, states).
-        initial_state: `Tensor`. An initial state for the RNN.  This must be
-            a tensor of appropriate type and shape [batch_size x cell.state_size].
-        dynamic: `bool`. If True, dynamic computation is performed. It will not
-            compute RNN steps above the sequence length. Note that because TF
-            requires to feed sequences of same length, 0 is used as a mask.
-            So a sequence padded with 0 at the end must be provided. When
-            computation is performed, it will stop when it meets a step with
-            a value of 0.
-        trainable: `bool`. If True, weights will be trainable.
-        restore: `bool`. If True, this layer weights will be restored when
-            loading a model.
-        reuse: `bool`. If True and 'scope' is provided, this layer variables
-            will be reused (shared).
-        scope: `str`. Define this layer scope (optional). A scope can be
-            used to share variables between layers. Note that scope will
-            override name.
-        name: `str`. A name for this layer (optional).
+  For advanced models, please use the full LSTMCell that follows.
+  """
 
-    References:
-        Long Short Term Memory, Sepp Hochreiter & Jurgen Schmidhuber,
-        Neural Computation 9(8): 1735-1780, 1997.
+  def __init__(self, num_units, forget_bias=1.0, input_size=None,
+               state_is_tuple=True, activation=tf.nn.tanh):
+    """Initialize the basic LSTM cell.
 
-    Links:
-        [http://deeplearning.cs.cmu.edu/pdfs/Hochreiter97_lstm.pdf]
-        (http://deeplearning.cs.cmu.edu/pdfs/Hochreiter97_lstm.pdf)
-
+    Args:
+      num_units: int, The number of units in the LSTM cell.
+      forget_bias: float, The bias added to forget gates (see above).
+      input_size: Deprecated and unused.
+      state_is_tuple: If True, accepted and returned states are 2-tuples of
+        the `c_state` and `m_state`.  If False, they are concatenated
+        along the column axis.  The latter behavior will soon be deprecated.
+      activation: Activation function of the inner states.
     """
-    cell = BasicLSTMCell(n_units, activation=activation,
-                         inner_activation=inner_activation,
-                         forget_bias=forget_bias, bias=bias,
-                         weights_init=weights_init, trainable=trainable,
-                         restore=restore, reuse=reuse)
-    x = _rnn_template(incoming, cell=cell, dropout=dropout,
-                      return_seq=return_seq, return_state=return_state,
-                      initial_state=initial_state, dynamic=dynamic,
-                      scope=scope, name=name)
+    if not state_is_tuple:
+      logging.warn("%s: Using a concatenated state is slower and will soon be "
+                   "deprecated.  Use state_is_tuple=True.", self)
+    if input_size is not None:
+      logging.warn("%s: The input_size parameter is deprecated.", self)
+    self._num_units = num_units
+    self._forget_bias = forget_bias
+    self._state_is_tuple = state_is_tuple
+    self._activation = activation
 
-    o, state = x
-    if return_seq:
-        o = tf.concat(0, o, name="StackedSequence")
+  @property
+  def state_size(self):
+    return (LSTMStateTuple(self._num_units, self._num_units)
+            if self._state_is_tuple else 2 * self._num_units)
 
-    #print(o)
-    o.scope = scope
-    o.W = cell.W
-    o.b = cell.b
-    return o, state
+  @property
+  def output_size(self):
+    return self._num_units
 
+  def __call__(self, inputs, state, scope=None):
+    """Long short-term memory cell (LSTM)."""
+    with tf.variable_scope(scope or type(self).__name__):  # "BasicLSTMCell"
+      # Parameters of gates are concatenated into one multiply for efficiency.
+      if self._state_is_tuple:
+        c, h = state
+      else:
+        c, h = tf.split(1, 2, state)
+      concat = _linear([inputs, h], 4 * self._num_units, True)
+
+      # i = input_gate, j = new_input, f = forget_gate, o = output_gate
+      i, j, f, o = tf.split(1, 4, concat)
+
+      new_c = (c * tf.nn.sigmoid(f + self._forget_bias) + tf.nn.sigmoid(i) *
+               self._activation(j))
+      new_h = self._activation(new_c) * tf.nn.sigmoid(o)
+
+      if self._state_is_tuple:
+        new_state = LSTMStateTuple(new_c, new_h)
+      else:
+        new_state = tf.concat(1, [new_c, new_h])
+      return new_h, new_state
+
+def _linear(args, output_size, bias, bias_start=0.0, scope=None):
+  """Linear map: sum_i(args[i] * W[i]), where W[i] is a variable.
+
+  Args:
+    args: a 2D Tensor or a list of 2D, batch x n, Tensors.
+    output_size: int, second dimension of W[i].
+    bias: boolean, whether to add a bias term or not.
+    bias_start: starting value to initialize the bias; 0 by default.
+    scope: VariableScope for the created subgraph; defaults to "Linear".
+
+  Returns:
+    A 2D Tensor with shape [batch x output_size] equal to
+    sum_i(args[i] * W[i]), where W[i]s are newly created matrices.
+
+  Raises:
+    ValueError: if some of the arguments has unspecified or wrong shape.
+  """
+  if args is None or (nest.is_sequence(args) and not args):
+    raise ValueError("`args` must be specified")
+  if not nest.is_sequence(args):
+    args = [args]
+
+  # Calculate the total size of arguments on dimension 1.
+  total_arg_size = 0
+  shapes = [a.get_shape().as_list() for a in args]
+  for shape in shapes:
+    if len(shape) != 2:
+      raise ValueError("Linear is expecting 2D arguments: %s" % str(shapes))
+    if not shape[1]:
+      raise ValueError("Linear expects shape[1] of arguments: %s" % str(shapes))
+    else:
+      total_arg_size += shape[1]
+
+  dtype = [a.dtype for a in args][0]
+
+  # Now the computation.
+  with tf.variable_scope(scope or "Linear"):
+    d = 1 / np.sqrt(output_size)
+    matrix = tf.get_variable(
+        "Matrix", [total_arg_size, output_size], dtype=dtype,
+        initializer=tf.random_uniform_initializer(minval=-d, maxval=d)
+    )
+    if len(args) == 1:
+      res = tf.matmul(args[0], matrix)
+    else:
+      res = tf.matmul(tf.concat(1, args), matrix)
+    if not bias:
+      return res
+    bias_term = tf.get_variable(
+        "Bias", [output_size],
+        dtype=dtype,
+        initializer=tf.random_uniform_initializer(minval=-d, maxval=d))
+  return res + bias_term

@@ -2,7 +2,7 @@ import tensorflow as tf
 import tflearn
 import numpy as np
 from deeprl.common.logger import logger
-from deeprl.approximators.layers import spatialsoftmax, custom_lstm, convolutional_lstm
+from deeprl.approximators.layers import spatialsoftmax, custom_lstm, convolutional_lstm, conv_layer, fc_layer
 from tensorflow.python.ops.rnn_cell import LSTMStateTuple
 from copy import deepcopy
 
@@ -72,18 +72,15 @@ class ActorCriticNN(object):
 
         with tf.name_scope('HiddenLayers') as scope:
             # Add first convolutional layer
-            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1', weight_decay=0.0,
-                                  bias_init=tf.constant_initializer(0.1), padding='valid')
+            net = conv_layer(net, 32, 8, 4, activation='relu', name='Conv1')
             self._add_trainable(net)
 
             # Add second convolutional layer
-            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name='Conv2', weight_decay=0.0,
-                                  bias_init=tf.constant_initializer(0.1), padding='valid')
+            net = conv_layer(net, 64, 4, 2, activation='relu', name='Conv2')
             self._add_trainable(net)
 
             net = tflearn.flatten(net)
-            net = tflearn.fully_connected(net, 256, activation='relu', name='FC3', weight_decay=0.0,
-                                          bias_init=tf.constant_initializer(0.1))
+            net = fc_layer(net, 256, activation='relu', name='FC3')
             self._add_trainable(net)
             self.embedding_layer = net
 
@@ -99,11 +96,11 @@ class ActorCriticNN(object):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers'):
-            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1')
+            net = conv_layer(net, 32, 8, 4, activation='relu', name='Conv1')
             self._add_trainable(net)
-            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='relu', name='Conv2')
+            net = conv_layer(net, 64, 4, 2, activation='relu', name='Conv2')
             self._add_trainable(net)
-            net = tflearn.conv_2d(net, 64, 3, strides=1, activation='relu', name='Conv3')
+            net = conv_layer(net, 64, 3, 1, activation='relu', name='Conv3')
             self._add_trainable(net)
             net = tflearn.flatten(net)
             net = tflearn.fully_connected(net, 512, activation='relu', name='FC4')
@@ -189,12 +186,12 @@ class ActorCriticNN(object):
         with tf.name_scope('ForwardInputs'):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
         with tf.name_scope('HiddenLayers'):
-            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1', padding='valid', weight_decay=0.)
+            net = conv_layer(net, 32, 8, 4, activation='relu', name='Conv1')
             self._add_trainable(net)
-            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='linear', name='Conv2', padding='valid', weight_decay=0.)
+            net = conv_layer(net, 64, 4, 2, activation='linear', name='Conv2')
             self._add_trainable(net)
             net = spatialsoftmax(net, epsilon=0.9)
-            net = tflearn.fully_connected(net, 256, activation='relu', name='FC3')
+            net = fc_layer(net, 256, activation='relu', name='FC3')
             self._add_trainable(net)
             net = tflearn.reshape(net, [1, -1, 256], "ReshapedLSTMInput")
             net, state = custom_lstm(net, 256, initial_state=self.initial_state,
@@ -216,30 +213,34 @@ class ActorCriticNN(object):
         with tf.name_scope('LSTMInput'):
             # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
             # 'h' (256), which are both influencing the layer in the forward/backward pass.
-            #self.initial_state = LSTMStateTuple(
-            #    tf.placeholder(tf.float32, shape=[1, 9, 9, 64], name="InitialLSTMState_c"),
-            #    tf.placeholder(tf.float32, shape=[1, 9, 9, 64], name="InitialLSTMState_h")
-            #)
             self.n_steps = tf.placeholder(tf.int32, shape=[1])
 
         with tf.name_scope('HiddenLayers'):
-            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1', padding='valid',
-                                  weight_decay=0.)
+            net = conv_layer(net, 32, 8, 4, activation='relu', name='Conv1')
             self._add_trainable(net)
             net = tf.reshape(net, [-1, 1] + net.get_shape().as_list()[1:])
 
             net, new_state, self.initial_state = convolutional_lstm(net, outer_filter_size=4, num_features=64,
                                                                     stride=2, inner_filter_size=5, inner_depthwise=True)
             self.theta += net.W + [net.b]
-            #net, state = conv_lstm(net, 64, 4, stride=2, initial_state=self.initial_state, inner_filter_size=3,
-            #                       sequence_length=self.n_steps, name='ConvLSTM_{}'.format(self.agent_name))
-            #self._add_trainable(net)
+
             net = tf.reshape(net, [-1, 9, 9, 64])
             self.lstm_state_variable = new_state
-            net = tflearn.fully_connected(net, 256, activation='relu', name='FC3', weight_decay=0.0,
-                                          bias_init=tf.constant_initializer(0.1))
+            net = fc_layer(net, 256, activation='relu', name='FC3')
             self.embedding_layer = net
 
+        return net
+
+    def _small_fcn(self):
+        """
+        This network works with the CartPole-v0/v1 environments (sort of)
+        :param network_name:    The name of the network
+        :return:                The network as a graph node
+        """
+        with tf.name_scope('HiddenLayers'):
+            net = fc_layer(self.inputs, 128, activation='tanh', name='FC1')
+            self._add_trainable(net)
+        self.embedding_layer = net
         return net
 
     def reset_lstm_state(self):
@@ -280,17 +281,6 @@ class ActorCriticNN(object):
             self.theta += [layer.W] + ([layer.b] if layer.b else [])
         #logger.info('{}: {}'.format(layer.name, [t.name for t in self.theta]))
 
-    def _small_fcn(self):
-        """
-        This network works with the CartPole-v0/v1 environments (sort of)
-        :param network_name:    The name of the network
-        :return:                The network as a graph node
-        """
-        with tf.name_scope('HiddenLayers'):
-            net = tflearn.fully_connected(self.inputs, 128, activation='tanh', name='FC1')
-            self._add_trainable(net)
-        self.embedding_layer = net
-        return net
 
     def build_network(self, num_actions, input_shape):
         logger.debug('Input shape: {}'.format(input_shape))
@@ -318,16 +308,16 @@ class ActorCriticNN(object):
 
         with tf.name_scope("Outputs"):
             with tf.name_scope("Policy"):
-                self.pi = tflearn.fully_connected(net, num_actions, activation='softmax', name='pi_sa', weight_decay=0.)
+                self.pi = fc_layer(net, num_actions, activation='softmax', name='pi_sa')
                 self._add_trainable(self.pi)
             with tf.name_scope("Value"):
                 if self.policy_weighted_val:
-                    q_val = tflearn.fully_connected(net, num_actions, activation='linear', weight_decay=0.)
+                    q_val = fc_layer(net, num_actions, activation='linear', name='q_sa')
                     self._add_trainable(q_val)
                     self.value = tf.reduce_sum(tf.mul(q_val, tf.stop_gradient(self.pi)),
                                                reduction_indices=1, name='v_s')
                 else:
-                    self.value = tflearn.fully_connected(net, 1, activation='linear', name='v_s')
+                    self.value = fc_layer(net, 1, activation='linear', name='v_s')
                     self._add_trainable(self.value)
                 self.value = tflearn.reshape(self.value, [-1], 'FlattenedValue')
 
