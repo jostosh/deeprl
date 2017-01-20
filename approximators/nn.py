@@ -43,6 +43,8 @@ class ActorCriticNN(object):
         self.lstm_state_numeric = self.lstm_first_state_since_update = None
         #self.policy_quanization = hyper_parameters.policy_quantization
 
+        self.hp = hyper_parameters
+
         # Build computational graphs for loss, synchronization of parameters and parameter updates
         with tf.name_scope(agent_name):
             self.build_network(num_actions, hyper_parameters.input_shape)
@@ -383,12 +385,12 @@ class ActorCriticNN(object):
             self.frame_target = tf.placeholder(tf.float32, [None, 1] + self.input_shape[1:])
 
         with tf.name_scope(self.loss_scope):
-            frame_prediction_loss = tf.reduce_sum((self.frame_target - self.predicted_frame) ** 2,
+            frame_prediction_loss = tf.nn.l2_loss(self.frame_target - self.predicted_frame,
                                                   name='FramePredictionLoss')
             self.summaries.append(tf.summary.scalar('{}/FramePredictionLoss'.format(self.agent_name),
                                                     frame_prediction_loss))
 
-        self.loss += frame_prediction_loss
+        self.loss += self.hp.fplc * frame_prediction_loss
 
     def build_param_sync(self):
         with tf.name_scope("ParamSynchronization"):
@@ -435,9 +437,9 @@ class ActorCriticNN(object):
             if self.optimality_tightening:
                 self.upper_limits = tf.placeholder(tf.float32, [None], name='UpperLimits')
                 self.lower_limits = tf.placeholder(tf.float32, [None], name='LowerLimits')
-                value_loss += 4 * (tf.nn.relu(self.lower_limits - self.value) ** 2 +
-                                   tf.nn.relu(self.value - self.upper_limits) ** 2)
-                value_loss /= 5
+                value_loss += self.hp.otc * (tf.nn.relu(self.lower_limits - self.value) ** 2 +
+                                             tf.nn.relu(self.value - self.upper_limits) ** 2)
+                value_loss /= (self.hp.otc + 1)
 
         # We can combine the policy loss and the value loss in a single expression
         with tf.name_scope("CombinedLoss"):
