@@ -226,7 +226,7 @@ class ActorCriticNN(object):
                                                                     stride=2, inner_filter_size=5, inner_depthwise=True)
             self.theta += net.W + [net.b]
 
-            net = tf.reshape(net, [-1, 9, 9, 64])
+            net = tf.reshape(net, [-1, 9 * 9 * 64])
             self.lstm_state_variable = new_state
             net = fc_layer(net, 256, activation='relu', name='FC3')
             self.embedding_layer = net

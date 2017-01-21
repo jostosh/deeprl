@@ -62,7 +62,7 @@ def fc_layer(incoming, n_out, activation, name):
 
 def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_filter_size=None, forget_bias=1.0,
                        activation=tf.nn.tanh, padding='VALID', inner_depthwise=False):
-    _, kh, kw, n_input_features = incoming.get_shape().as_list()
+    _, _, kh, kw, n_input_features = incoming.get_shape().as_list()
 
     with tf.name_scope("ConvLSTM"):
 
