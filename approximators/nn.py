@@ -129,15 +129,12 @@ class ActorCriticNN(object):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers'):
-            net = tflearn.conv_2d(net, 32, 8, strides=4, activation='relu', name='Conv1', weight_decay=0.0,
-                                  bias_init=tf.constant_initializer(0.1), padding='valid')
+            net = conv_layer(net, 32, 8, 4, activation='relu', name='Conv1')
             self._add_trainable(net)
-            net = tflearn.conv_2d(net, 64, 4, strides=2, activation='linear', name='Conv2', weight_decay=0.0,
-                                  bias_init=tf.constant_initializer(0.1), padding='valid')
+            net = conv_layer(net, 64, 4, 2, activation='linear', name='Conv2')
             self._add_trainable(net)
-            net = spatialsoftmax(net)
-            net = tflearn.fully_connected(net, 256, activation='relu', name='FC3', weight_decay=0.0,
-                                          bias_init=tf.constant_initializer(0.1))
+            net = spatialsoftmax(net, epsilon=0.99)
+            net = fc_layer(net, 256, activation='relu', name='FC3')
             self._add_trainable(net)
             self.embedding_layer = net
 
@@ -192,7 +189,7 @@ class ActorCriticNN(object):
             self._add_trainable(net)
             net = conv_layer(net, 64, 4, 2, activation='linear', name='Conv2')
             self._add_trainable(net)
-            net = spatialsoftmax(net, epsilon=0.9)
+            net = spatialsoftmax(net, epsilon=0.99)
             net = fc_layer(net, 256, activation='relu', name='FC3')
             self._add_trainable(net)
             net = tflearn.reshape(net, [1, -1, 256], "ReshapedLSTMInput")
@@ -567,7 +564,8 @@ class ActorCriticNN(object):
                 fdict.update({self.upper_limits: upper_limits, self.lower_limits: lower_limits})
 
             # Update the parameters
-            session.run([self.minimize], feed_dict=fdict)
+            session.run(self.minimize, feed_dict=fdict)
+
 
         return None
 

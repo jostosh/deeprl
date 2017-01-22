@@ -304,7 +304,8 @@ if __name__ == "__main__":
     shared_optimizer = RMSPropCustom(session,
                                      learning_rate_ph,
                                      decay=hyperparameters.rms_decay,
-                                     epsilon=hyperparameters.rms_epsilon)
+                                     epsilon=hyperparameters.rms_epsilon,
+                                     feedback=hyperparameters.feedback)
 
     global_network = ActorCriticNN(num_actions=num_actions,
                                    agent_name='GLOBAL',
@@ -336,7 +337,7 @@ if __name__ == "__main__":
     embedding.sprite.single_image_dim.extend([160, 210])
     projector.visualize_embeddings(writer, embedding_config)
 
-    saver = tf.train.Saver(global_network.theta + shared_optimizer.g_moving_average + [T_var, embedding_var])
+    saver = tf.train.Saver(global_network.theta + shared_optimizer.mean_square + [T_var, embedding_var])
     weights_path = os.path.join(writer.get_logdir(), 'model.ckpt')
     os.makedirs(os.path.dirname(weights_path), exist_ok=True)
 

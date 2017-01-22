@@ -36,7 +36,8 @@ config1 = {
     'param_sweep': "",
     'score_at_10m': -10.,
     'fplc': 0.001,
-    'otc': 1
+    'otc': 1,
+    'feedback': False
 }
 
 param_sweep = {
@@ -114,4 +115,5 @@ class HyperParameters(object):
         self.fplc = params.fplc
         self.param_sweep = params.param_sweep
         self.score_at_10m = params.score_at_10m
+        self.feedback = params.feedback
 
