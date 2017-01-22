@@ -12,7 +12,9 @@ def get_log_dir(hyper_parameters):
                             hyper_parameters.env,
                             hyper_parameters.model,
                             'prediction={}'.format(hyper_parameters.frame_prediction),
-                            'residuals={}'.format(hyper_parameters.residual_prediction)
+                            'residuals={}'.format(hyper_parameters.residual_prediction),
+                            'feedback={}'.format(hyper_parameters.feedback),
+                            'ot={}'.format(hyper_parameters.optimality_tightening)
                             )
         # Check if base directory exists, if not create it
         os.makedirs(path, exist_ok=True)
@@ -23,7 +25,9 @@ def get_log_dir(hyper_parameters):
                             hyper_parameters.env,
                             hyper_parameters.model,
                             'prediction={}'.format(hyper_parameters.frame_prediction),
-                            'residuals={}'.format(hyper_parameters.residual_prediction)
+                            'residuals={}'.format(hyper_parameters.residual_prediction),
+                            'feedback={}'.format(hyper_parameters.feedback),
+                            'ot={}'.format(hyper_parameters.optimality_tightening)
                             )
         os.makedirs(path.replace("/data/s2098407", os.path.expanduser("~")), exist_ok=True)
 
