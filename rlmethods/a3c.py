@@ -114,6 +114,8 @@ class A3CAgent(object):
                 current_lr = hyperparameters.learning_rate - hyperparameters.learning_rate / hyperparameters.T_max * T
                 epr += rewards[i]
 
+                hyperparameters.fplc *= 0.999999
+
             if hyperparameters.clip_rewards:
                 # Reward clipping helps to stabilize training
                 rewards = np.clip(rewards, -1.0, 1.0)
@@ -162,7 +164,9 @@ class A3CAgent(object):
                                                          n_step_returns=n_step_targets[:batch_len],
                                                          values=values[:batch_len],
                                                          upper_limits=upper_limits,
-                                                         lower_limits=lower_limits)
+                                                         lower_limits=lower_limits,
+                                                         include_summaries=(self.agent_name == "Agent_1" and
+                                                                            n_updates % 50 == 0))
 
             if summaries:
                 writer.add_summary(summaries, self.t)

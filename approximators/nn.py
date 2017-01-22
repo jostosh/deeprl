@@ -220,7 +220,8 @@ class ActorCriticNN(object):
             net = tf.reshape(net, [-1, 1] + net.get_shape().as_list()[1:])
 
             net, new_state, self.initial_state = convolutional_lstm(net, outer_filter_size=4, num_features=64,
-                                                                    stride=2, inner_filter_size=5, inner_depthwise=True)
+                                                                    stride=2, inner_filter_size=5, inner_depthwise=True,
+                                                                    n_steps=self.n_steps)
             self.theta += net.W + [net.b]
 
             net = tf.reshape(net, [-1, 9 * 9 * 64])
@@ -520,7 +521,7 @@ class ActorCriticNN(object):
         return session.run(self.embedding_layer, feed_dict={self.inputs: [state]})
 
     def update_params(self, actions, states, lr, last_state, session, n_step_returns, values,
-                      upper_limits=None, lower_limits=None):
+                      upper_limits=None, lower_limits=None, include_summaries=False):
         """
         Updates the parameters of the global network
         :param actions:             array of actions
@@ -528,6 +529,7 @@ class ActorCriticNN(object):
         :param lr:                  actual learning rate
         """
         n_steps = len(actions)
+        summaries = None
 
         if self.recurrent:
 
@@ -546,7 +548,11 @@ class ActorCriticNN(object):
                 fdict.update({self.upper_limits: upper_limits, self.lower_limits: lower_limits})
 
             # Now we update our parameters AND we take the lstm_state
-            _, self.lstm_state_numeric = session.run([self.minimize, self.lstm_state_variable], feed_dict=fdict)
+            if include_summaries:
+                _, self.lstm_state_numeric, summaries = session.run(
+                    [self.minimize, self.lstm_state_variable, self.merged_summaries], feed_dict=fdict)
+            else:
+                _, self.lstm_state_numeric = session.run([self.minimize, self.lstm_state_variable], feed_dict=fdict)
 
             # We also need to remember the LSTM state for the next backward pass
             self.lstm_first_state_since_update = deepcopy(self.lstm_state_numeric)
@@ -564,8 +570,11 @@ class ActorCriticNN(object):
                 fdict.update({self.upper_limits: upper_limits, self.lower_limits: lower_limits})
 
             # Update the parameters
-            session.run(self.minimize, feed_dict=fdict)
+            if include_summaries:
+                _, summaries = session.run([self.minimize, self.merged_summaries], feed_dict=fdict)
+            else:
+                session.run(self.minimize, feed_dict=fdict)
 
 
-        return None
+        return summaries
 
