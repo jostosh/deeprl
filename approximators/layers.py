@@ -60,15 +60,15 @@ def fc_layer(incoming, n_out, activation, name):
                                    bias_init=bias_init, weight_decay=0.0, name=name)
 
 
-def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_filter_size=None, forget_bias=1.0,
+def convolutional_lstm(incoming, outer_filter_size, num_features, stride, n_steps, inner_filter_size=None, forget_bias=1.0,
                        activation=tf.nn.tanh, padding='VALID', inner_depthwise=False):
-    _, _, kh, kw, n_input_features = incoming.get_shape().as_list()
+    n_input_features = incoming.get_shape().as_list()[-1]
 
     with tf.name_scope("ConvLSTM"):
 
         with tf.name_scope("ConvLSTMWeights"):
             def get_conv_W(filter_size, n_in_features, n_out_features, name):
-                d = 1.0 / np.sqrt(filter_size * filter_size * n_in_features)
+                d = 1.0 / np.sqrt(filter_size * filter_size * (1 if inner_depthwise else n_in_features))
                 weight_init = tf.random_uniform([filter_size, filter_size, n_in_features, n_out_features],
                                                 minval=-d, maxval=d)
                 return tf.Variable(weight_init, name=name)
@@ -112,14 +112,15 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_
             output_shape = [-1] + state_shape[1:]
 
             initial_state = tf.placeholder(tf.float32, state_shape)
-            new_state = tf.reshape(tf.scan(lstm_step, incoming, initializer=initial_state), output_shape)
+            new_state = tf.reshape(tf.scan(lstm_step, incoming, initializer=initial_state, parallel_iterations=1),
+                                   output_shape)
 
             _, outputs = tf.split(3, 2, new_state)
 
             outputs.W = [W_h_to_ijfo, W_x_to_ijfo]
             outputs.b = b
 
-        return outputs, new_state[-1:], initial_state
+        return outputs, tf.slice(new_state, tf.concat(0, [n_steps-1, 3*[0]]), 4 * [-1]), initial_state
 
 
 def spatialsoftmax(incoming, epsilon=0.01):
@@ -428,8 +429,6 @@ class BasicLSTMCell(RNNCell):
   def output_size(self):
     return self._num_units
 
-
-
   def __call__(self, inputs, state, scope=None):
     """Long short-term memory cell (LSTM)."""
     with tf.variable_scope(scope or type(self).__name__):  # "BasicLSTMCell"
@@ -452,6 +451,7 @@ class BasicLSTMCell(RNNCell):
       else:
         new_state = tf.concat(1, [new_c, new_h])
       return new_h, new_state
+
 
 def _linear(args, output_size, bias, bias_start=0.0, scope=None):
   """Linear map: sum_i(args[i] * W[i]), where W[i] is a variable.
@@ -490,7 +490,8 @@ def _linear(args, output_size, bias, bias_start=0.0, scope=None):
 
   # Now the computation.
   with tf.variable_scope(scope or "Linear"):
-    d = 1 / np.sqrt(output_size / 4)
+    n_in = args[0].get_shape().as_list()[-1] + args[1].get_shape().as_list()[-1]
+    d = 1 / np.sqrt(n_in)
     matrix = tf.get_variable(
         "Matrix", [total_arg_size, output_size], dtype=dtype,
         initializer=tf.random_uniform_initializer(minval=-d, maxval=d)
