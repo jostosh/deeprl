@@ -15,6 +15,10 @@ rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
 #rc('font',**{'family':'serif','serif':['Palatino']})
 rc('text', usetex=True)
 
+import plotly.offline as py
+import time
+from plotly.graph_objs import *
+
 
 def event_arrays_to_np_arrays(event_array):
     value_by_step = {}
@@ -41,21 +45,22 @@ def export_plots():
         if any([IsTensorFlowEventsFile(f) for f in files]) and 'hyper_parameters.pkl' in files:
             with open(os.path.join(root, 'hyper_parameters.pkl'), 'rb') as f:
                 hyper_parameters = pickle.load(f)
-                hyper_parameters = hyper_parameters.__dict__ if isinstance(hyper_parameters, HyperParameters) \
-                    else hyper_parameters
-                event_files = [os.path.join(root, f) for f in files if 'events.out.tfevents.' in f]
-                hyper_parameters_str = json.dumps(hyper_parameters, sort_keys=True)
+            hyper_parameters = hyper_parameters.__dict__ if isinstance(hyper_parameters, HyperParameters) \
+                else hyper_parameters
+            event_files = [os.path.join(root, f) for f in files if IsTensorFlowEventsFile(f)]
+            hyper_parameters_str = json.dumps(hyper_parameters, sort_keys=True)
 
-                if hyper_parameters_str not in event_files_by_hp:
-                    event_files_by_hp[hyper_parameters_str] = event_files
-                else:
-                    event_files_by_hp[hyper_parameters_str] += event_files
+            if hyper_parameters_str not in event_files_by_hp:
+                event_files_by_hp[hyper_parameters_str] = event_files
+            else:
+                event_files_by_hp[hyper_parameters_str] += event_files
 
     events_by_scalar_by_hp = {}
 
     for hyper_parameters_str, event_files in event_files_by_hp.items():
         hyper_parameters = json.loads(hyper_parameters_str)
         events_by_scalar = {}
+        print("Currently looking at {} event files".format(len(event_files)))
         for event_file in event_files:
             ea = event_accumulator.EventAccumulator(event_file)
             ea.Reload()
@@ -78,12 +83,55 @@ def export_plots():
 
             print("Now considering {}".format(scalar))
             pprint.pprint(hyper_parameters)
-            plt.rc('font', family='serif')
-            plt.plot(steps, values, 'k-')
-            plt.fill_between(steps, values - errors, values + errors, facecolor='green')
-            plt.grid(True, color='w', linestyle='-', linewidth=2)
-            plt.gca().patch.set_facecolor('0.8')
-            plt.show()
+
+            trace1 = Scatter(
+                x=np.concatenate([steps, steps[::-1]]),
+                y=np.concatenate([values+errors, (values-errors)[::-1]]),
+                fill='tozerox',
+                fillcolor='rgba(0,100,80,0.2)',
+                line=Line(color='transparent'),
+                showlegend=False
+            )
+            line1 = Scatter(
+                x=steps,
+                y=values,
+                line=Line(color='rgb(0,100,8)'),
+                mode='lines'
+            )
+            data = Data([trace1, line1])
+            layout = Layout(
+                paper_bgcolor='rgb(255,255,255)',
+                plot_bgcolor='rgb(229,229,229)',
+                xaxis=XAxis(
+                    gridcolor='rgb(255,255,255)',
+                    showgrid=True,
+                    showline=False,
+                    showticklabels=True,
+                    tickcolor='rgb(127,127,127)',
+                    ticks='outside',
+                    zeroline=False
+                ),
+                yaxis=YAxis(
+                    gridcolor='rgb(255,255,255)',
+                    showgrid=True,
+                    showline=False,
+                    showticklabels=True,
+                    tickcolor='rgb(127,127,127)',
+                    ticks='outside',
+                    zeroline=False
+                ),
+            )
+            fig = Figure(data=data, layout=layout)
+            py.plot(fig)
+            time.sleep(5)
+
+
+            #plt.rc('font', family='serif')
+            #plt.plot(steps, values, 'k-')
+            #plt.fill_between(steps, values - errors, values + errors, facecolor='green')
+            #plt.grid(True, color='w', linestyle='-', linewidth=2)
+            #plt.gca().patch.set_facecolor('0.8')
+            #plt.show()
 
 
 
