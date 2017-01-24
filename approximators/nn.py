@@ -74,12 +74,14 @@ class ActorCriticNN(object):
 
         with tf.name_scope('HiddenLayers') as scope:
             # Add first convolutional layer
-            net = conv_layer(net, 32, 8, 4, activation='relu', name='Conv1')
+            net = conv_layer(net, 32, 8, 4, activation='linear', name='Conv1')
             self._add_trainable(net)
+            net = tf.nn.relu(net)
 
             # Add second convolutional layer
-            net = conv_layer(net, 64, 4, 2, activation='relu', name='Conv2')
+            net = conv_layer(net, 64, 4, 2, activation='linear', name='Conv2')
             self._add_trainable(net)
+            net = tf.nn.relu(net)
 
             net = tflearn.flatten(net)
             net = fc_layer(net, 256, activation='relu', name='FC3')
@@ -366,8 +368,8 @@ class ActorCriticNN(object):
             self._add_trainable(encoding)
 
             # We will use the linear conv activation of conv1 and conv2 and inject those in their mirrored decoding layers
-            conv1 = self.layers["{}/HiddenLayers/Conv1/Relu:0".format(self.agent_name)]
-            conv2 = self.layers["{}/HiddenLayers/Conv2/Relu:0".format(self.agent_name)]
+            conv1 = self.layers["{}/HiddenLayers/Conv1/BiasAdd:0".format(self.agent_name)]
+            conv2 = self.layers["{}/HiddenLayers/Conv2/BiasAdd:0".format(self.agent_name)]
 
             # Now we can compute the 'transformation layer' which we will be put into the decoding stream
             transformation = tflearn.fully_connected(tf.mul(action_embedding, encoding),
