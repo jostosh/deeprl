@@ -107,7 +107,7 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, n_step
         with tf.name_scope("Reshaping"):
             _, _, h, w, _ = incoming.get_shape().as_list()
             n_pad = 2 * (outer_filter_size // 2) if padding == 'SAME' else 0
-            state_shape = [1, (h - outer_filter_size + n_pad) // stride + 1, (w - outer_filter_size + n_pad) // stride + 1,
+            state_shape = [None, (h - outer_filter_size + n_pad) // stride + 1, (w - outer_filter_size + n_pad) // stride + 1,
                            2 * num_features]
             output_shape = [-1] + state_shape[1:]
 
@@ -121,6 +121,20 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, n_step
             outputs.b = b
 
         return outputs, tf.slice(new_state, tf.concat(0, [n_steps-1, 3*[0]]), 4 * [-1]), initial_state
+
+
+def conv_transpose(incoming, nb_filter, size, stride, activation=tf.nn.elu):
+    b, h, w, n_in = incoming.get_shape().as_list()
+    d = 1 / np.sqrt(size * size * n_in)
+    W = tf.Variable(tf.random_uniform([size, size, nb_filter, n_in], minval=-d, maxval=d))
+    b = tf.Variable(tf.random_uniform([nb_filter], minval=-d, maxval=d))
+
+    output_shape = tf.convert_to_tensor([b, h * stride, w * stride, nb_filter])
+    conv = tf.nn.conv2d_transpose(incoming, W, output_shape, strides=[1, stride, stride, 1], padding='SAME')
+
+    out = activation(tf.nn.bias_add(conv, b))
+    return out
+
 
 
 def spatialsoftmax(incoming, epsilon=0.01):
