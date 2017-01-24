@@ -114,8 +114,6 @@ class A3CAgent(object):
                 current_lr = hyperparameters.learning_rate - hyperparameters.learning_rate / hyperparameters.T_max * T
                 epr += rewards[i]
 
-                hyperparameters.fplc *= 0.999999
-
             if hyperparameters.clip_rewards:
                 # Reward clipping helps to stabilize training
                 rewards = np.clip(rewards, -1.0, 1.0)

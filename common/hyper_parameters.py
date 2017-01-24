@@ -35,7 +35,7 @@ config1 = {
     'optimality_tightening': False,
     'param_sweep': "",
     'score_at_10m': -10.,
-    'fplc': 0.01,
+    'fplc': 0.001,
     'otc': 1.,
     'feedback': False
 }
