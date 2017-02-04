@@ -2,9 +2,7 @@ from tensorflow.python.summary import event_accumulator
 import argparse
 import os
 import pickle
-from deeprl.common.primitive_utils import sorted_dict
 import json
-import pprint
 from tensorflow.python.summary.event_accumulator import IsTensorFlowEventsFile, EventAccumulator
 from deeprl.common.hyper_parameters import HyperParameters
 import numpy as np
@@ -12,17 +10,10 @@ from matplotlib import pyplot as plt
 plt.style.use('ggplot')
 import matplotlib as mpl
 
-#mpl.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
-#mpl.rc('text', usetex=True)
-
-#rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
-## for Palatino and other serif fonts use:
-#rc('font',**{'family':'serif','serif':['Palatino']})
-#rc('text', usetex=True)
-
-import plotly.offline as py
-import time
-from plotly.graph_objs import *
+mpl.rc('text', usetex=True)
+mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman']})
+mpl.rc('xtick', labelsize=12)
+mpl.rc('ytick', labelsize=12)
 import colorlover as cl
 
 
@@ -31,31 +22,6 @@ colorscalen = []
 
 for c in cl.to_numeric(colorscale):
     colorscalen.append((c[0]/255., c[1]/255, c[2]/255))
-
-layout = Layout(
-    paper_bgcolor='rgb(255,255,255)',
-    plot_bgcolor='rgb(230,230,230)',
-    xaxis=XAxis(
-        gridcolor='rgb(255,255,255)',
-        showgrid=True,
-        showline=False,
-        showticklabels=True,
-        tickcolor='rgb(127,127,127)',
-        ticks='outside',
-        zeroline=False
-    ),
-    yaxis=YAxis(
-        gridcolor='rgb(255,255,255)',
-        showgrid=True,
-        showline=False,
-        showticklabels=True,
-        tickcolor='rgb(127,127,127)',
-        ticks='outside',
-        zeroline=False
-    ),
-    legend=Legend(font=Font(family='Times New Roman', size=18)),
-    font=Font(family='Times New Roman', size=18)
-)
 
 
 def event_arrays_to_np_arrays(event_array):
@@ -69,8 +35,8 @@ def event_arrays_to_np_arrays(event_array):
 
     error_by_step = {}
     for step, val in value_by_step.items():
-        error_by_step[step] = np.std(val)
-        value_by_step[step] = np.mean(val)
+        error_by_step[step] = 0#np.std(val)
+        value_by_step[step] = np.max(val)
 
     steps = np.asarray([k for k in value_by_step.keys()])
     values = np.asarray([v for v in value_by_step.values()])
@@ -107,7 +73,6 @@ def export_plots():
     for env, event_files_by_hp in event_files_by_hp_by_env.items():
         hp_idx = 0
 
-        data_objs = []
         handles = []
         for hyper_parameters_str, event_files in sorted(event_files_by_hp.items()):
             hyper_parameters = json.loads(hyper_parameters_str)
@@ -135,28 +100,6 @@ def export_plots():
                 values = np.asarray(values)
                 errors = np.asarray(errors)
 
-                #print("Now considering {}".format(scalar))
-                pprint.pprint(hyper_parameters)
-
-                '''
-                trace = Scatter(
-                    x=np.concatenate([steps, steps[::-1]]),
-                    y=np.concatenate([values+errors, (values-errors)[::-1]]),
-                    fill='tozerox',
-                    fillcolor=colorscale[hp_idx].replace('rgb', 'rgba').replace(')', ',0.2)'),#'rgba(0,100,80,0.2)',
-                    line=Line(color='transparent'),
-                    showlegend=False
-                )
-                line = Scatter(
-                    x=steps,
-                    y=values,
-                    line=Line(color=colorscale[hp_idx], width=2),
-                    mode='lines',
-                    name=obtain_name(hyper_parameters)
-                )
-                data_objs += [trace, line]
-                '''
-
                 hp_idx += 1
 
                 plt.fill_between(steps, values - errors, values + errors, facecolor=colorscalen[hp_idx],
@@ -164,30 +107,19 @@ def export_plots():
 
                 handles.append(plt.plot(steps, values, color=colorscalen[hp_idx], linewidth=2.0,
                                             label=obtain_name(hyper_parameters))[0])
-                #print(errors[:10])
+        position_by_env = {
+            'Breakout-v0': 'upper left',
+            'Pong-v0': 'lower right',
+            'BeamRider-v0': 'upper left'
+        }
+
         plt.xlabel('Train episode')
         plt.ylabel('Score')
         plt.title(env.replace('-v0', ''))
-        plt.legend(handles=handles)
+        plt.legend(handles=handles, loc=position_by_env[env], framealpha=0.)
 
-        plt.savefig(os.path.join(args.output_dir, env + args.image_suffix + '.pdf'))
+        plt.savefig(os.path.join(args.output_dir, env.replace('-v0', '') + args.image_suffix + '.pdf'))
         plt.clf()
-        #plt.show()
-
-        #layout.update({'title': env.replace('-v0', '')})
-        #data = Data(data_objs)
-        #fig = Figure(data=data, layout=layout)
-        #py.plot(fig)
-        #time.sleep(5)
-
-
-                #plt.rc('font', family='serif')
-                #plt.plot(steps, values, 'k-')
-                #plt.fill_between(steps, values - errors, values + errors, facecolor='green')
-                #plt.grid(True, color='w', linestyle='-', linewidth=2)
-                #plt.gca().patch.set_facecolor('0.8')
-                #plt.show()
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_dir")
