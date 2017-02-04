@@ -35,8 +35,8 @@ def event_arrays_to_np_arrays(event_array):
 
     error_by_step = {}
     for step, val in value_by_step.items():
-        error_by_step[step] = 0#np.std(val)
-        value_by_step[step] = np.max(val)
+        error_by_step[step] = np.std(val)
+        value_by_step[step] = np.mean(val)
 
     steps = np.asarray([k for k in value_by_step.keys()])
     values = np.asarray([v for v in value_by_step.values()])
