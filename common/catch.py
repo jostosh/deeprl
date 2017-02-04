@@ -17,27 +17,22 @@ class CatchEnv():
         self.vy = 1
         self.ballx, self.bally = np.random.randint(24), 4
         self.image[self.bally, self.ballx] = 1
-        #print(self.image[-1, self.pos-2:self.pos+3].shape)
-        #print(self.pos)
-        self.image[-5, self.pos-2:self.pos+3] = np.ones(5)
+        self.image[-5, self.pos - 2:self.pos + 3] = np.ones(5)
 
         return self.step(2)[0]
 
 
     def step(self, action):
         def left():
-            if self.pos > 2:
-                self.image[-5, self.pos+2] = 0
-                self.pos -= 1
-                self.image[-5, self.pos-2] = 1
+            if self.pos > 3:
+                self.pos -= 2
         def right():
-            if self.pos < 21:
-                self.image[-5, self.pos-2] = 0
-                self.pos += 1
-                self.image[-5, self.pos+2] = 1
+            if self.pos < 20:
+                self.pos += 2
         def noop():
             pass
         {0: left, 1: right, 2: noop}[action]()
+
 
         self.image[self.bally, self.ballx] = 0
         self.ballx += self.vx
@@ -50,6 +45,8 @@ class CatchEnv():
             self.vx *= -1
         self.image[self.bally, self.ballx] = 1
 
+        self.image[-5].fill(0)
+        self.image[-5, self.pos-2:self.pos+3] = np.ones(5)
 
         terminal = self.bally == 23 - 4
         reward = int(self.pos - 2 <= self.ballx <= self.pos + 2) if terminal else 0
