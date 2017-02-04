@@ -26,7 +26,7 @@ from plotly.graph_objs import *
 import colorlover as cl
 
 
-colorscale = cl.scales['12']['qual']['Paired']
+colorscale = cl.scales['8']['qual']['Dark2']
 colorscalen = []
 
 for c in cl.to_numeric(colorscale):
@@ -63,7 +63,9 @@ def event_arrays_to_np_arrays(event_array):
     for event in event_array:
         for scalar_event in event:
             if scalar_event.step not in value_by_step:
-                value_by_step[scalar_event.step] = scalar_event.value
+                value_by_step[scalar_event.step] = [scalar_event.value]
+            else:
+                value_by_step[scalar_event.step].append(scalar_event.value)
 
     error_by_step = {}
     for step, val in value_by_step.items():
@@ -133,7 +135,7 @@ def export_plots():
                 values = np.asarray(values)
                 errors = np.asarray(errors)
 
-                print("Now considering {}".format(scalar))
+                #print("Now considering {}".format(scalar))
                 pprint.pprint(hyper_parameters)
 
                 '''
@@ -157,16 +159,18 @@ def export_plots():
 
                 hp_idx += 1
 
+                plt.fill_between(steps, values - errors, values + errors, facecolor=colorscalen[hp_idx],
+                                 alpha=0.2)
+
                 handles.append(plt.plot(steps, values, color=colorscalen[hp_idx], linewidth=2.0,
                                             label=obtain_name(hyper_parameters))[0])
-                plt.fill_between(steps, values - errors, values + errors, facecolor=colorscalen[hp_idx] + (0.2,))
-
+                #print(errors[:10])
         plt.xlabel('Train episode')
         plt.ylabel('Score')
         plt.title(env.replace('-v0', ''))
         plt.legend(handles=handles)
 
-        plt.savefig(os.path.join(args.output_dir, env + '.eps'))
+        plt.savefig(os.path.join(args.output_dir, env + args.image_suffix + '.pdf'))
         plt.clf()
         #plt.show()
 
@@ -189,6 +193,7 @@ if __name__ == "__main__":
     parser.add_argument("--input_dir")
     parser.add_argument("--output_dir", default='/home/jos/Dropbox/RUG/6e Jaar/mproj/thesis/im')
     parser.add_argument("--scalar_subset", nargs='+', default=None)
+    parser.add_argument("--image_suffix", default="")
     args = parser.parse_args()
 
     export_plots()
