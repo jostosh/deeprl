@@ -153,6 +153,8 @@ class A3CAgent(object):
             else:
                 lower_limits = upper_limits = None
 
+            hyperparameters.fplc *= hyperparameters.fp_decay
+
             # Now update the global approximator's parameters
             summaries = self.local_network.update_params(actions=actions[:batch_len],
                                                          states=states[:batch_len],

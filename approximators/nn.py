@@ -389,7 +389,8 @@ class ActorCriticNN(object):
             self.summaries.append(tf.summary.scalar('{}/FramePredictionLoss'.format(self.agent_name),
                                                     frame_prediction_loss))
 
-        self.loss += self.hp.fplc * frame_prediction_loss
+        self.fp_loss_coeff = tf.placeholder(tf.float32)
+        self.loss += self.fp_loss_coeff * frame_prediction_loss
 
     def build_param_sync(self):
         with tf.name_scope("ParamSynchronization"):
@@ -544,7 +545,8 @@ class ActorCriticNN(object):
                 self.advantage_no_grad: n_step_returns - values
             }
             if self.frame_prediction:
-                fdict.update({self.frame_target: [s[-1:, :, :] for s in states[1:]] + [last_state[-1:, :, :]]})
+                fdict.update({self.frame_target: [s[-1:, :, :] for s in states[1:]] + [last_state[-1:, :, :]],
+                              self.fp_loss_coeff: self.hp.fplc})
             if upper_limits and lower_limits:
                 fdict.update({self.upper_limits: upper_limits, self.lower_limits: lower_limits})
 
@@ -566,7 +568,8 @@ class ActorCriticNN(object):
                 self.advantage_no_grad: n_step_returns - values
             }
             if self.frame_prediction:
-                fdict.update({self.frame_target: [s[-1:, :, :] for s in states[1:]] + [last_state[-1:, :, :]]})
+                fdict.update({self.frame_target: [s[-1:, :, :] for s in states[1:]] + [last_state[-1:, :, :]],
+                              self.fp_loss_coeff: self.hp.fplc})
             if upper_limits and lower_limits:
                 fdict.update({self.upper_limits: upper_limits, self.lower_limits: lower_limits})
 
