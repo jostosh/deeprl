@@ -39,14 +39,14 @@ def policy_quantization(incoming, n_prototypes, advantage):
     return winning_prototypes, policy_quantization_loss
 
 
-def conv_layer(incoming, n_filters, filter_size, stride, activation, name):
+def conv_layer(incoming, n_filters, filter_size, stride, activation, name, padding='valid'):
     _, kh, kw, input_channels = incoming.get_shape().as_list()
     d = 1.0 / np.sqrt(filter_size * filter_size * input_channels)
     weight_init = tf.random_uniform([filter_size, filter_size, input_channels, n_filters], minval=-d, maxval=d)
     bias_init   = tf.random_uniform([n_filters], minval=-d, maxval=d)
 
     return tflearn.conv_2d(incoming=incoming, nb_filter=n_filters, filter_size=filter_size, strides=stride,
-                           padding='valid', activation=activation, weights_init=weight_init, bias_init=bias_init,
+                           padding=padding, activation=activation, weights_init=weight_init, bias_init=bias_init,
                            weight_decay=0.0, name=name)
 
 
@@ -89,6 +89,8 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, n_step
                 c, h = tf.split(3, 2, lstm_state)
 
                 conv_x = tf.nn.conv2d(x, W_x_to_ijfo, strides=[1, stride, stride, 1], padding=padding)
+                print(conv_x.get_shape().as_list())
+
                 if inner_depthwise:
                     conv_h = tf.nn.depthwise_conv2d(h, W_h_to_ijfo, strides=4 * [1], padding='SAME')
                 else:
@@ -107,34 +109,36 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, n_step
         with tf.name_scope("Reshaping"):
             _, _, h, w, _ = incoming.get_shape().as_list()
             n_pad = 2 * (outer_filter_size // 2) if padding == 'SAME' else 0
-            state_shape = [None, (h - outer_filter_size + n_pad) // stride + 1, (w - outer_filter_size + n_pad) // stride + 1,
+            state_shape = [None,
+                           (h - outer_filter_size + n_pad) // stride + 1,
+                           (w - outer_filter_size + n_pad) // stride + 1,
                            2 * num_features]
             output_shape = [-1] + state_shape[1:]
 
-            initial_state = tf.placeholder(tf.float32, state_shape)
+            initial_state = tf.placeholder(tf.float32, state_shape, name='ConvLSTMInitialState')
             new_state = tf.reshape(tf.scan(lstm_step, incoming, initializer=initial_state, parallel_iterations=1),
-                                   output_shape)
+                                   output_shape, name='NewState')
 
             _, outputs = tf.split(3, 2, new_state)
 
             outputs.W = [W_h_to_ijfo, W_x_to_ijfo]
             outputs.b = b
 
-        return outputs, tf.slice(new_state, tf.concat(0, [n_steps-1, 3*[0]]), 4 * [-1]), initial_state
+        #return outputs, tf.slice(new_state, tf.concat(0, [n_steps-1, 3*[0]]), 4 * [-1]), initial_state
+        return outputs, new_state[-1], initial_state
 
 
 def conv_transpose(incoming, nb_filter, size, stride, activation=tf.nn.elu):
-    b, h, w, n_in = incoming.get_shape().as_list()
+    _, h, w, n_in = incoming.get_shape().as_list()
     d = 1 / np.sqrt(size * size * n_in)
     W = tf.Variable(tf.random_uniform([size, size, nb_filter, n_in], minval=-d, maxval=d))
     b = tf.Variable(tf.random_uniform([nb_filter], minval=-d, maxval=d))
 
-    output_shape = tf.convert_to_tensor([b, h * stride, w * stride, nb_filter])
+    output_shape = [-1, h * stride, w * stride, nb_filter]
     conv = tf.nn.conv2d_transpose(incoming, W, output_shape, strides=[1, stride, stride, 1], padding='SAME')
 
     out = activation(tf.nn.bias_add(conv, b))
     return out
-
 
 
 def spatialsoftmax(incoming, epsilon=0.01):
