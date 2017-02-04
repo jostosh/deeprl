@@ -20,7 +20,7 @@ import time
 from plotly.graph_objs import *
 import colorlover as cl
 
-colorscale = cl.scales['11']['qual']['Set3']
+colorscale = cl.scales['12']['qual']['Paired']
 
 layout = Layout(
     paper_bgcolor='rgb(255,255,255)',
@@ -124,7 +124,7 @@ def export_plots():
                 line = Scatter(
                     x=steps,
                     y=values,
-                    line=Line(color=colorscale[hp_idx]),
+                    line=Line(color=colorscale[hp_idx], width=4),
                     mode='lines'
                 )
                 data_objs += [trace, line]
