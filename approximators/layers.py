@@ -60,7 +60,7 @@ def fc_layer(incoming, n_out, activation, name):
                                    bias_init=bias_init, weight_decay=0.0, name=name)
 
 
-def convolutional_lstm(incoming, outer_filter_size, num_features, stride, n_steps, inner_filter_size=None, forget_bias=1.0,
+def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_filter_size=None, forget_bias=1.0,
                        activation=tf.nn.tanh, padding='VALID', inner_depthwise=False):
     n_input_features = incoming.get_shape().as_list()[-1]
 
@@ -68,29 +68,22 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, n_step
 
         with tf.name_scope("ConvLSTMWeights"):
             def get_conv_W(filter_size, n_in_features, n_out_features, name):
-                d = 1.0 / np.sqrt(filter_size * filter_size * (1 if inner_depthwise else n_in_features))
-                weight_init = tf.random_uniform([filter_size, filter_size, n_in_features, n_out_features],
-                                                minval=-d, maxval=d)
-                return tf.Variable(weight_init, name=name)
+                return tf.Variable(tflearn.initializations.truncated_normal(
+                    [filter_size, filter_size, n_in_features, n_out_features]), name=name)
 
+            W_x_to_ijfo = get_conv_W(outer_filter_size, n_input_features, num_features * 4, name='Wh')
             if inner_depthwise:
-                W_h_to_ijfo = get_conv_W(outer_filter_size, num_features, 4, name='Wh')
+                W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, 4, name='Wx')
             else:
-                W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, num_features * 4, name='Wh')
+                W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, num_features * 4, name='Wx')
 
-            W_x_to_ijfo = get_conv_W(outer_filter_size, n_input_features, num_features * 4, name='Wx')
-
-            d = 1.0 / np.sqrt(outer_filter_size * outer_filter_size * n_input_features)
-            bias_init = tf.random_uniform([4 * num_features], minval=-d, maxval=d)
-            b = tf.Variable(bias_init, dtype=tf.float32, name='Bias')
+            b = tf.Variable(tf.zeros(4 * num_features), dtype=tf.float32, name='Bias')
 
         def lstm_step(lstm_state, x):
             with tf.name_scope("ConvLSTMStep"):
                 c, h = tf.split(3, 2, lstm_state)
 
                 conv_x = tf.nn.conv2d(x, W_x_to_ijfo, strides=[1, stride, stride, 1], padding=padding)
-                print(conv_x.get_shape().as_list())
-
                 if inner_depthwise:
                     conv_h = tf.nn.depthwise_conv2d(h, W_h_to_ijfo, strides=4 * [1], padding='SAME')
                 else:
@@ -107,36 +100,40 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, n_step
                 return tf.concat(3, [new_c, new_h])
 
         with tf.name_scope("Reshaping"):
-            _, _, h, w, _ = incoming.get_shape().as_list()
+            _, batch_size, h, w, _ = incoming.get_shape().as_list()
             n_pad = 2 * (outer_filter_size // 2) if padding == 'SAME' else 0
-            state_shape = [None,
+            state_shape = [batch_size,
                            (h - outer_filter_size + n_pad) // stride + 1,
                            (w - outer_filter_size + n_pad) // stride + 1,
                            2 * num_features]
             output_shape = [-1] + state_shape[1:]
+            #print(state_shape)
 
-            initial_state = tf.placeholder(tf.float32, state_shape, name='ConvLSTMInitialState')
-            new_state = tf.reshape(tf.scan(lstm_step, incoming, initializer=initial_state, parallel_iterations=1),
-                                   output_shape, name='NewState')
+            initial_state = tf.placeholder(tf.float32, state_shape, name='ConvLSTMState')
+            new_state = tf.reshape(tf.scan(lstm_step, incoming, initializer=initial_state), output_shape)
 
             _, outputs = tf.split(3, 2, new_state)
 
             outputs.W = [W_h_to_ijfo, W_x_to_ijfo]
             outputs.b = b
 
-        #return outputs, tf.slice(new_state, tf.concat(0, [n_steps-1, 3*[0]]), 4 * [-1]), initial_state
-        return outputs, new_state[-1], initial_state
+    return outputs, new_state[-1:], initial_state
 
 
 def conv_transpose(incoming, nb_filter, size, stride, activation=tf.nn.elu):
     _, h, w, n_in = incoming.get_shape().as_list()
+    #print(h,w,n_in)
     d = 1 / np.sqrt(size * size * n_in)
     W = tf.Variable(tf.random_uniform([size, size, nb_filter, n_in], minval=-d, maxval=d))
     b = tf.Variable(tf.random_uniform([nb_filter], minval=-d, maxval=d))
 
-    output_shape = [-1, h * stride, w * stride, nb_filter]
-    conv = tf.nn.conv2d_transpose(incoming, W, output_shape, strides=[1, stride, stride, 1], padding='SAME')
+    batch_size = tf.gather(tf.shape(incoming), tf.constant([0]))
 
+    output_shape = [h * stride, w * stride, nb_filter]
+    complete_out_shape = tf.concat(0, [batch_size, tf.constant(output_shape)])
+
+    conv = tf.nn.conv2d_transpose(incoming, W, complete_out_shape, strides=[1, stride, stride, 1], padding='SAME')
+    conv.set_shape([None] + output_shape)
     out = activation(tf.nn.bias_add(conv, b))
     return out
 

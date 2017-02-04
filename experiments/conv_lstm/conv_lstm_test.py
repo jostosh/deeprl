@@ -55,11 +55,12 @@ def train():
         net = conv_layer(net, 8, 3, 1, tf.nn.elu, 'encode_2', 'same')
         net = conv_layer(net, 8, 3, 2, tf.nn.elu, 'encode_3', 'same')
         net = conv_layer(net, 4, 1, 1, tf.nn.elu, 'encode_4', 'same')
+        print("HAAAAI", net.get_shape().as_list())
         net, _, initial_state = convolutional_lstm(tf.reshape(net, [FLAGS.seq_length, FLAGS.batch_size, 8, 8, 4]),
                                                    outer_filter_size=3,
                                                    num_features=4,
                                                    stride=1,
-                                                   n_steps=np.asarray([FLAGS.seq_length], dtype='int32'),
+                                                   #n_steps=np.asarray([FLAGS.seq_length], dtype='int32'),
                                                    inner_filter_size=3,
                                                    padding='SAME')
         print("HAAAAI", net.get_shape().as_list())
@@ -112,7 +113,7 @@ def train():
 
             assert not np.isnan(loss_r), 'Model diverged with loss = NaN'
 
-            if step % 1000 == 0:
+            if step % 1000 == 0 and step != 0:
                 checkpoint_path = os.path.join(FLAGS.train_dir, 'model.ckpt')
                 saver.save(sess, checkpoint_path, global_step=step)
                 print("saved to " + FLAGS.train_dir)
@@ -122,7 +123,8 @@ def train():
                 video = cv2.VideoWriter()
                 success = video.open("generated_conv_lstm_video.mov", fourcc, 4, (180, 180), True)
                 dat_gif = dat
-                ims = sess.run(out, feed_dict={x: dat_gif[:-1]}).reshape((FLAGS.seq_length, FLAGS.batch_size, 32, 32, 3))
+                ims = sess.run(out, feed_dict={x: dat_gif[:-1],
+                                               initial_state: start_state}).reshape((FLAGS.seq_length, FLAGS.batch_size, 32, 32, 3))
                 ims = ims[:, 0, :, :, :]
                 for i in range(FLAGS.seq_length):
                     x_1_r = np.uint8(np.maximum(ims[i, :, :, :], 0) * 255)
