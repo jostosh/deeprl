@@ -170,7 +170,7 @@ class A3CAgent(object):
                 writer.add_summary(summaries, self.t)
 
             if terminal_state:
-                if n_updates % 5 == 0:
+                if n_updates % 20 == 0:
                     logger.info('Terminal state reached (episode {}, reward {}, lr {:.5f}, T {}): resetting state'.format(
                         self.n_episodes, epr, current_lr, T))
 
