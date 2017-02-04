@@ -3,12 +3,15 @@ import gym
 import numpy as np
 from copy import deepcopy
 import tensorflow as tf
+from deeprl.common.catch import CatchEnv
 
 
 def get_env(env, frames_per_state=4, output_shape=None, session=None):
     if env in ['Breakout-v0', 'Pong-v0', 'BeamRider-v0', 'Qbert-v0', 'SpaceInvaders-v0']:
         return AtariEnvironment(env.replace('-', 'Deterministic-'), frames_per_state, output_shape=output_shape,
                                 session=session)
+    elif env == 'Catch':
+        return CatchEnv(frames_per_state)
     return ClassicControl(env)
 
 
