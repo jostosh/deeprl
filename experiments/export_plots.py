@@ -9,22 +9,32 @@ from tensorflow.python.summary.event_accumulator import IsTensorFlowEventsFile, 
 from deeprl.common.hyper_parameters import HyperParameters
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib import rc
-rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
+plt.style.use('ggplot')
+import matplotlib as mpl
+
+#mpl.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
+#mpl.rc('text', usetex=True)
+
+#rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
 ## for Palatino and other serif fonts use:
 #rc('font',**{'family':'serif','serif':['Palatino']})
-rc('text', usetex=True)
+#rc('text', usetex=True)
 
 import plotly.offline as py
 import time
 from plotly.graph_objs import *
 import colorlover as cl
 
+
 colorscale = cl.scales['12']['qual']['Paired']
+colorscalen = []
+
+for c in cl.to_numeric(colorscale):
+    colorscalen.append((c[0]/255., c[1]/255, c[2]/255))
 
 layout = Layout(
     paper_bgcolor='rgb(255,255,255)',
-    plot_bgcolor='rgb(229,229,229)',
+    plot_bgcolor='rgb(230,230,230)',
     xaxis=XAxis(
         gridcolor='rgb(255,255,255)',
         showgrid=True,
@@ -43,7 +53,10 @@ layout = Layout(
         ticks='outside',
         zeroline=False
     ),
+    legend=Legend(font=Font(family='Times New Roman', size=18)),
+    font=Font(family='Times New Roman', size=18)
 )
+
 
 def event_arrays_to_np_arrays(event_array):
     value_by_step = {}
@@ -61,6 +74,13 @@ def event_arrays_to_np_arrays(event_array):
     values = np.asarray([v for v in value_by_step.values()])
     errors = np.asarray([v for v in error_by_step.values()])
     return steps, values, errors
+
+
+def obtain_name(hp):
+    return hp['model'].upper().replace('_', '-') + \
+        (' {}FP'.format('r' if hp['residual_prediction'] else '') if hp['frame_prediction'] else '') + \
+        (' OT' if hp['optimality_tightening'] else '') + \
+        ' ({})'.format(hp['t_max'])
 
 
 def export_plots():
@@ -86,7 +106,8 @@ def export_plots():
         hp_idx = 0
 
         data_objs = []
-        for hyper_parameters_str, event_files in event_files_by_hp.items():
+        handles = []
+        for hyper_parameters_str, event_files in sorted(event_files_by_hp.items()):
             hyper_parameters = json.loads(hyper_parameters_str)
             events_by_scalar = {}
             print("Currently looking at {} event files".format(len(event_files)))
@@ -95,6 +116,8 @@ def export_plots():
                 ea.Reload()
                 for scalar in ea.Tags()['scalars']:
                     if args.scalar_subset and scalar not in args.scalar_subset:
+                        continue
+                    if scalar != 'Evaluation/Score':
                         continue
                     items = ea.Scalars(scalar)
                     if scalar not in events_by_scalar:
@@ -113,6 +136,7 @@ def export_plots():
                 print("Now considering {}".format(scalar))
                 pprint.pprint(hyper_parameters)
 
+                '''
                 trace = Scatter(
                     x=np.concatenate([steps, steps[::-1]]),
                     y=np.concatenate([values+errors, (values-errors)[::-1]]),
@@ -124,16 +148,33 @@ def export_plots():
                 line = Scatter(
                     x=steps,
                     y=values,
-                    line=Line(color=colorscale[hp_idx], width=4),
-                    mode='lines'
+                    line=Line(color=colorscale[hp_idx], width=2),
+                    mode='lines',
+                    name=obtain_name(hyper_parameters)
                 )
                 data_objs += [trace, line]
+                '''
+
                 hp_idx += 1
 
-        data = Data(data_objs)
-        fig = Figure(data=data, layout=layout)
-        py.plot(fig)
-        time.sleep(5)
+                handles.append(plt.plot(steps, values, color=colorscalen[hp_idx], linewidth=2.0,
+                                            label=obtain_name(hyper_parameters))[0])
+                plt.fill_between(steps, values - errors, values + errors, facecolor=colorscalen[hp_idx] + (0.2,))
+
+        plt.xlabel('Train episode')
+        plt.ylabel('Score')
+        plt.title(env.replace('-v0', ''))
+        plt.legend(handles=handles)
+
+        plt.savefig(os.path.join(args.output_dir, env + '.eps'))
+        plt.clf()
+        #plt.show()
+
+        #layout.update({'title': env.replace('-v0', '')})
+        #data = Data(data_objs)
+        #fig = Figure(data=data, layout=layout)
+        #py.plot(fig)
+        #time.sleep(5)
 
 
                 #plt.rc('font', family='serif')
@@ -146,7 +187,7 @@ def export_plots():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_dir")
-    parser.add_argument("--output_dir")
+    parser.add_argument("--output_dir", default='/home/jos/Dropbox/RUG/6e Jaar/mproj/thesis/im')
     parser.add_argument("--scalar_subset", nargs='+', default=None)
     args = parser.parse_args()
 
