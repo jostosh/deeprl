@@ -13,8 +13,8 @@ import cv2
 from matplotlib import pyplot as plt
 plt.style.use('ggplot')
 import matplotlib as mpl
-import colorlover as cl
-
+import signal
+import sys
 #mpl.rc('text', usetex=True)
 #mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman']})
 mpl.rc('xtick', labelsize=20)
@@ -46,9 +46,19 @@ if __name__ == "__main__":
     sess.run(tf.global_variables_initializer())
     saver.restore(sess, model_checkpoint_path)
 
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
     video_out = os.path.join(args.model_dir, 'video.avi')
-    out = cv2.VideoWriter(video_out, fourcc, 20.0, (692, 947))
+    out = cv2.VideoWriter(video_out, fourcc, 15., (947, 692), isColor=True)
+
+
+    def signal_handler(signal, frame):
+        print("Writing video")
+        out.release()
+        print("Closing...")
+        cv2.destroyAllWindows()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
 
     env = get_env(hp.env, hp.frames_per_state, hp.input_shape[1:])
 
@@ -182,8 +192,9 @@ if __name__ == "__main__":
                 #cv2.waitKey(1)
 
                 result = np.concatenate((all_convs.copy(), resized_env_and_plot.copy()), axis=1)
-
+                print("Iter: {}".format(iter))
                 out.write((result * 255.0).astype('u1'))
+
 
 
                 #cv2.imshow('all_convs', result)
