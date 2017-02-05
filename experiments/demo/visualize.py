@@ -10,6 +10,19 @@ from tensorflow.contrib.framework.python.framework.checkpoint_utils import list_
 import time
 import numpy as np
 import cv2
+from matplotlib import pyplot as plt
+plt.style.use('ggplot')
+import matplotlib as mpl
+import colorlover as cl
+
+mpl.rc('text', usetex=True)
+mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman']})
+mpl.rc('xtick', labelsize=14)
+mpl.rc('ytick', labelsize=14)
+mpl.rc('figure', facecolor="#ccffcc")
+mpl.rc('axes', facecolor="#f2f2f2")
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 
 if __name__ == "__main__":
@@ -37,39 +50,53 @@ if __name__ == "__main__":
 
     pprint.pprint([op.name for op in sess.graph.get_operations()])
 
-    font = cv2.FONT_HERSHEY_PLAIN
+    font = cv2.FONT_HERSHEY_SIMPLEX
+
+    fig, axes = plt.subplots(ncols=1, nrows=2)
+    canvas = fig.canvas
+    ax1, ax2 = axes.ravel()
 
     title_image = np.zeros((20, (1 + 20*2+2 + 9*2+2)*4, 3), dtype='float32')
-    title_image[:, :, 2] = 204/255.
-    title_image[:, :, 1] = 255/255.
-    title_image[:, :, 0] = 204/255.
 
-    cv2.putText(title_image, "Conv1", (5, 15), font, 1, (0., 0., 0.), bottomLeftOrigin=False, thickness=2)
-    cv2.putText(title_image, "Conv2", (5 + (20*2 + 2) * 4, 15), font, 1, (0., 0., 0.), bottomLeftOrigin=False,
+    background_color = (204/255., 255/255., 204/255.)
+
+    def set_color(im, c):
+        im[:, :, 2] = c[2]
+        im[:, :, 1] = c[1]
+        im[:, :, 0] = c[0]
+    set_color(title_image, background_color)
+
+    cv2.putText(title_image, "Conv1", (5, 15), font, .5, (0., 0., 0.), bottomLeftOrigin=False, thickness=2)
+    cv2.putText(title_image, "Conv2", (5 + (20*2 + 2) * 4, 15), font, .5, (0., 0., 0.), bottomLeftOrigin=False,
                 thickness=2)
 
     conv1_image = np.zeros((20 * 8 + 8, 1 + 20 * 2 + 2, 3), dtype='float32')
     conv2_image = np.zeros((9 * 16 + 16 + 8, 9 * 2 + 2, 3), dtype='float32')
-
-    conv1_image[:, :, 2] = 204/255.
-    conv2_image[:, :, 2] = 204/255.
-    conv1_image[:, :, 1] = 255/255.
-    conv2_image[:, :, 1] = 255/255.
-    conv1_image[:, :, 0] = 204/255.
-    conv2_image[:, :, 0] = 204/255.
+    set_color(conv1_image, background_color)
+    set_color(conv2_image, background_color)
 
     slice_ms1 = np.ones((8, 2))
     slice_ms2 = np.ones((16, 2))
 
     iter = 1
+
     for _ in range(args.n_episodes):
         state = env.reset_random()
         agent.local_network.reset()
         terminal = False
-        while not terminal:
-            value, action, conv1_out, conv2_out = agent.local_network.get_value_and_action_and_visualize(state, sess)
-            state, r, terminal, _ = env.step(action)
+        value_buffer = []
+        max_val = -1000
+        min_val = 1000
+        episode_step = 0
 
+        while not terminal:
+            value, action, conv1_out, conv2_out, pi = agent.local_network.get_value_and_action_and_visualize(state, sess)
+
+            max_val = max(value, max_val - abs(max_val) * 0.001)
+            min_val = min(value, min_val + abs(min_val) * 0.001)
+
+            state, r, terminal, _ = env.step(action)
+            value_buffer.append(value)
             for i in range(8):
                 for j in range(2):
                     idx = i*2 + j
@@ -88,13 +115,40 @@ if __name__ == "__main__":
                     im = cv2.cvtColor(slice / (mslice if mslice != 0 else 1.), cv2.COLOR_GRAY2RGB)
                     conv2_image[i*9+i:(i+1)*9+i, j*9+j:(j+1)*9+j, :] = im
 
-            all_convs = cv2.resize(np.concatenate((conv1_image, conv2_image), axis=1), None, fx=4, fy=4)
-            all_convs = np.concatenate((title_image, all_convs), axis=0)
-            cv2.imshow('all_convs', all_convs)
-            cv2.waitKey(1)
+            #ax.text(0.0, 0.0, "Conv1", fontsize=45)
+            #ax.axis('off')
+            if episode_step > 10:
+                print(min_val, max_val)
+                ax1.cla()
+                ax2.cla()
+                bar = ax2.bar(range(env.num_actions()), pi)
+                ax2.set_title("Policy")#r"\pi(s,a)")
+                ax2.set_ylabel(r"$\pi(s,a)$", fontsize=16)
+                ax2.set_ylim([0., 1.])
+                ax2.set_xticklabels(env.env.get_action_meanings(), rotation=45)
+                xticks_pos = [0.65 * patch.get_width() + patch.get_xy()[0] for patch in bar]
+                ax2.set_xticks(xticks_pos)
+                ax1.plot(range(episode_step-9, episode_step+1), value_buffer[-10:])
+                ax1.set_title("Value estimate")
+                ax1.set_ylabel(r"$v(s)$", fontsize=16)
+                ax1.set_ylim([min_val, max_val])
+                ax1.set_xlabel(r"Step", fontsize=14)
+                plt.tight_layout()
+                canvas.draw()
+                image = np.fromstring(canvas.tostring_rgb(), dtype='uint8')
+                image = image.reshape(canvas.get_width_height()[::-1] + (3,))
+                cv2.imshow('test', image)
+                cv2.waitKey(1)
+
+                all_convs = cv2.resize(np.concatenate((conv1_image, conv2_image), axis=1), None, fx=4, fy=4)
+                all_convs = np.concatenate((title_image, all_convs), axis=0)
+                cv2.imshow('all_convs', all_convs[:, :, ::-1])
+                cv2.waitKey(1)
+
+                env.env.render()
+                time.sleep(1/60/4)
 
             iter += 1
-            env.env.render()
-            time.sleep(1/60/4)
+            episode_step += 1
 
 
