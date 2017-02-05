@@ -46,8 +46,8 @@ if __name__ == "__main__":
     sess.run(tf.global_variables_initializer())
     saver.restore(sess, model_checkpoint_path)
 
-    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-    video_out = os.path.join(args.model_dir, 'video.avi')
+    fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+    video_out = os.path.join(args.model_dir, 'video.mp4')
     out = cv2.VideoWriter(video_out, fourcc, 15., (947, 692), isColor=True)
 
 
