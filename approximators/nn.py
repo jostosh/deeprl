@@ -537,7 +537,7 @@ class ActorCriticNN(object):
                                                           feed_dict={self.inputs: [state]})
 
         action = np.random.choice(self.num_actions, p=pi[0])
-        return value[0], action, conv1_out, conv2_out
+        return value[0], action, conv1_out, conv2_out, pi[0]
 
     def get_embedding(self, state, session):
         assert self.embedding_layer is not None, "No embedding layer was configured for TensorBoard embeddings"
