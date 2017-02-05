@@ -146,7 +146,7 @@ if __name__ == "__main__":
 
             fc1_image[1:-1, 0:8, :] = cv2.cvtColor(np.reshape(fc1, (32, 8)), cv2.COLOR_GRAY2RGB)
             if display_lstm:
-                lstm_image[1:-1, 0:8, :] = cv2.cvtColor(np.reshape(lstm, (32, 8)), cv2.COLOR_GRAY2RGB)
+                lstm_image[1:-1, 0:8, :] = cv2.cvtColor(np.reshape((lstm + 1.) / 2., (32, 8)), cv2.COLOR_GRAY2RGB)
             #ax.text(0.0, 0.0, "Conv1", fontsize=45)
             #ax.axis('off')
             if episode_step > 10:
@@ -174,8 +174,8 @@ if __name__ == "__main__":
                 resized_env_image = cv2.resize(env_image, (plot_image.shape[1], new_height))
                 plot_and_env = np.concatenate((resized_env_image, plot_image), axis=0) / 255.
 
-
-                all_convs = cv2.resize(np.concatenate((conv1_image, conv2_image), axis=1), None, fx=4, fy=4)
+                all_convs = cv2.resize(np.concatenate((conv1_image, conv2_image), axis=1), None, fx=4, fy=4,
+                                       interpolation=cv2.INTER_NEAREST)
                 fc_image_resized = cv2.resize(fc1_image, (180, all_convs.shape[0]), interpolation=cv2.INTER_NEAREST)
                 if display_lstm:
                     lstm_image_resized = cv2.resize(lstm_image, (180, all_convs.shape[0]), interpolation=cv2.INTER_NEAREST)
@@ -187,12 +187,9 @@ if __name__ == "__main__":
                 new_width = int(factor * plot_and_env.shape[1])
                 resized_env_and_plot = cv2.resize(plot_and_env, (new_width, all_convs.shape[0]))
 
-
-                #cv2.imshow('test', resized_env_and_plot)
-                #cv2.waitKey(1)
-
                 result = np.concatenate((all_convs.copy(), resized_env_and_plot.copy()), axis=1)
-                print("Iter: {}".format(iter))
+                cv2.imshow('Demo', result)
+                cv2.waitKey(1)
                 out.write((result * 255.0).astype('u1'))
 
 
