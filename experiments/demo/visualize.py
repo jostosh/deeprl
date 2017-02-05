@@ -20,7 +20,6 @@ import sys
 mpl.rc('xtick', labelsize=20)
 mpl.rc('ytick', labelsize=20)
 mpl.rc('figure', facecolor="#ccffcc")
-mpl.rc('axes', facecolor="#f2f2f2")
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -48,7 +47,7 @@ if __name__ == "__main__":
 
     fourcc = cv2.VideoWriter_fourcc(*'MP4V')
     video_out = os.path.join(args.model_dir, 'video.mp4')
-    out = cv2.VideoWriter(video_out, fourcc, 15., (947, 692), isColor=True)
+    out = cv2.VideoWriter(video_out, fourcc, 15., (1478, 1080), isColor=True)
 
 
     def signal_handler(signal, frame):
@@ -183,22 +182,19 @@ if __name__ == "__main__":
                 all_convs = np.concatenate((all_convs, fc_image_resized) + (lstm_image_resized,)
                                            if display_lstm else tuple([]), axis=1)
                 all_convs = np.concatenate((title_image, all_convs), axis=0)
-                factor = all_convs.shape[0] / plot_and_env.shape[0]
-                new_width = int(factor * plot_and_env.shape[1])
-                resized_env_and_plot = cv2.resize(plot_and_env, (new_width, all_convs.shape[0]))
 
-                result = np.concatenate((all_convs.copy(), resized_env_and_plot.copy()), axis=1)
+                factor = 1080 / plot_and_env.shape[0]
+                resized_env_and_plot = cv2.resize(plot_and_env, (int(factor * plot_and_env.shape[1]), 1080))
+
+                factor = resized_env_and_plot.shape[0] / all_convs.shape[0]
+                new_width = int(factor * all_convs.shape[1])
+                resized_all_convs = cv2.resize(all_convs, (new_width, 1080), interpolation=cv2.INTER_NEAREST)
+
+                result = np.concatenate((resized_all_convs, resized_env_and_plot), axis=1)
+                print(result.shape)
                 cv2.imshow('Demo', result)
                 cv2.waitKey(1)
                 out.write((result * 255.0).astype('u1'))
-
-
-
-                #cv2.imshow('all_convs', result)
-                #cv2.waitKey(1)
-
-                #env.env.render()
-                #time.sleep(1/60/4)
 
             iter += 1
             episode_step += 1
