@@ -521,10 +521,13 @@ class ActorCriticNN(object):
         """
         conv1 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/Relu:0")
         conv2 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/Relu_1:0")
+        fc1 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/FC3/Relu:0")
+        lstm_out = None
         if self.recurrent:
-            value, pi, self.lstm_state_numeric, conv1_out, conv2_out = session.run(
+            lstm = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/ReshapedLSTMOutput/Reshape:0")
+            value, pi, self.lstm_state_numeric, conv1_out, conv2_out, fc1_out, lstm_out = session.run(
                 [
-                    self.value, self.pi, self.lstm_state_variable, conv1, conv2
+                    self.value, self.pi, self.lstm_state_variable, conv1, conv2, fc1, lstm
                 ],
                 feed_dict={
                     self.inputs: [state],
@@ -533,11 +536,11 @@ class ActorCriticNN(object):
                 }
             )
         else:
-            value, pi, conv1_out, conv2_out = session.run([self.value, self.pi, conv1, conv2],
+            value, pi, conv1_out, conv2_out, fc1 = session.run([self.value, self.pi, conv1, conv2, fc1],
                                                           feed_dict={self.inputs: [state]})
 
         action = np.random.choice(self.num_actions, p=pi[0])
-        return value[0], action, conv1_out, conv2_out, pi[0]
+        return value[0], action, conv1_out, conv2_out, pi[0], fc1_out, lstm_out
 
     def get_embedding(self, state, session):
         assert self.embedding_layer is not None, "No embedding layer was configured for TensorBoard embeddings"
