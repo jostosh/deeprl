@@ -19,7 +19,7 @@ from copy import deepcopy
 
 class A3CAgent(object):
 
-    def __init__(self, env_name, global_network, agent_name, session, optimizer):
+    def __init__(self, env_name, global_network, agent_name, session, optimizer, hp):
         """
         Initializes an Asynchronous Advantage Actor-Critic agent (A3C).
         :param env_name:        Name of the environment
@@ -28,14 +28,14 @@ class A3CAgent(object):
         :param session:         TensorFlow session
         """
         self.env = get_env(env_name,
-                           frames_per_state=hyperparameters.frames_per_state,
-                           output_shape=hyperparameters.input_shape[1:])
+                           frames_per_state=hp.frames_per_state,
+                           output_shape=hp.input_shape[1:])
         self.num_actions = self.env.num_actions()
 
         self.local_network = ActorCriticNN(num_actions=self.num_actions,
                                            agent_name=agent_name,
                                            optimizer=optimizer,
-                                           hyper_parameters=hyperparameters,
+                                           hyper_parameters=hp,
                                            global_network=global_network)
 
         self._train_thread = threading.Thread(target=self._train, name=agent_name)
@@ -46,6 +46,7 @@ class A3CAgent(object):
 
         self.n_episodes = 1
         self.train_episode = 0
+        self.hp = hp
 
     def train(self):
         """
@@ -69,21 +70,21 @@ class A3CAgent(object):
         """
         logger.info('Starting training')
         # Initialize the reward, action and observation arrays
-        rewards = np.zeros(hyperparameters.t_max, dtype='float')
-        values = np.zeros(hyperparameters.t_max + 1, dtype='float')
-        actions = np.zeros(hyperparameters.t_max, dtype='int')
-        n_step_targets = np.zeros(hyperparameters.t_max, dtype='float')
-        states = np.zeros((hyperparameters.t_max,) + self.env.state_shape(), dtype='float')
+        rewards = np.zeros(self.hp.t_max, dtype='float')
+        values = np.zeros(self.hp.t_max + 1, dtype='float')
+        actions = np.zeros(self.hp.t_max, dtype='int')
+        n_step_targets = np.zeros(self.hp.t_max, dtype='float')
+        states = np.zeros((self.hp.t_max,) + self.env.state_shape(), dtype='float')
 
         epr = 0
         total_duration = 0.
 
         T = session.run(T_var)
-        last_checkpoint = T - hyperparameters.evaluation_interval
+        last_checkpoint = T - self.hp.evaluation_interval
         n_updates = 0
 
         # Main loop, execute this while T < T_max
-        while T < hyperparameters.T_max:
+        while T < self.hp.T_max:
             #[arr.fill(0) for arr in [rewards, actions, values, n_step_targets, states]]
             t0 = time.time()
 
@@ -97,7 +98,7 @@ class A3CAgent(object):
             terminal_state = False
 
             # Now take steps following the thread-specific policy given by self.theta and self.theta_v
-            while not terminal_state and self.t - t_start != hyperparameters.t_max:
+            while not terminal_state and self.t - t_start != self.hp.t_max:
 
                 # Index of current step
                 i = self.t - t_start
@@ -111,10 +112,10 @@ class A3CAgent(object):
                 # Increment time counters
                 self.t += 1
                 T = session.run(global_step)
-                current_lr = hyperparameters.learning_rate - hyperparameters.learning_rate / hyperparameters.T_max * T
+                current_lr = self.hp.learning_rate - self.hp.learning_rate / self.hp.T_max * T
                 epr += rewards[i]
 
-            if hyperparameters.clip_rewards:
+            if self.hp.clip_rewards:
                 # Reward clipping helps to stabilize training
                 rewards = np.clip(rewards, -1.0, 1.0)
 
@@ -125,21 +126,21 @@ class A3CAgent(object):
             # Forward view of n-step returns, start from i == t_max - 1 and go to i == 0
             for i in reversed(range(batch_len)):
                 # Straightforward accumulation of rewards
-                n_step_target = rewards[i] + hyperparameters.gamma * n_step_target
+                n_step_target = rewards[i] + self.hp.gamma * n_step_target
                 n_step_targets[i] = n_step_target
 
             # Count the number of updates
             n_updates += 1
 
-            if hyperparameters.optimality_tightening:
+            if self.hp.optimality_tightening:
                 values[batch_len] = n_step_target
                 lower_limits = []
                 for j in range(batch_len):
                     current_max = -np.inf
                     for k in range(batch_len - j):
                         current_max = max(current_max,
-                                          np.sum(rewards[j:j + k + 1] * (hyperparameters.gamma ** np.arange(k + 1))) +
-                                          hyperparameters.gamma ** (k + 1) * values[j + k + 1])
+                                          np.sum(rewards[j:j + k + 1] * (self.hp.gamma ** np.arange(k + 1))) +
+                                          self.hp.gamma ** (k + 1) * values[j + k + 1])
                     lower_limits.append(current_max)
 
                 upper_limits = []
@@ -147,13 +148,13 @@ class A3CAgent(object):
                     current_min = np.inf
                     for k in range(j):
                         current_min = min(current_min, np.sum(rewards[j - k - 1:j] *
-                                                              (hyperparameters.gamma ** np.arange(-k-1, 0))) +
-                                          hyperparameters.gamma ** (-k - 1) * values[j - k - 1])
+                                                              (self.hp.gamma ** np.arange(-k-1, 0))) +
+                                          self.hp.gamma ** (-k - 1) * values[j - k - 1])
                     upper_limits.append(current_min)
             else:
                 lower_limits = upper_limits = None
 
-            hyperparameters.fplc *= hyperparameters.fp_decay
+            self.hp.fplc *= self.hp.fp_decay
 
             # Now update the global approximator's parameters
             summaries = self.local_network.update_params(actions=actions[:batch_len],
@@ -188,11 +189,11 @@ class A3CAgent(object):
                 logger.info("Steps per second: {}, steps per hour: {}".format(1 / mean_duration,
                                                                            3600 / mean_duration))
 
-            if T - last_checkpoint > hyperparameters.evaluation_interval and self.agent_name == 'Agent_0':
+            if T - last_checkpoint > self.hp.evaluation_interval and self.agent_name == 'Agent_0':
                 if isinstance(self.env, AtariEnvironment):
                     mean_score = self.evaluate(50)
 
-                last_checkpoint = T // (hyperparameters.evaluation_interval / 10) * (hyperparameters.evaluation_interval / 10) # round to the nearest 1e6
+                last_checkpoint = T // (self.hp.evaluation_interval / 10) * (self.hp.evaluation_interval / 10) # round to the nearest 1e6
                 logger.info("Storing weights at {}".format(weights_path))
                 saver.save(session, weights_path, global_step=T_var)
                 logger.info("Stored weights!")
@@ -273,22 +274,6 @@ class A3CAgent(object):
 
         return np.mean(returns)
 
-
-def upper_bounds(v_t, r_t, v_end):
-    T = len(r_t)
-
-    R_t = np.array(r_t)
-
-    g = hyperparameters.gamma
-
-    R_t[-1] += g * v_end
-    for i in reversed(range(T - 1)):
-        R_t[i] += g * R_t[i+1]
-
-    return [g ** (-t2) * min([g * v_t[t1] + R_t[-t2] - R_t[t1] for t1 in range(T - t2)])
-            for t2 in range(hyperparameters.t_max)]
-
-
 if __name__ == "__main__":
 
     hyperparameters = HyperParameters(parse_cmd_args())
@@ -317,7 +302,7 @@ if __name__ == "__main__":
                                    optimizer=shared_optimizer)
     shared_optimizer.set_global_theta(global_network.theta) #.build_update(global_network.theta)
 
-    agents = [A3CAgent(env_name, global_network, 'Agent_%d' % i, session, optimizer=shared_optimizer)
+    agents = [A3CAgent(env_name, global_network, 'Agent_%d' % i, session, optimizer=shared_optimizer, hp=hyperparameters)
               for i in range(n_threads)]
 
     writer = writer_new_event(hyperparameters, session)
@@ -341,7 +326,11 @@ if __name__ == "__main__":
     embedding.sprite.single_image_dim.extend([160, 210])
     projector.visualize_embeddings(writer, embedding_config)
 
-    saver = tf.train.Saver(global_network.theta + shared_optimizer.mean_square + [T_var, embedding_var])
+    saver = tf.train.Saver({var.name: var for var in
+                            global_network.theta + shared_optimizer.mean_square + [T_var, embedding_var]})
+
+    print(saver.saver_def)
+    exit(0)
     weights_path = os.path.join(writer.get_logdir(), 'model.ckpt')
     os.makedirs(os.path.dirname(weights_path), exist_ok=True)
 
