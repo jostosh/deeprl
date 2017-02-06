@@ -141,7 +141,7 @@ if __name__ == "__main__":
                     im = cv2.cvtColor(slice / (mslice if mslice != 0 else 1.), cv2.COLOR_GRAY2RGB)
                     conv2_image[i*9+i:(i+1)*9+i, j*9+j:(j+1)*9+j, :] = im
 
-            env_image = env.env._get_image()
+            env_image = env.env._get_image()[:, :, ::-1]
 
             fc1_image[1:-1, 0:8, :] = cv2.cvtColor(np.reshape(fc1, (32, 8)), cv2.COLOR_GRAY2RGB)
             if display_lstm:
@@ -191,7 +191,6 @@ if __name__ == "__main__":
                 resized_all_convs = cv2.resize(all_convs, (new_width, 1080), interpolation=cv2.INTER_NEAREST)
 
                 result = np.concatenate((resized_all_convs, resized_env_and_plot), axis=1)
-                print(result.shape)
                 cv2.imshow('Demo', result)
                 cv2.waitKey(1)
                 out.write((result * 255.0).astype('u1'))
