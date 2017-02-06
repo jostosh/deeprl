@@ -15,6 +15,7 @@ plt.style.use('ggplot')
 import matplotlib as mpl
 import signal
 import sys
+from copy import deepcopy
 #mpl.rc('text', usetex=True)
 #mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman']})
 mpl.rc('xtick', labelsize=20)
@@ -94,6 +95,8 @@ if __name__ == "__main__":
     conv2_image = np.zeros((9 * 16 + 16 + 8, 9 * 2 + 2, 3), dtype='float32')
     fc1_image = np.zeros((34, 9, 3), dtype='float32')
     lstm_image = np.zeros((34, 9, 3), dtype='float32')
+    frame_prediction_image = np.zeros((84*2+3, 86, 3), dtype='float32')
+    set_color(frame_prediction_image, background_color)
     set_color(conv1_image, background_color)
     set_color(conv2_image, background_color)
     set_color(fc1_image, background_color)
@@ -115,13 +118,27 @@ if __name__ == "__main__":
         print("Now at episode {}".format(episode_idx))
 
         while not terminal:
+            rnn_state = None
+            if hp.frame_prediction and agent.local_network.recurrent:
+                rnn_state = deepcopy(agent.local_network.lstm_state_numeric)
+
             value, action, conv1_out, conv2_out, pi, fc1, lstm = agent.local_network\
                 .get_value_and_action_and_visualize(state, sess)
+
+            if hp.frame_prediction:
+                predicted_frame = agent.local_network.get_frame_prediction(state, action, sess, rnn_state)
 
             max_val = max(value, max_val - abs(max_val) * 0.001)
             min_val = min(value, min_val + abs(min_val) * 0.001)
 
             state, r, terminal, _ = env.step(action)
+
+            if hp.frame_prediction:
+                print(state.dtype, predicted_frame.dtype)
+                frame_prediction_image[1:85, 1:85, :] = cv2.cvtColor(predicted_frame[0, 0, :, :], cv2.COLOR_GRAY2RGB) * 255.
+                frame_prediction_image[86:-1, 1:85, :] = cv2.cvtColor(state[-1, :, :], cv2.COLOR_GRAY2RGB) * 255.
+                cv2.imshow('prediction', frame_prediction_image)
+
             value_buffer.append(value)
             for i in range(8):
                 for j in range(2):
@@ -142,6 +159,15 @@ if __name__ == "__main__":
                     conv2_image[i*9+i:(i+1)*9+i, j*9+j:(j+1)*9+j, :] = im
 
             env_image = env.env._get_image()[:, :, ::-1]
+            if hp.frame_prediction:
+                factor = env_image.shape[0] / frame_prediction_image.shape[0]
+                new_width = int(factor * frame_prediction_image.shape[1])
+                env_image = np.concatenate(
+                    (
+                        env_image,
+                        cv2.resize(frame_prediction_image, (new_width, env_image.shape[0]))
+                    ),
+                    axis=1)
 
             fc1_image[1:-1, 0:8, :] = cv2.cvtColor(np.reshape(fc1, (32, 8)), cv2.COLOR_GRAY2RGB)
             if display_lstm:
