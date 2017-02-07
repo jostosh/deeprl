@@ -130,7 +130,7 @@ class AtariEnvironment(object):
             step_terminal = True
         self.env.ale.getScreenGrayscale(self._screen)
 
-        preprocessed_observation = self._preprocess_observation(self._screen)
+        preprocessed_observation = self._preprocess_observation(self._screen).astype(dtype='float32')
         #self.last_observation = self._screen.copy()
         [self.state.append(preprocessed_observation) for _ in range(self.frames_per_state - len(self.state) + 1)]
 
