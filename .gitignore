@@ -20,9 +20,14 @@ lib64/
 parts/
 sdist/
 var/
+experiments/mnist_logs
+experiments/movingmnist
+experiments/conv_lstm/checkpoints
+*.mov
 *.egg-info/
 .installed.cfg
 *.egg
+roms/
 
 experiments/mnist
 
