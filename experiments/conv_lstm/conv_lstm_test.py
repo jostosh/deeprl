@@ -113,7 +113,7 @@ def train():
 
             assert not np.isnan(loss_r), 'Model diverged with loss = NaN'
 
-            if step % 1000 == 0 and step != 0:
+            if step == FLAGS.max_step-1:
                 checkpoint_path = os.path.join(FLAGS.train_dir, 'model.ckpt')
                 saver.save(sess, checkpoint_path, global_step=step)
                 print("saved to " + FLAGS.train_dir)
