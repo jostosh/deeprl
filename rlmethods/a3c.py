@@ -15,6 +15,7 @@ from tensorflow.contrib.tensorboard.plugins import projector
 import scipy.misc
 import subprocess
 from copy import deepcopy
+from deeprl.common.catch import CatchEnv
 
 
 class A3CAgent(object):
@@ -190,7 +191,7 @@ class A3CAgent(object):
                                                                            3600 / mean_duration))
 
             if T - last_checkpoint > self.hp.evaluation_interval and self.agent_name == 'Agent_0':
-                if isinstance(self.env, AtariEnvironment):
+                if isinstance(self.env, AtariEnvironment) or isinstance(self.env, CatchEnv):
                     mean_score = self.evaluate(50)
 
                 last_checkpoint = T // (self.hp.evaluation_interval / 10) * (self.hp.evaluation_interval / 10) # round to the nearest 1e6
@@ -232,7 +233,7 @@ class A3CAgent(object):
 
             if t % 100 == 0:
                 embeddings.append(self.local_network.get_embedding(self.last_state, session))
-                embedding_images.append(self.env.env._get_image())
+                embedding_images.append(self.env.env._get_image() if isinstance(self.env, AtariEnvironment) else self.last_state[-1, :, :])
 
                 if len(embeddings) > 100:
                     deletion_index = np.random.randint(100)
@@ -247,15 +248,15 @@ class A3CAgent(object):
         embeddings = list(embeddings)
         embedding_images = list(embedding_images)
 
-        frame_height = 210
-        frame_width = 160
-        sprite_image = np.empty((10 * frame_height, 10 * frame_width, 3))
+        frame_height = embedding_images[0].shape[0]
+        frame_width = embedding_images[0].shape[1]
+        sprite_image = np.empty((10 * frame_height, 10 * frame_width) + ((3,) if isinstance(self.env, AtariEnvironment) else tuple()))
 
         def create_sprite_im():
             image_index = 0
             for i in range(0, sprite_image.shape[0], frame_height):
                 for j in range(0, sprite_image.shape[1], frame_width):
-                    sprite_image[i:i+frame_height, j:j+frame_width, :] = embedding_images[image_index]
+                    sprite_image[i:i+frame_height, j:j+frame_width] = embedding_images[image_index]
                     image_index += 1
                     if image_index == len(embedding_images):
                         return
@@ -266,6 +267,7 @@ class A3CAgent(object):
 
         scipy.misc.imsave(os.path.join(writer.get_logdir(), 'embedding_sprite.png'), sprite_image)
         session.run(embedding_assign, feed_dict={embedding_placeholder: np.concatenate(embeddings, axis=0)})
+
         logger.info("Mean score {}".format(np.mean(returns)))
         writer.add_summary(make_summary_from_python_var('Evaluation/Score', np.mean(returns)), self.train_episode)
         writer.flush()
@@ -328,9 +330,6 @@ if __name__ == "__main__":
 
     saver = tf.train.Saver({var.name: var for var in
                             global_network.theta + shared_optimizer.mean_square + [T_var, embedding_var]})
-
-    print(saver.saver_def)
-    exit(0)
     weights_path = os.path.join(writer.get_logdir(), 'model.ckpt')
     os.makedirs(os.path.dirname(weights_path), exist_ok=True)
 
