@@ -11,7 +11,7 @@ plt.style.use('ggplot')
 import matplotlib as mpl
 
 mpl.rc('text', usetex=True)
-mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman']})
+mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman'], 'size': 12})
 mpl.rc('xtick', labelsize=12)
 mpl.rc('ytick', labelsize=12)
 import colorlover as cl
@@ -22,7 +22,8 @@ colorscalen = []
 
 for c in cl.to_numeric(colorscale):
     colorscalen.append((c[0]/255., c[1]/255, c[2]/255))
-
+colorscalen.append((0., 0., 0.))
+colorscalen.append((1., 0., 0.))
 
 def event_arrays_to_np_arrays(event_array):
     value_by_step = {}
@@ -60,6 +61,8 @@ def export_plots():
                 hyper_parameters = pickle.load(f)
             hyper_parameters = hyper_parameters.__dict__ if isinstance(hyper_parameters, HyperParameters) \
                 else hyper_parameters
+            if 'git_description' in hyper_parameters:
+                del hyper_parameters['git_description']
             event_files = [os.path.join(root, f) for f in files if IsTensorFlowEventsFile(f)]
             hyper_parameters_str = json.dumps(hyper_parameters, sort_keys=True)
 
@@ -102,10 +105,9 @@ def export_plots():
 
                 hp_idx += 1
 
-                plt.fill_between(steps, values - errors, values + errors, facecolor=colorscalen[hp_idx],
-                                 alpha=0.2)
+                plt.fill_between(steps, values - errors, values + errors, facecolor=colorscalen[hp_idx], alpha=0.2)
 
-                handles.append(plt.plot(steps, values, color=colorscalen[hp_idx], linewidth=2.0,
+                handles.append(plt.plot(steps, values, linewidth=2.0, color=colorscalen[hp_idx],
                                             label=obtain_name(hyper_parameters))[0])
         position_by_env = {
             'Breakout-v0': 'upper left',
