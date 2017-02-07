@@ -65,4 +65,8 @@ class CatchEnv():
     def state_shape(self):
         return (self.fps,) + self.output_shape
 
+    def set_test(self):
+        pass
 
+    def set_train(self):
+        pass
