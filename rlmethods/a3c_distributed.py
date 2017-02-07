@@ -25,9 +25,9 @@ class A3CAgent(object):
         :param agent_name:      Name of this agent
         :param session:         TensorFlow session
         """
-        self.env = env #get_env(env_name,
-                    #       frames_per_state=hyper_parameters.frames_per_state,
-                    #       output_shape=hyper_parameters.input_shape[1:])
+        self.env = get_env(env_name,
+                           frames_per_state=hyper_parameters.frames_per_state,
+                           output_shape=hyper_parameters.input_shape[1:])
         self.num_actions = self.env.num_actions()
 
         self.local_network = ActorCriticNN(num_actions=self.num_actions,
@@ -77,12 +77,13 @@ class A3CAgent(object):
 
         nloops = 0
         mean_duration = 0
+        n_updates = 0
 
         total_duration = 0.
         # Main loop, execute this while T < T_max
+        t0 = time.time()
         while T < hyper_parameters.T_max:
             # [arr.fill(0) for arr in [rewards, actions, values, n_step_targets, states]]
-            t0 = time.time()
 
             # A new batch begins, reset the gradients and synchronize thread-specific parameters
             #self.synchronize_thread_parameters(session)
@@ -115,10 +116,44 @@ class A3CAgent(object):
                 epr += rewards[i]
                 step = session.run(increment_step)
 
+            if hyper_parameters.clip_rewards:
+                # Reward clipping helps to stabilize training
+                rewards = np.clip(rewards, -1.0, 1.0)
+
             # Initialize the n-step return
             n_step_target = 0 if terminal_state else self.local_network.get_value(self.last_state, session)
-
             batch_len = self.t - t_start
+
+            # Forward view of n-step returns, start from i == t_max - 1 and go to i == 0
+            for i in reversed(range(batch_len)):
+                # Straightforward accumulation of rewards
+                n_step_target = rewards[i] + hyper_parameters.gamma * n_step_target
+                n_step_targets[i] = n_step_target
+
+            # Count the number of updates
+            n_updates += 1
+
+            if hyper_parameters.optimality_tightening:
+                values[batch_len] = n_step_target
+                lower_limits = []
+                for j in range(batch_len):
+                    current_max = -np.inf
+                    for k in range(batch_len - j):
+                        current_max = max(current_max,
+                                          np.sum(rewards[j:j + k + 1] * (hyper_parameters.gamma ** np.arange(k + 1))) +
+                                          hyper_parameters.gamma ** (k + 1) * values[j + k + 1])
+                    lower_limits.append(current_max)
+
+                upper_limits = []
+                for j in range(batch_len):
+                    current_min = np.inf
+                    for k in range(j):
+                        current_min = min(current_min, np.sum(rewards[j - k - 1:j] *
+                                                              (hyper_parameters.gamma ** np.arange(-k-1, 0))) +
+                                          hyper_parameters.gamma ** (-k - 1) * values[j - k - 1])
+                    upper_limits.append(current_min)
+            else:
+                lower_limits = upper_limits = None
 
             # Now update the global approximator's parameters
             summaries = self.local_network.update_params(actions[:batch_len],
@@ -126,38 +161,30 @@ class A3CAgent(object):
                                                          current_lr,
                                                          self.last_state,
                                                          session,
-                                                         rewards[:batch_len],
-                                                         n_step_target)
-            #if is_chief:
-            #    sv.summary_computed(sess=session, summary=summaries)
+                                                         n_step_targets[:batch_len],
+                                                         values[:batch_len],
+                                                         upper_limits=upper_limits,
+                                                         lower_limits=lower_limits)
 
-            end = time.time()
-            #writer.add_summary(summaries, self.t)
+            if summaries:
+                writer.add_summary(summaries, self.t)
 
-            start = time.time()
             if terminal_state:
-                logger.info('Terminal state reached (episode {}, step {}, reward {}, worker {}): resetting state'
-                            .format(self.n_episodes, step, epr, hyper_parameters.task_index))
+                if n_updates % 5 == 0:
+                    logger.info('Terminal state reached (episode {}, reward {}, lr {:.5f}, T {}): resetting state'.format(
+                        self.n_episodes, epr, current_lr, T))
 
-
-                #if is_chief:
-                #    sv.summary_computed(sess=session, summary=make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr))
-                #writer.add_summary(make_summary_from_python_var('{}/EpisodeReward'.format(self.agent_name), epr), T)
                 self.n_episodes += 1
-                self.last_state = self.env.reset()
+                self.last_state = self.env.reset_random()
                 epr = 0
                 self.local_network.reset()
-            end = time.time()
-            #logger.debug("Time for episode reset: {}".format((end - start)))
 
             total_duration += time.time() - t0
+            mean_duration = total_duration / T
 
-            nloops += 1
-            mean_duration = total_duration / self.t
-            # if rank == 1 and (self.t / 10) % 10 == 0:
-            if self.n_episodes % 10 == 0:
-                logger.info("Steps per second: {}, steps per hour: {}".format(1 / mean_duration * len(workers),
-                                                                              3600 / mean_duration * len(workers)))
+            if self.agent_name == "Agent_1" and n_updates % 50 == 0:
+                logger.info("Steps per second: {}, steps per hour: {}".format(T / (time.time() - t0),
+                                                                              T / (time.time() - t0) * 3600))
 
 
 if __name__ == "__main__":
@@ -170,7 +197,8 @@ if __name__ == "__main__":
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5 / float(len(workers + parameter_servers)))
     #server_def = tf.train.ServerDef(cluster=cluster.as_cluster_def(), default_session_)
     server = tf.train.Server(cluster, job_name=hyper_parameters.job_name, task_index=hyper_parameters.task_index,
-                             config=tf.ConfigProto(gpu_options=gpu_options))
+                             config=tf.ConfigProto(gpu_options=gpu_options,inter_op_parallelism_threads=1,
+                                                   intra_op_parallelism_threads=1))
     if hyper_parameters.job_name == "ps":
         server.join()
     else:
@@ -210,12 +238,13 @@ if __name__ == "__main__":
                 shared_optimizer.set_global_theta(global_network.theta)  # .build_update(global_network.theta)
 
             with tf.device("/job:worker/task:{}".format(hyper_parameters.task_index)):
-                env = get_env(env_name, frames_per_state=hyper_parameters.frames_per_state, output_shape=hyper_parameters.input_shape[1:])
-                agents = [A3CAgent(env, global_network, 'Agent_%d' % hyper_parameters.task_index, optimizer=shared_optimizer)]
+                #env = get_env(env_name, frames_per_state=hyper_parameters.frames_per_state, output_shape=hyper_parameters.input_shape[1:])
+                agents = [] #[A3CAgent(env, global_network, 'Agent_%d' % hyper_parameters.task_index, optimizer=shared_optimizer)]
                 #agents = []
-                #for i in range(len(workers)):
-                #    with tf.device('/job:worker/task:%d' % i):
-                #        agents.append(A3CAgent(env, global_network, 'Agent_%d' % i, optimizer=shared_optimizer))
+                for i in range(hyper_parameters.n_threads):
+                    agents.append(A3CAgent(None, global_network, 'Agent_{}'.format(str(i + hyper_parameters.n_threads *
+                                                                                      hyper_parameters.task_index)),
+                                           optimizer=shared_optimizer))
 
                 init_op = tf.global_variables_initializer()
                     #writer = tf.summary.FileWriter(hyper_parameters.log_dir, graph=graph) #.train.SummaryWriter(hyper_parameters.log_dir)
