@@ -16,11 +16,17 @@ import matplotlib as mpl
 import signal
 import sys
 from copy import deepcopy
-#mpl.rc('text', usetex=True)
-#mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman']})
-mpl.rc('xtick', labelsize=20)
-mpl.rc('ytick', labelsize=20)
-mpl.rc('figure', facecolor="#ccffcc")
+import matplotlib.gridspec as gridspec
+
+
+
+mpl.rc('text', usetex=True)
+mpl.rc('text', color='white')
+mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman']})
+mpl.rc('xtick', labelsize=14, color='white')
+mpl.rc('ytick', labelsize=14, color='white')
+mpl.rc('figure', facecolor="#000000")
+mpl.rc('axes', facecolor='#111111', labelcolor='white', labelsize=16, titlesize=20, prop_cycle=mpl.cycler(color=['ffff00']))
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -28,7 +34,7 @@ from matplotlib.figure import Figure
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-d", "--model_dir")
-    parser.add_argument("-n", "--n_episodes", default=10)
+    parser.add_argument("-n", "--n_episodes", default=5)
     args = parser.parse_args()
 
     sess = tf.Session()
@@ -48,7 +54,7 @@ if __name__ == "__main__":
 
     fourcc = cv2.VideoWriter_fourcc(*'MP4V')
     video_out = os.path.join(args.model_dir, 'video.mp4')
-    out = cv2.VideoWriter(video_out, fourcc, 15., (1478, 1080), isColor=True)
+    out = cv2.VideoWriter(video_out, fourcc, 15., (1920, 1080), isColor=True)
 
 
     def signal_handler(signal, frame):
@@ -69,30 +75,30 @@ if __name__ == "__main__":
     fig, axes = plt.subplots(ncols=1, nrows=2)
     canvas = fig.canvas
     ax1, ax2 = axes.ravel()
+    my_dpi = 96
+    fig2 = plt.figure(figsize=(1920/my_dpi, 1080/my_dpi), dpi=my_dpi)
+    gs = gridspec.GridSpec(3, 6)
+    ax_conv1 = plt.subplot(gs[:, 0])
+    ax_conv2 = plt.subplot(gs[:, 1])
+    ax_fc3 = plt.subplot(gs[:, 2])
+    ax_lstm = plt.subplot(gs[:, 3])
+    ax_game = plt.subplot(gs[0, 4])
+    ax_val = plt.subplot(gs[1, 4])
+    ax_pol = plt.subplot(gs[2, 4])
+
+    ax_input = plt.subplot(gs[0, 5])
+    ax_prediction = plt.subplot(gs[1, 5])
 
     display_lstm = hp.model == "a3c_lstm"
-
-    title_image = np.zeros((20, (1 + 20*2+2 + 9*2+2)*4 + 180 * (2 if display_lstm else 1), 3), dtype='float32')
-
-    background_color = (204/255., 255/255., 204/255.)
+    background_color = (0.1, 0.1, 0.1)
 
     def set_color(im, c):
         im[:, :, 2] = c[2]
         im[:, :, 1] = c[1]
         im[:, :, 0] = c[0]
-    set_color(title_image, background_color)
-
-    cv2.putText(title_image, "Conv1", (5, 15), font, .5, (0., 0., 0.), bottomLeftOrigin=False, thickness=2)
-    cv2.putText(title_image, "Conv2", (5 + (20*2 + 2) * 4, 15), font, .5, (0., 0., 0.), bottomLeftOrigin=False,
-                thickness=2)
-    cv2.putText(title_image, "FC3", (5 + (20*2 + 2) * 4 + (9 * 2 + 2)*4, 15), font, .5, (0., 0., 0.),
-                bottomLeftOrigin=False, thickness=2)
-    if display_lstm:
-        cv2.putText(title_image, "LSTM4", (5 + (20*2 + 2) * 4 + (9 * 2 + 2)*4 + 180, 15), font, .5, (0., 0., 0.),
-                    bottomLeftOrigin=False, thickness=2)
 
     conv1_image = np.zeros((20 * 8 + 8, 1 + 20 * 2 + 2, 3), dtype='float32')
-    conv2_image = np.zeros((9 * 16 + 16 + 8, 9 * 2 + 2, 3), dtype='float32')
+    conv2_image = np.zeros((9 * 16 + 16, 9 * 2 + 2, 3), dtype='float32')
     fc1_image = np.zeros((34, 9, 3), dtype='float32')
     lstm_image = np.zeros((34, 9, 3), dtype='float32')
     frame_prediction_image = np.zeros((84*2+3, 86, 3), dtype='float32')
@@ -128,16 +134,10 @@ if __name__ == "__main__":
             if hp.frame_prediction:
                 predicted_frame = agent.local_network.get_frame_prediction(state, action, sess, rnn_state)
 
-            max_val = max(value, max_val - abs(max_val) * 0.001)
-            min_val = min(value, min_val + abs(min_val) * 0.001)
+            max_val = max(value + abs(value) * 0.1, max_val - abs(max_val) * 0.001)
+            min_val = min(value - abs(value) * 0.1, min_val + abs(min_val) * 0.001)
 
             state, r, terminal, _ = env.step(action)
-
-            if hp.frame_prediction:
-                print(state.dtype, predicted_frame.dtype)
-                frame_prediction_image[1:85, 1:85, :] = cv2.cvtColor(predicted_frame[0, 0, :, :], cv2.COLOR_GRAY2RGB) * 255.
-                frame_prediction_image[86:-1, 1:85, :] = cv2.cvtColor(state[-1, :, :], cv2.COLOR_GRAY2RGB) * 255.
-                cv2.imshow('prediction', frame_prediction_image)
 
             value_buffer.append(value)
             for i in range(8):
@@ -159,67 +159,57 @@ if __name__ == "__main__":
                     conv2_image[i*9+i:(i+1)*9+i, j*9+j:(j+1)*9+j, :] = im
 
             env_image = env.env._get_image()[:, :, ::-1]
-            if hp.frame_prediction:
-                factor = env_image.shape[0] / frame_prediction_image.shape[0]
-                new_width = int(factor * frame_prediction_image.shape[1])
-                env_image = np.concatenate(
-                    (
-                        env_image,
-                        cv2.resize(frame_prediction_image, (new_width, env_image.shape[0]))
-                    ),
-                    axis=1)
-
             fc1_image[1:-1, 0:8, :] = cv2.cvtColor(np.reshape(fc1, (32, 8)), cv2.COLOR_GRAY2RGB)
             if display_lstm:
                 lstm_image[1:-1, 0:8, :] = cv2.cvtColor(np.reshape((lstm + 1.) / 2., (32, 8)), cv2.COLOR_GRAY2RGB)
             #ax.text(0.0, 0.0, "Conv1", fontsize=45)
             #ax.axis('off')
-            if episode_step > 10:
-                ax1.cla()
-                ax2.cla()
-                bar = ax2.bar(range(env.num_actions()), pi)
-                ax2.set_title("Policy", fontsize=24)#r"\pi(s,a)")
-                ax2.set_ylabel(r"$\pi(s,a)$", fontsize=24)
-                ax2.set_ylim([0., 1.])
-                ax2.set_xticklabels(env.env.get_action_meanings(), rotation=45)
+            if episode_step > 20:
+                [ax.cla() for ax in [ax_conv1, ax_conv2, ax_fc3, ax_lstm, ax_game, ax_input, ax_prediction,
+                                     ax_pol, ax_val]]
+                [ax.axis('off') for ax in [ax_conv1, ax_conv2, ax_fc3, ax_lstm, ax_game, ax_input, ax_prediction]]
+
+                ax_conv1.imshow(conv1_image)
+                ax_conv1.set_title('Conv1')
+                ax_conv2.imshow(conv2_image)
+                ax_conv2.set_title('Conv2')
+                ax_fc3.imshow(np.reshape(fc1, (32, 8)), cmap='gray', interpolation='nearest')
+                ax_fc3.set_title('FC3')
+                ax_lstm.imshow(np.reshape((lstm + 1.) / 2., (32, 8)), cmap='gray', interpolation='nearest')
+                ax_lstm.set_title('LSTM4')
+                # gs.tight_layout(fig2, h_pad=0., w_pad=0.)
+                # fig2 = plt.gcf()
+
+                ax_game.imshow(env_image)
+                ax_game.set_title("Game env")
+
+                ax_input.imshow(state[-1, :, :], cmap='gray')
+                ax_input.set_title("Preprocessed frame")
+                if hp.frame_prediction:
+                    ax_prediction.imshow(predicted_frame[0, 0, :, :], cmap='gray')
+                    ax_prediction.set_title("Predicted frame")
+                bar = ax_pol.bar(range(env.num_actions()), pi)
+                ax_pol.set_title("Policy")  # r"\pi(s,a)")
+                ax_pol.set_ylabel(r"$\pi(s,a)$")
+                ax_pol.set_ylim([0., 1.])
+                ax_pol.set_xticklabels(env.env.get_action_meanings(), rotation=90)
                 xticks_pos = [0.65 * patch.get_width() + patch.get_xy()[0] for patch in bar]
-                ax2.set_xticks(xticks_pos)
-                ax1.plot(range(episode_step-9, episode_step+1), value_buffer[-10:], linewidth=2)
-                ax1.set_title("Value estimate", fontsize=24)
-                ax1.set_ylabel(r"$v(s)$", fontsize=24)
-                ax1.set_ylim([min_val, max_val])
-                ax1.set_xlabel(r"Step", fontsize=20)
+                ax_pol.set_xticks(xticks_pos)
+                line, = ax_val.plot(range(episode_step - 19, episode_step + 1), value_buffer[-20:], linewidth=2)
+                ax_val.set_title("Value estimate")
+                ax_val.set_ylabel(r"$v(s)$")
+                ax_val.set_ylim([min_val, max_val])
+                ax_val.set_xlim([episode_step - 19, episode_step])
+                ax_val.set_xlabel(r"Step")
                 plt.tight_layout()
-                canvas.draw()
-                plot_image = np.fromstring(canvas.tostring_rgb(), dtype='uint8')
-                plot_image = plot_image.reshape(canvas.get_width_height()[::-1] + (3,))
 
-                factor = plot_image.shape[1] / env_image.shape[1]
-                new_height = int(factor * env_image.shape[0])
-                resized_env_image = cv2.resize(env_image, (plot_image.shape[1], new_height))
-                plot_and_env = np.concatenate((resized_env_image, plot_image), axis=0) / 255.
-
-                all_convs = cv2.resize(np.concatenate((conv1_image, conv2_image), axis=1), None, fx=4, fy=4,
-                                       interpolation=cv2.INTER_NEAREST)
-                fc_image_resized = cv2.resize(fc1_image, (180, all_convs.shape[0]), interpolation=cv2.INTER_NEAREST)
-                if display_lstm:
-                    lstm_image_resized = cv2.resize(lstm_image, (180, all_convs.shape[0]), interpolation=cv2.INTER_NEAREST)
-
-                all_convs = np.concatenate((all_convs, fc_image_resized) + (lstm_image_resized,)
-                                           if display_lstm else tuple([]), axis=1)
-                all_convs = np.concatenate((title_image, all_convs), axis=0)
-
-                factor = 1080 / plot_and_env.shape[0]
-                resized_env_and_plot = cv2.resize(plot_and_env, (int(factor * plot_and_env.shape[1]), 1080))
-
-                factor = resized_env_and_plot.shape[0] / all_convs.shape[0]
-                new_width = int(factor * all_convs.shape[1])
-                resized_all_convs = cv2.resize(all_convs, (new_width, 1080), interpolation=cv2.INTER_NEAREST)
-
-                result = np.concatenate((resized_all_convs, resized_env_and_plot), axis=1)
-                cv2.imshow('Demo', result)
-                cv2.waitKey(1)
-                out.write((result * 255.0).astype('u1'))
+                canvas2 = fig2.canvas
+                canvas2.draw()
+                plot_image = np.fromstring(canvas2.tostring_rgb(), dtype='uint8')
+                plot_image = plot_image.reshape(canvas2.get_width_height()[::-1] + (3,))
+                #cv2.imshow('plotim', plot_image)
+                #cv2.waitKey(1)
+                out.write(plot_image.astype('u1'))
 
             iter += 1
             episode_step += 1

@@ -340,6 +340,7 @@ class ActorCriticNN(object):
             net = tflearn.conv_2d_transpose(net, 32, 4, strides=2, activation='linear',
                                             output_shape=conv1.get_shape().as_list()[1:],
                                             weight_decay=0., padding='valid', name='DeConv2')
+            logger.warn("First deconv shape: {}".format(net.get_shape().as_list()))
             self._add_trainable(net)
             if self.residual_prediction:
                 net += conv1
@@ -348,6 +349,7 @@ class ActorCriticNN(object):
             # Then we do the latter again
             net = tflearn.conv_2d_transpose(net, 1, 8, strides=4, activation='linear',
                                             output_shape=[84, 84, 1], padding='valid', weight_decay=0., name='DeConv1')
+            logger.warn("First deconv shape: {}".format(net.get_shape().as_list()))
             self._add_trainable(net)
             net = tf.nn.relu(net, name='DeConv1Relu')
         return net
@@ -391,6 +393,14 @@ class ActorCriticNN(object):
 
         self.fp_loss_coeff = tf.placeholder(tf.float32)
         self.loss += self.fp_loss_coeff * frame_prediction_loss
+
+    def get_frame_prediction(self, state, action, session, rnn_state):
+        feed_dict = {self.inputs: [state], self.actions: [action]}
+        if self.recurrent:
+            feed_dict[self.initial_state] = rnn_state
+            feed_dict[self.n_steps] = [1]
+        predicted_frame = session.run(self.predicted_frame, feed_dict=feed_dict)
+        return predicted_frame
 
     def build_param_sync(self):
         with tf.name_scope("ParamSynchronization"):
