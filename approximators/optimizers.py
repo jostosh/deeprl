@@ -84,7 +84,7 @@ class RMSPropCustom(object):
             loss_ch_fact = tf.minimum(ch_fact_ubound, loss_ch_fact) #tf.cond(tf.greater(loss_ch_fact, ch_fact_ubound), lambda: ch_fact_ubound, lambda: loss_ch_fact)
             loss_hat = tf.cond(not_first_iter, lambda: self.loss_prev * loss_ch_fact, lambda: loss)
 
-            d_den = tf.minimum(loss_hat, loss_prev) # tf.cond(tf.greater(loss_hat, self.loss_prev), lambda: self.loss_prev, lambda: loss_hat)
+            d_den = tf.minimum(loss_hat, self.loss_prev) # tf.cond(tf.greater(loss_hat, self.loss_prev), lambda: self.loss_prev, lambda: loss_hat)
             d_t = self.feedback_decay * self.d + (1.-self.feedback_decay) * tf.abs((loss_hat - self.loss_prev) / d_den)
             d_t = tf.cond(not_first_iter, lambda: d_t, lambda: tf.constant(1.))
 
