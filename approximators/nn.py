@@ -334,7 +334,7 @@ class ActorCriticNN(object):
             net = tflearn.reshape(incoming, [-1] + conv2.get_shape().as_list()[1:], 'TransformationReshaped')
             if self.residual_prediction:
                 net += conv2
-            net = tf.nn.relu(net, 'TransformationRelu')
+            net = self.hp.activation(net, 'TransformationAct')
 
             # Then we perform a conv_2d_transpose (this is sometimes referred to as a DeConvolution layer)
             net = tflearn.conv_2d_transpose(net, 32, 4, strides=2, activation='linear',
@@ -344,14 +344,14 @@ class ActorCriticNN(object):
             self._add_trainable(net)
             if self.residual_prediction:
                 net += conv1
-            net = tf.nn.relu(net, name='DeConv2Relu')
+            net = self.hp.activation(net, name='DeConv2Act')
 
             # Then we do the latter again
             net = tflearn.conv_2d_transpose(net, 1, 8, strides=4, activation='linear',
                                             output_shape=[84, 84, 1], padding='valid', weight_decay=0., name='DeConv1')
             logger.warn("First deconv shape: {}".format(net.get_shape().as_list()))
             self._add_trainable(net)
-            net = tf.nn.relu(net, name='DeConv1Relu')
+            net = self.hp.activation(net, name='DeConv1Act')
         return net
 
     def build_frame_predictor(self):
@@ -386,7 +386,7 @@ class ActorCriticNN(object):
             self.frame_target = tf.placeholder(tf.float32, [None, 1] + self.input_shape[1:])
 
         with tf.name_scope(self.loss_scope):
-            frame_prediction_loss = tf.nn.l2_loss(self.frame_target - self.predicted_frame,
+            frame_prediction_loss = tf.nn.l2_loss(self.frame_target[:, :, 2:-2, 2:-2] - self.predicted_frame[:, :, 2:-2, 2:-2],
                                                   name='FramePredictionLoss')
             self.summaries.append(tf.summary.scalar('{}/FramePredictionLoss'.format(self.agent_name),
                                                     frame_prediction_loss))
