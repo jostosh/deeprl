@@ -4,6 +4,7 @@ import os
 import numpy as np
 import itertools
 from deeprl.common.logger import logger
+import tensorflow as tf
 
 """
 For some important parameter settings check out:
@@ -38,13 +39,19 @@ config1 = {
     'fplc': 1.,
     'otc': 1.,
     'feedback': False,
-    'fp_decay': 0.99999
+    'fp_decay': 0.99999,
+    'activation': 'relu'
 }
 
 param_sweep = {
     'learning_rate': [5e-5, 1e-4, 3.5e-4, 7e-4, 1e-3],
     'fplc': [1e-4, 1e-3, 1e-2],
     'otc': [0.5, 1.0, 2.0]
+}
+
+activation_fn = {
+    'relu': tf.nn.relu,
+    'elu': tf.nn.elu
 }
 
 
@@ -117,4 +124,5 @@ class HyperParameters(object):
         self.score_at_10m = params.score_at_10m
         self.feedback = params.feedback
         self.fp_decay = params.fp_decay
+        self.activation = activation_fn[params.activation]
 
