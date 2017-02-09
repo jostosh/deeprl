@@ -76,15 +76,15 @@ class ActorCriticNN(object):
             # Add first convolutional layer
             net = conv_layer(net, 32, 8, 4, activation='linear', name='Conv1')
             self._add_trainable(net)
-            net = tf.nn.relu(net)
+            net = self.hp.activation(net)
 
             # Add second convolutional layer
             net = conv_layer(net, 64, 4, 2, activation='linear', name='Conv2')
             self._add_trainable(net)
-            net = tf.nn.relu(net)
+            net = self.hp.activation(net)
 
             net = tflearn.flatten(net)
-            net = fc_layer(net, 256, activation='relu', name='FC3')
+            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
             self._add_trainable(net)
             self.embedding_layer = net
 
@@ -100,14 +100,14 @@ class ActorCriticNN(object):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers'):
-            net = conv_layer(net, 32, 8, 4, activation='relu', name='Conv1')
+            net = conv_layer(net, 32, 8, 4, activation=self.hp.activation, name='Conv1')
             self._add_trainable(net)
-            net = conv_layer(net, 64, 4, 2, activation='relu', name='Conv2')
+            net = conv_layer(net, 64, 4, 2, activation=self.hp.activation, name='Conv2')
             self._add_trainable(net)
-            net = conv_layer(net, 64, 3, 1, activation='relu', name='Conv3')
+            net = conv_layer(net, 64, 3, 1, activation=self.hp.activation, name='Conv3')
             self._add_trainable(net)
             net = tflearn.flatten(net)
-            net = tflearn.fully_connected(net, 512, activation='relu', name='FC4')
+            net = tflearn.fully_connected(net, 512, activation=self.hp.activation, name='FC4')
             self._add_trainable(net)
 
         return net
@@ -131,12 +131,12 @@ class ActorCriticNN(object):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers'):
-            net = conv_layer(net, 32, 8, 4, activation='relu', name='Conv1')
+            net = conv_layer(net, 32, 8, 4, activation=self.hp.activation, name='Conv1')
             self._add_trainable(net)
             net = conv_layer(net, 64, 4, 2, activation='linear', name='Conv2')
             self._add_trainable(net)
             net = spatialsoftmax(net, epsilon=0.99)
-            net = fc_layer(net, 256, activation='relu', name='FC3')
+            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
             self._add_trainable(net)
             self.embedding_layer = net
 
@@ -187,12 +187,12 @@ class ActorCriticNN(object):
         with tf.name_scope('ForwardInputs'):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
         with tf.name_scope('HiddenLayers'):
-            net = conv_layer(net, 32, 8, 4, activation='relu', name='Conv1')
+            net = conv_layer(net, 32, 8, 4, activation=self.hp.activation, name='Conv1')
             self._add_trainable(net)
             net = conv_layer(net, 64, 4, 2, activation='linear', name='Conv2')
             self._add_trainable(net)
             net = spatialsoftmax(net, epsilon=0.99)
-            net = fc_layer(net, 256, activation='relu', name='FC3')
+            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
             self._add_trainable(net)
             net = tflearn.reshape(net, [1, -1, 256], "ReshapedLSTMInput")
             net, state = custom_lstm(net, 256, initial_state=self.initial_state,
@@ -217,7 +217,7 @@ class ActorCriticNN(object):
             self.n_steps = tf.placeholder(tf.int32, shape=[1])
 
         with tf.name_scope('HiddenLayers'):
-            net = conv_layer(net, 32, 8, 4, activation='relu', name='Conv1')
+            net = conv_layer(net, 32, 8, 4, activation=self.hp.activation, name='Conv1')
             self._add_trainable(net)
             net = tf.reshape(net, [-1, 1] + net.get_shape().as_list()[1:])
 
@@ -227,7 +227,7 @@ class ActorCriticNN(object):
 
             net = tf.reshape(net, [-1, 9 * 9 * 64])
             self.lstm_state_variable = new_state
-            net = fc_layer(net, 256, activation='relu', name='FC3')
+            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
             self.embedding_layer = net
 
         return net
@@ -529,9 +529,11 @@ class ActorCriticNN(object):
         """
         Returns the action and the value
         """
-        conv1 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/Relu:0")
-        conv2 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/Relu_1:0")
-        fc1 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/FC3/Relu:0")
+        activation_str = 'Relu' if self.hp.activation == tf.nn.relu else 'Elu'
+
+        conv1 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/{}:0".format(activation_str))
+        conv2 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/{}_1:0".format(activation_str))
+        fc1 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/FC3/{}:0".format(activation_str))
         lstm_out = None
         if self.recurrent:
             lstm = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/ReshapedLSTMOutput/Reshape:0")
