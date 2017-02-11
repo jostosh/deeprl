@@ -61,7 +61,7 @@ def fc_layer(incoming, n_out, activation, name):
 
 
 def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_filter_size=None, forget_bias=1.0,
-                       activation=tf.nn.tanh, padding='VALID', inner_depthwise=False, batch_norm=False):
+                       activation=tf.nn.tanh, padding='VALID', inner_depthwise=False):
     n_input_features = incoming.get_shape().as_list()[-1]
 
     with tf.name_scope("ConvLSTM"):
@@ -94,19 +94,10 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_
 
                 # i = input_gate, j = new_input, f = forget_gate, o = output_gate
                 i, j, f, o = tf.split(3, 4, concat)
-                if batch_norm:
-                    i = tflearn.batch_normalization(i, gamma=0.1)
-                    j = tflearn.batch_normalization(i, gamma=0.1)
-                    f = tflearn.batch_normalization(i, gamma=0.1)
-                    o = tflearn.batch_normalization(i, gamma=0.1)
 
                 new_c = (c * tf.nn.sigmoid(f + forget_bias) + tf.nn.sigmoid(i) *
                          activation(j))
-                if batch_norm:
-                    batch_norm_new_c = tflearn.batch_normalization(new_c, gamma=0.1)
-                    new_h = activation(batch_norm_new_c) * tf.nn.sigmoid(o)
-                else:
-                    new_h = activation(new_c) * tf.nn.sigmoid(o)
+                new_h = activation(new_c) * tf.nn.sigmoid(o)
 
                 return tf.concat(3, [new_c, new_h])
 
