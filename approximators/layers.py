@@ -61,19 +61,21 @@ def fc_layer(incoming, n_out, activation, name):
 
 
 def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_filter_size=None, forget_bias=1.0,
-                       activation=tf.nn.tanh, padding='VALID', inner_depthwise=False):
+                       activation=tf.nn.tanh, padding='VALID', inner_depthwise=False, batch_norm=False):
     n_input_features = incoming.get_shape().as_list()[-1]
 
     with tf.name_scope("ConvLSTM"):
 
         with tf.name_scope("ConvLSTMWeights"):
-            def get_conv_W(filter_size, n_in_features, n_out_features, name):
-                return tf.Variable(tflearn.initializations.truncated_normal(
-                    [filter_size, filter_size, n_in_features, n_out_features]), name=name)
+            def get_conv_W(filter_size, n_in_features, n_out_features, name, depthwise=False):
+                d = 1.0 / np.sqrt(filter_size * filter_size * (n_in_features if not depthwise else 1))
+                weights_init = tf.random_uniform([filter_size, filter_size, n_in_features, n_out_features], minval=-d,
+                                                 maxval=d)
+                return tf.Variable(weights_init, name=name)
 
             W_x_to_ijfo = get_conv_W(outer_filter_size, n_input_features, num_features * 4, name='Wh')
             if inner_depthwise:
-                W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, 4, name='Wx')
+                W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, 4, name='Wx', depthwise=True)
             else:
                 W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, num_features * 4, name='Wx')
 
@@ -92,10 +94,19 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_
 
                 # i = input_gate, j = new_input, f = forget_gate, o = output_gate
                 i, j, f, o = tf.split(3, 4, concat)
+                if batch_norm:
+                    i = tflearn.batch_normalization(i, gamma=0.1)
+                    j = tflearn.batch_normalization(i, gamma=0.1)
+                    f = tflearn.batch_normalization(i, gamma=0.1)
+                    o = tflearn.batch_normalization(i, gamma=0.1)
 
                 new_c = (c * tf.nn.sigmoid(f + forget_bias) + tf.nn.sigmoid(i) *
                          activation(j))
-                new_h = activation(new_c) * tf.nn.sigmoid(o)
+                if batch_norm:
+                    batch_norm_new_c = tflearn.batch_normalization(new_c, gamma=0.1)
+                    new_h = activation(batch_norm_new_c) * tf.nn.sigmoid(o)
+                else:
+                    new_h = activation(new_c) * tf.nn.sigmoid(o)
 
                 return tf.concat(3, [new_c, new_h])
 
