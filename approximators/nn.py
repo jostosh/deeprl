@@ -135,7 +135,7 @@ class ActorCriticNN(object):
             self._add_trainable(net)
             net = conv_layer(net, 64, 4, 2, activation='linear', name='Conv2')
             self._add_trainable(net)
-            net = spatialsoftmax(net, epsilon=0.99)
+            net = spatialsoftmax(net, epsilon=0.01)
             net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
             self._add_trainable(net)
             self.embedding_layer = net
