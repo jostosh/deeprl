@@ -149,8 +149,13 @@ def spatialsoftmax(incoming, epsilon=0.01):
         # actually in the range (-1, 1) and not greater than 1 or smaller than -1.
         #
         # Note that each '1' in the reshape is to enforce broadcasting along that dimension
-        cartesian_y = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, h), (1, h, 1, 1), name="CartesianY")
-        cartesian_x = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, w), (1, 1, w, 1), name="CartesianX")
+        #cartesian_y = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, h), (1, h, 1, 1), name="CartesianY")
+        #cartesian_x = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, w), (1, 1, w, 1), name="CartesianX")
+
+        cartesian_x, cartesian_y = tf.meshgrid(tf.linspace(0., 1 - epsilon, w),
+                                               tf.linspace(0., 1 - epsilon, h))
+        cartesian_x = tf.reshape(cartesian_x, (1, h, w, 1))
+        cartesian_y = tf.reshape(cartesian_y, (1, h, w, 1))
 
         # Compute the softmax numerator
         numerator_softmax = tf.exp(incoming, name='Numerator')
