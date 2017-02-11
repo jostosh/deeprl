@@ -6,7 +6,7 @@ from tensorflow.python.training import training_ops
 class RMSPropCustom(object):
 
     def __init__(self, session, learning_rate, decay=0.99, epsilon=1e-8, theta=None, momentum=0., feedback=False,
-                 thl=0.1, thu=10., feedback_decay=0.99):
+                 thl=0.5, thu=2., feedback_decay=0.99):
         self.learning_rate = learning_rate
         self.decay = decay
 
@@ -102,6 +102,7 @@ class RMSPropCustom(object):
         with tf.name_scope("RMSPropMinimize"):
             minimize = tf.group(*([tf.assign_add(t, -self.learning_rate *
                                       tf.div(grad, tf.sqrt(ms + self.epsilon) * (d_t if self.feedback else 1.)),
-                                      use_locking=False) for t, grad, ms in zip(self.global_theta, grads, g_update)] + \
-                       other_updates), name='minimize')
+                                      use_locking=False)
+                                   for t, grad, ms in zip(self.global_theta, grads, g_update)] + other_updates),
+                                name='minimize')
         return minimize
