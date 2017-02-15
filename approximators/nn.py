@@ -222,7 +222,8 @@ class ActorCriticNN(object):
             net = tf.reshape(net, [-1, 1] + net.get_shape().as_list()[1:])
 
             net, new_state, self.initial_state = convolutional_lstm(net, outer_filter_size=4, num_features=64,
-                                                                    stride=2, inner_filter_size=3, inner_depthwise=False)
+                                                                    stride=2, inner_filter_size=3, inner_depthwise=False,
+                                                                    forget_bias=0.)
             self.theta += net.W + [net.b]
 
             net = tf.reshape(net, [-1, 9 * 9 * 64])
