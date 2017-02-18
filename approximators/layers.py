@@ -372,14 +372,31 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
         with tf.name_scope("Summary"):
             euclidean_downsampled = euclidian_dist[:, ::3, ::3, :, :]
             _, m, n, _, _ = euclidean_downsampled.get_shape().as_list()
+
+            # The euclidean_downsampled Tensor contains the spatial coefficients for different centroids
+            # We can reshape this such that we multiply the corresponding filters with the help of broadcasting
             euclidian_dist_reshaped = tf.reshape(euclidean_downsampled, 4 * [1] + [m, n, n_centroids])
             current_filter_shape = convs.W.get_shape().as_list()
             current_filter_shape[-1] //= n_centroids
-            weights_stacked = tf.reshape(convs.W, current_filter_shape + [1, 1, n_centroids])
-            locally_weighted_kernels = tf.reduce_sum(tf.mul(euclidian_dist_reshaped, weights_stacked), axis=6)
-            locally_weighted_kernels -= tf.reduce_min(locally_weighted_kernels, axis=[4, 5], keep_dims=True)
 
+            # Now we stack the weights, that is, there is an extra axis for the centroids
+            weights_stacked = tf.reshape(convs.W, current_filter_shape + [1, 1, n_centroids])
+
+            # Get the locally weighted kernels
+            locally_weighted_kernels = tf.reduce_sum(tf.mul(euclidian_dist_reshaped, weights_stacked), axis=6)
+
+            # Normalize
+            locally_weighted_kernels -= tf.reduce_min(locally_weighted_kernels, axis=[4, 5], keep_dims=True)
+            locally_weighted_kernels /= tf.reduce_max(locally_weighted_kernels, axis=[4, 5], keep_dims=True)
+
+            # Now comes the tricky part to get all the locally weighted kernels grouped in a tiled image. We need to to
+            # do quite some transposing. First we transpose the locally weighted kernels such that the first two axes
+            # correspond to the #in and #out channels, the 3rd and 4th correspond to rows and columns of the kernels,
+            # the last two dimensions correspond to the spatial locations of the kernels.
             in_out_kernel_spatial = tf.transpose(locally_weighted_kernels, [2, 3, 0, 1, 4, 5])
+
+            # Now we flatten the last two dimensions, effectively taking the images for the spatial locations on a
+            # single row. We also apply some padding, so that we can visually separate the kernels easily
             in_out_kernel_spatial_flattened = tf.pad(tf.reshape(in_out_kernel_spatial, [current_filter_shape[2],
                                                                                         current_filter_shape[3],
                                                                                         current_filter_shape[0],
@@ -388,17 +405,28 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
                                                      [[0, 0], [0, 0], [1, 0], [1, 0], [0, 0]])
             current_filter_shape[0] += 1
             current_filter_shape[1] += 1
+
+            # Transpose again, again we first have axes for in and out channels, followed by the flattened spatial
+            # locations, and finally by the row and column axes of the kernels themselves
             in_out_spatial_f_kernel = tf.transpose(in_out_kernel_spatial_flattened, [0, 1, 4, 2, 3])
+
+            # Now we take together the spatial rows and filter rows
             in_out_y_reshaped = tf.reshape(in_out_spatial_f_kernel, [current_filter_shape[2],
                                                                      current_filter_shape[3],
                                                                      n,
                                                                      m * current_filter_shape[0],
                                                                      current_filter_shape[1]])
+
+            # Now we do the same for combining the columns
             in_out_y_switched = tf.transpose(in_out_y_reshaped, [0, 1, 2, 4, 3])
             in_out_grid = tf.reshape(in_out_y_switched, [current_filter_shape[2],
                                                          current_filter_shape[3],
                                                          n * current_filter_shape[1],
                                                          m * current_filter_shape[0]])
+
+            # And we are done! We want the last dimension to be the depth of the images we display, so it makes sense
+            # to transpose it one last time. Remember that for our rows were put at the end, so that they need to be on
+            # the 2nd axis now
             summary_image = tf.transpose(in_out_grid, [1, 3, 2, 0])
 
             out.visual_summary = summary_image
