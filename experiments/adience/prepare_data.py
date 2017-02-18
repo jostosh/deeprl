@@ -27,8 +27,8 @@ def load(idx):
         if not os.path.exists(path):
             continue
 
-        images.append(misc.imresize(misc.imread(path), (214, 214)))
-        labels.append(0 if gender == 'm' else 1)
+        images.append(misc.imresize(misc.imread(path), (256, 256)))
+        labels.append(np.asarray([1, 0], dtype='float') if gender == 'm' else np.asarray([0, 1], dtype='float'))
 
     images = np.asarray(images)
     labels = np.asarray(labels)
@@ -40,6 +40,7 @@ all_labels = []
 
 for i in range(5):
     images, labels = load(i)
+    print(images.shape)
     all_images.append(images)
     all_labels.append(labels)
 
@@ -51,5 +52,5 @@ for i in range(5):
         f.create_dataset("train/images", data=np.concatenate([all_images[j] for j in train_sets]))
         f.create_dataset("train/labels", data=np.concatenate([all_labels[j] for j in train_sets]))
 
-        f.create_dataset("test/images", data=all_images[i])
+        f.create_dataset("test/images", data=all_images[i][:, 14:14+227, 14:14+227, :])
         f.create_dataset("test/labels", data=all_labels[i])
