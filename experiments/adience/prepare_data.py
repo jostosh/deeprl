@@ -4,6 +4,9 @@ import os
 from scipy import misc
 import numpy as np
 import h5py
+import matplotlib.pyplot as plt
+
+display = False
 
 base_path = '/home/jos/datasets/aligned'
 
@@ -29,6 +32,11 @@ def load(idx):
 
         images.append(misc.imresize(misc.imread(path), (256, 256)))
         labels.append(np.asarray([1, 0], dtype='float') if gender == 'm' else np.asarray([0, 1], dtype='float'))
+
+        if display and i % 100 == 0:
+            plt.imshow(misc.imread(path))
+            plt.title("man" if gender == 'm' else 'woman')
+            plt.show()
 
     images = np.asarray(images)
     labels = np.asarray(labels)
