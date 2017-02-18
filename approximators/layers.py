@@ -307,9 +307,13 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
                 assert len(n_centroids) == 2, "Length of n_centroids list must be 2."
                 start_x, end_x = scaling / (1 + n_centroids[0]), scaling - scaling / (1 + n_centroids[0])
                 start_y, end_y = scaling / (1 + n_centroids[1]), scaling - scaling / (1 + n_centroids[1])
-                centroids_x = tf.Variable(tf.concat(0, n_centroids[1] * [tf.linspace(start_x, end_x, n_centroids[0])]))
-                centroids_y = tf.Variable(tf.concat(0, n_centroids[0] * [tf.linspace(start_y, end_y, n_centroids[1])]))
-                centroids_y = tf.reshape(tf.transpose(tf.reshape(centroids_y, n_centroids)), [np.prod(n_centroids)])
+
+                x_, y_ = tf.meshgrid(tf.linspace(start_x, end_x, n_centroids[0]),
+                                     tf.linspace(start_y, end_y, n_centroids[1]))
+
+                centroids_x = tf.Variable(tf.reshape(x_, [np.prod(n_centroids)]))
+                centroids_y = tf.Variable(tf.reshape(y_, [np.prod(n_centroids)]))
+                #centroids_y = tf.reshape(tf.transpose(tf.reshape(centroids_y, n_centroids)), [np.prod(n_centroids)])
                 n_centroids = np.prod(n_centroids)
 
             elif isinstance(n_centroids, int):
@@ -402,7 +406,7 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
 
     # Add to collection for tflearn functionality
     tf.add_to_collection(tf.GraphKeys.LAYER_TENSOR + '/' + name, out)
-    return out
+    return out, centroids_x, centroids_y
 
 
 class BasicLSTMCell(RNNCell):
