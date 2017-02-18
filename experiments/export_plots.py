@@ -9,6 +9,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 plt.style.use('ggplot')
 import matplotlib as mpl
+import tensorflow as tf
+import pprint
 
 mpl.rc('text', usetex=True)
 mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman'], 'size': 12})
@@ -49,6 +51,7 @@ def obtain_name(hp):
     return hp['model'].upper().replace('_', '-') + \
         (' {}FP'.format('r' if hp['residual_prediction'] else '') if hp['frame_prediction'] else '') + \
         (' OT' if hp['optimality_tightening'] else '') + \
+        (' relu' if 'activation' not in hp else hp['activation']) + \
         ' ({})'.format(hp['t_max'])
 
 
@@ -64,6 +67,11 @@ def export_plots():
             if 'git_description' in hyper_parameters:
                 del hyper_parameters['git_description']
             event_files = [os.path.join(root, f) for f in files if IsTensorFlowEventsFile(f)]
+
+            if 'activation' in hyper_parameters:
+                print(hyper_parameters['activation'].__dict__)
+                hyper_parameters['activation'] = 'elu' if hyper_parameters['activation'] == tf.nn.elu else 'relu'
+
             hyper_parameters_str = json.dumps(hyper_parameters, sort_keys=True)
 
             if hyper_parameters['env'] not in event_files_by_hp_by_env:
@@ -81,6 +89,7 @@ def export_plots():
             hyper_parameters = json.loads(hyper_parameters_str)
             events_by_scalar = {}
             print("Currently looking at {} event files".format(len(event_files)))
+            pprint.pprint(hyper_parameters)
             for event_file in event_files:
                 ea = event_accumulator.EventAccumulator(event_file)
                 ea.Reload()
