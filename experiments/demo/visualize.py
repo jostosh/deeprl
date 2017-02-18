@@ -70,8 +70,6 @@ if __name__ == "__main__":
 
     pprint.pprint([op.name for op in sess.graph.get_operations()])
 
-    font = cv2.FONT_HERSHEY_SIMPLEX
-
     fig, axes = plt.subplots(ncols=1, nrows=2)
     canvas = fig.canvas
     ax1, ax2 = axes.ravel()
@@ -162,8 +160,6 @@ if __name__ == "__main__":
             fc1_image[1:-1, 0:8, :] = cv2.cvtColor(np.reshape(fc1, (32, 8)), cv2.COLOR_GRAY2RGB)
             if display_lstm:
                 lstm_image[1:-1, 0:8, :] = cv2.cvtColor(np.reshape((lstm + 1.) / 2., (32, 8)), cv2.COLOR_GRAY2RGB)
-            #ax.text(0.0, 0.0, "Conv1", fontsize=45)
-            #ax.axis('off')
             if episode_step > 20:
                 [ax.cla() for ax in [ax_conv1, ax_conv2, ax_fc3, ax_lstm, ax_game, ax_input, ax_prediction,
                                      ax_pol, ax_val]]
@@ -177,8 +173,6 @@ if __name__ == "__main__":
                 ax_fc3.set_title('FC3')
                 ax_lstm.imshow(np.reshape((lstm + 1.) / 2., (32, 8)), cmap='gray', interpolation='nearest')
                 ax_lstm.set_title('LSTM4')
-                # gs.tight_layout(fig2, h_pad=0., w_pad=0.)
-                # fig2 = plt.gcf()
 
                 ax_game.imshow(env_image)
                 ax_game.set_title("Game env")
@@ -207,8 +201,6 @@ if __name__ == "__main__":
                 canvas2.draw()
                 plot_image = np.fromstring(canvas2.tostring_rgb(), dtype='uint8')
                 plot_image = plot_image.reshape(canvas2.get_width_height()[::-1] + (3,))
-                #cv2.imshow('plotim', plot_image)
-                #cv2.waitKey(1)
                 out.write(plot_image.astype('u1'))
 
             iter += 1
