@@ -434,7 +434,7 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
 
     # Add to collection for tflearn functionality
     tf.add_to_collection(tf.GraphKeys.LAYER_TENSOR + '/' + name, out)
-    return out, centroids_x, centroids_y
+    return out
 
 
 class BasicLSTMCell(RNNCell):
