@@ -40,7 +40,8 @@ config1 = {
     'otc': 1.,
     'feedback': False,
     'fp_decay': 0.99999,
-    'activation': 'relu'
+    'activation': 'relu',
+    'ss_epsilon': 0.5
 }
 
 param_sweep = {
@@ -125,4 +126,4 @@ class HyperParameters(object):
         self.feedback = params.feedback
         self.fp_decay = params.fp_decay
         self.activation = activation_fn[params.activation]
-
+        self.ss_epsilon = params.ss_epsilon
