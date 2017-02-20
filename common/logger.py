@@ -3,7 +3,7 @@ from os.path import expanduser
 import os
 
 VERSION = 'v0.9.5'
-LOGDIRBASE = "/home/jvdw/tensorflowlogs/{}".format(VERSION) #"{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
+LOGDIRBASE = "/data/s2098407/tensorflowlogs/{}".format(VERSION) #"{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
 
 
 def get_log_dir(hyper_parameters):
