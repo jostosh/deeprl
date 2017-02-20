@@ -237,7 +237,7 @@ def fully_connected_weight_sharing(incoming, axis_len, filter_size, dimensionali
 
 def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, strides, activation, name='SoftWeightConv',
                            scope=None, reuse=False, local_normalization=True, centroids_trainable=False, scaling=1.0,
-                           distance_fn='EXP', padding='same', sigma_trainable=None):
+                           distance_fn='EXP', padding='same', sigma_trainable=None, per_feature=False):
     """
     Defines a soft weight sharing layer. The soft weight sharing is accomplished by performing multiple convolutions
     which are then combined by a local weighting locally depends on the distance to the 'centroid' of each convolution.
@@ -265,6 +265,7 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
         :param sigma_trainable  Whether the sigma parameters of the exponential distance function should be trainable.
                     By default, this parameter is set to None, in which case it takes over the value of
                     centroids_trainable.
+        :param per_feature      If True, the centroids are given per output feature.
 
     Return values:
         :return: A 4D Tensor with similar dimensionality as a normal conv_2d's output
@@ -303,6 +304,9 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
             centroids_y = tf.Variable(tf.random_uniform([n_centroids], minval=0, maxval=scaling),
                                       trainable=centroids_trainable)
             '''
+
+            centroids_f = 1 if not per_feature else n_filters
+
             if isinstance(n_centroids, list):
                 assert len(n_centroids) == 2, "Length of n_centroids list must be 2."
                 start_x, end_x = scaling / (1 + n_centroids[0]), scaling - scaling / (1 + n_centroids[0])
@@ -311,15 +315,15 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
                 x_, y_ = tf.meshgrid(tf.linspace(start_x, end_x, n_centroids[0]),
                                      tf.linspace(start_y, end_y, n_centroids[1]))
 
-                centroids_x = tf.Variable(tf.reshape(x_, [np.prod(n_centroids)]))
-                centroids_y = tf.Variable(tf.reshape(y_, [np.prod(n_centroids)]))
+                centroids_x = tf.Variable(tf.tile(tf.reshape(x_, [np.prod(n_centroids)]), [centroids_f]))
+                centroids_y = tf.Variable(tf.tile(tf.reshape(y_, [np.prod(n_centroids)]), [centroids_f]))
                 #centroids_y = tf.reshape(tf.transpose(tf.reshape(centroids_y, n_centroids)), [np.prod(n_centroids)])
                 n_centroids = np.prod(n_centroids)
 
             elif isinstance(n_centroids, int):
-                centroids_x = tf.Variable(tf.random_uniform([n_centroids], minval=0, maxval=scaling),
+                centroids_x = tf.Variable(tf.random_uniform([centroids_f * n_centroids], minval=0, maxval=scaling),
                                           trainable=centroids_trainable)
-                centroids_y = tf.Variable(tf.random_uniform([n_centroids], minval=0, maxval=scaling),
+                centroids_y = tf.Variable(tf.random_uniform([centroids_f * n_centroids], minval=0, maxval=scaling),
                                           trainable=centroids_trainable)
             else:
                 raise TypeError("n_centroids is neither a list nor an int!")
@@ -330,18 +334,19 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
             # Define the distance of each cell w.r.t. the centroids. We can easily accomplish this through broadcasting
             # i.e. x_diff2 will have shape [1, 1, n, 1, c] with n as above and c the number of centroids. Similarly,
             # y_diff2 will have shape [1, m, 1, 1, c]
-            x_diff2 = tf.square(tf.reshape(centroids_x, [1, 1, 1, 1, n_centroids]) - x_coordinates,
+            x_diff2 = tf.square(tf.reshape(centroids_x, [1, 1, 1, centroids_f, n_centroids]) - x_coordinates,
                                 name='xDiffSquared')
-            y_diff2 = tf.square(tf.reshape(centroids_y, [1, 1, 1, 1, n_centroids]) - y_coordinates,
+            y_diff2 = tf.square(tf.reshape(centroids_y, [1, 1, 1, centroids_f, n_centroids]) - y_coordinates,
                                 name='yDiffSquared')
 
             if distance_fn == 'EXP':
-                sigma = tf.Variable(scaling/2 * np.ones(n_centroids, dtype='float'), dtype=tf.float32,
+                sigma = tf.Variable(scaling/2 * np.ones(n_centroids * centroids_f, dtype='float'), dtype=tf.float32,
                                     name='Sigma', trainable=sigma_trainable)
 
             # Again, we use broadcasting. The result is of shape [1, m, n, 1, c]
             euclidian_dist = np.sqrt(2) - tf.sqrt(x_diff2 + y_diff2, name="Euclidean") if distance_fn == 'EUCLIDEAN' \
-                else tf.exp(-tf.div((x_diff2 + y_diff2), tf.reshape(sigma ** 2, [1, 1, 1, 1, n_centroids])), 'Exp')
+                else tf.exp(-tf.div((x_diff2 + y_diff2),
+                                    tf.reshape(sigma ** 2, [1, 1, 1, centroids_f, n_centroids])), 'Exp')
 
             # Optionally, we will perform local normalization such that the weight coefficients add up to 1 for each
             # spatial cell.
@@ -375,7 +380,10 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
 
             # The euclidean_downsampled Tensor contains the spatial coefficients for different centroids
             # We can reshape this such that we multiply the corresponding filters with the help of broadcasting
-            euclidian_dist_reshaped = tf.reshape(euclidean_downsampled, 4 * [1] + [m, n, n_centroids])
+            if per_feature:
+                euclidean_downsampled = tf.transpose(euclidean_downsampled, [0, 3, 1, 2, 4])
+
+            euclidian_dist_reshaped = tf.reshape(euclidean_downsampled, 3 * [1] + [centroids_f, m, n, n_centroids])
             current_filter_shape = convs.W.get_shape().as_list()
             current_filter_shape[-1] //= n_centroids
 

@@ -26,6 +26,8 @@ class LogDir(object):
             'feedback': False,
             'optimality_tightening': False,
             'residual_prediction': False,
+            'per_feature': args.per_feature,
+            'trainable_centroids': args.trainable_centroids
         })
         logdir = os.path.join(get_log_dir(hyperparameters))
         os.makedirs(logdir, exist_ok=True)
@@ -75,11 +77,13 @@ def network_spatial_interpolation(input):
     net = tflearn.layers.max_pool_2d(net, kernel_size=3, strides=2, padding='valid')
     net = tflearn.layers.local_response_normalization(net)
 
-    net = spatial_weight_sharing(net, n_centroids=[2, 2], n_filters=128, filter_size=5, strides=1, activation=tf.nn.elu)
+    net = spatial_weight_sharing(net, n_centroids=[2, 2], n_filters=128, filter_size=5, strides=1, activation=tf.nn.elu,
+                                 per_feature=args.per_feature, centroids_trainable=args.trainable_centroids)
     net = tflearn.layers.max_pool_2d(net, kernel_size=3, strides=2, padding='valid')
     net = tflearn.layers.local_response_normalization(net)
 
-    net = spatial_weight_sharing(net, n_centroids=[2, 2], n_filters=192, filter_size=3, strides=1, activation=tf.nn.elu)
+    net = spatial_weight_sharing(net, n_centroids=[2, 2], n_filters=192, filter_size=3, strides=1, activation=tf.nn.elu,
+                                 per_feature=args.per_feature, centroids_trainable=args.trainable_centroids)
     net = tflearn.layers.max_pool_2d(net, kernel_size=3, strides=2, padding='valid')
 
     net = tflearn.layers.fully_connected(net, 512, activation=tf.nn.elu)
@@ -129,6 +133,8 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default='default')
     parser.add_argument("--crop", dest='crop', action='store_true')
     parser.add_argument("--display", dest='display', action='store_true')
+    parser.add_argument("--per_feature", dest='per_feature', action='store_true')
+    parser.add_argument("--trainable_centroids", dest='trainable_centroids', action='store_true')
     parser.add_argument("--verbosity", type=int, default=0)
     parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--n_epochs", type=int, default=75)
