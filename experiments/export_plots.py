@@ -20,9 +20,9 @@ import plotly.graph_objs as go
 
 
 mpl.rc('text', usetex=True)
-mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman'], 'size': 12})
-mpl.rc('xtick', labelsize=12)
-mpl.rc('ytick', labelsize=12)
+mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman'], 'size': 14})
+mpl.rc('xtick', labelsize=14)
+mpl.rc('ytick', labelsize=14)
 import colorlover as cl
 
 
@@ -48,6 +48,47 @@ def event_arrays_to_np_arrays(event_array):
         np_arrays_x.append(np.asarray([se.step for se in event]))
         np_arrays_y.append(np.asarray([se.value for se in event]))
 
+    continuous_arrays_x = []
+    continuous_arrays_y = []
+
+    min_x = -np.inf
+    max_x = np.inf
+    for x_arr, y_arr in zip(np_arrays_x, np_arrays_y):
+        xc_arr = []
+        yc_arr = []
+        min_x = max(min_x, x_arr[0])
+        max_x = min(max_x, x_arr[-1])
+
+        for i in range(len(x_arr) - 1):
+            xc_arr.append(np.linspace(x_arr[i], x_arr[i+1], x_arr[i+1] - x_arr[i] + 1, dtype=np.int64)[:-1])
+            print(xc_arr[-1])
+            yc_arr.append(np.linspace(y_arr[i], y_arr[i+1], x_arr[i+1] - x_arr[i] + 1)[:-1])
+        xc_arr.append(np.asarray([x_arr[-1]]))
+        yc_arr.append(np.asarray([y_arr[-1]]))
+
+        continuous_arrays_x.append(np.concatenate(xc_arr))
+        continuous_arrays_y.append(np.concatenate(yc_arr))
+
+        print(continuous_arrays_x[-1][-1] - continuous_arrays_x[-1][0], len(continuous_arrays_x[-1]),
+              len(continuous_arrays_y[-1]))
+
+    c_arrays_y = []
+    for x_arr, y_arr in zip(continuous_arrays_x, continuous_arrays_y):
+        idx1 = x_arr.tolist().index(min_x)
+        idx2 = x_arr.tolist().index(max_x)
+
+        #y_arr = np.asarray(y_arr[idx1:idx2])
+
+        #print(x_arr[idx1:idx2], idx1, idx2, len(y_arr[idx1:idx2]))
+
+        c_arrays_y.append(y_arr[idx1:idx2])
+    #print(min_x, max_x)
+
+    if args.interpolate:
+        values = np.mean(np.stack(c_arrays_y), axis=0)
+        errors = np.std(np.stack(c_arrays_y), axis=0)
+        steps = np.arange(min_x, max_x)
+        return steps, values, errors, np_arrays_x, np_arrays_y
 
     error_by_step = {}
     for step, val in value_by_step.items():
@@ -62,11 +103,12 @@ def event_arrays_to_np_arrays(event_array):
 
 def obtain_name(hp):
     function_by_name = {
-        'idx': lambda: 'Fold ' + hp['idx']
+        'idx': lambda p: 'Fold ' + hp['idx'],
+        'model': lambda p: {'default': 'Default CNN', 'spatial': 'SIWS CNN'}[hp[p]]
     }
 
     if args.trace_by:
-        return ' '.join(function_by_name[n]() for n in args.trace_by)
+        return ' '.join(function_by_name[n](n) for n in args.trace_by)
 
     return hp['model'].upper().replace('_', '-') + \
         (' {}FP'.format('r' if hp['residual_prediction'] else '') if hp['frame_prediction'] else '') + \
@@ -115,9 +157,11 @@ def export_plots():
                 hyper_parameters = pickle.load(f)
             hyper_parameters = hyper_parameters.__dict__ if isinstance(hyper_parameters, HyperParameters) \
                 else hyper_parameters
-            if 'git_description' in hyper_parameters:
-                del hyper_parameters['git_description']
             hyper_parameters['idx'] = str(file_count)
+
+            for param in args.ignore_params:
+                if param in hyper_parameters:
+                    del hyper_parameters[param]
             file_count += 1
             event_files = [os.path.join(root, f) for f in files if IsTensorFlowEventsFile(f)]
 
@@ -223,6 +267,8 @@ if __name__ == "__main__":
     parser.add_argument("--input_dir")
     parser.add_argument("--output_dir", default='/home/jos/Dropbox/RUG/6e Jaar/mproj/thesis/im')
     parser.add_argument("--scalar_subset", nargs='+', default=['Evaluation/Score'])
+    parser.add_argument("--ignore_params", nargs='+', default=['git_description'])
+    parser.add_argument("--interpolate", dest='interpolate', action='store_true')
     parser.add_argument("--image_suffix", default="")
     parser.add_argument("--xlabel", default="Train episode")
     parser.add_argument("--ylabel", default="Score")
