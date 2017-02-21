@@ -9,6 +9,13 @@ def log_uniform(lo, hi, rate):
   v = log_lo * (1-rate) + log_hi * rate
   return np.exp(v)
 
+def uniform(lo, hi, rate):
+    return rate * (hi - lo) + lo
+
+func_by_param = {
+    'learning_rate': log_uniform,
+    'ss_epsilon': uniform
+}
 
 lo_by_param = {
     'learning_rate': 1e-4,
@@ -31,8 +38,8 @@ if __name__ == "__main__":
 
     for i in range(50):
         command = ["python3", "mproj/deeprl/rlmethods/a3c.py", '--env=Catch', '--model={}'.format(args.model),
-                   '--evaluation_interval=50000', '--T_max=1000000',  '--n_threads=12'] + a3c_args +\
-                  ["--{}={}".format(p, log_uniform(lo_by_param[p], hi_by_param[p], np.random.rand()))
+                   '--evaluation_interval=50000', '--T_max=1000000',  '--n_threads=12'] + a3c_args + \
+                  ["--{}={}".format(p, func_by_param[p](lo_by_param[p], hi_by_param[p], np.random.rand()))
                    for p in args.params]
         print('INITIATING COMMAND:\n{}'.format(' '.join(command)))
 
