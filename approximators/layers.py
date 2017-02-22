@@ -248,7 +248,8 @@ def fully_connected_weight_sharing(incoming, axis_len, filter_size, dimensionali
 
 def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, strides, activation, name='SoftWeightConv',
                            scope=None, reuse=False, local_normalization=True, centroids_trainable=False, scaling=1.0,
-                           distance_fn='EXP', padding='same', sigma_trainable=None, per_feature=False):
+                           distance_fn='EXP', padding='same', sigma_trainable=None, per_feature=False,
+                           color_coding=False):
     """
     Defines a soft weight sharing layer. The soft weight sharing is accomplished by performing multiple convolutions
     which are then combined by a local weighting locally depends on the distance to the 'centroid' of each convolution.
@@ -277,7 +278,7 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
                     By default, this parameter is set to None, in which case it takes over the value of
                     centroids_trainable.
         :param per_feature      If True, the centroids are given per output feature.
-
+        :param color_coding     If True, uses color coding for visual summary
     Return values:
         :return: A 4D Tensor with similar dimensionality as a normal conv_2d's output
     """
@@ -290,6 +291,18 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
 
     if sigma_trainable is None:
         sigma_trainable = centroids_trainable
+
+    if color_coding:
+        assert incoming.get_shape().as_list()[-1] == 1, "Color coding is only supported for singleton input features"
+        assert np.prod(n_centroids) <= 12, "Color coding is only supported for n_centroids <= 12"
+
+        try:
+            import colorlover as cl
+        except ImportError:
+            print("WARNING: Unable to import colorlover, you can install it through 'pip install colorlover --user'\n"
+                  "For now, this layer does not use color coding")
+            color_coding = False
+
 
     with vscope as scope:
         name = scope.name
@@ -389,11 +402,13 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
             euclidean_downsampled = euclidian_dist[:, ::3, ::3, :, :]
             _, m, n, _, _ = euclidean_downsampled.get_shape().as_list()
 
-            # The euclidean_downsampled Tensor contains the spatial coefficients for different centroids
-            # We can reshape this such that we multiply the corresponding filters with the help of broadcasting
             if per_feature:
+                # In case we have centroids per feature, we need to make sure that the centroids dimension is at the 2nd
+                # axis
                 euclidean_downsampled = tf.transpose(euclidean_downsampled, [0, 3, 1, 2, 4])
 
+            # The euclidean_downsampled Tensor contains the spatial coefficients for different centroids
+            # We can reshape this such that we multiply the corresponding filters with the help of broadcasting
             euclidian_dist_reshaped = tf.reshape(euclidean_downsampled, 3 * [1] + [centroids_f, m, n, n_centroids])
             current_filter_shape = convs.W.get_shape().as_list()
             current_filter_shape[-1] //= n_centroids
@@ -403,6 +418,21 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
 
             # Get the locally weighted kernels
             locally_weighted_kernels = tf.reduce_sum(tf.mul(euclidian_dist_reshaped, weights_stacked), axis=6)
+
+            if color_coding:
+                colors_numeric = [list(c) for c in cl.to_numeric(cl.scales['9']['qual']['Set1'][:n_centroids])]
+                colors = tf.reshape(colors_numeric, (1, 1, 3, 1, 1, 1, n_centroids))
+                #current_filter_shape[2] *= 3
+                weights_stacked *= colors
+
+                #bsz = tf.shape()
+                print("SHAPE::::  ", euclidian_dist_reshaped.get_shape())
+                color_distance = tf.tile(tf.reduce_sum(
+                    euclidian_dist_reshaped * colors, axis=6), current_filter_shape[:-1] + 3*[1])
+                locally_weighted_kernels = tf.concat(2, [color_distance, locally_weighted_kernels])
+
+                current_filter_shape[2] = 4
+
 
             # Normalize
             locally_weighted_kernels -= tf.reduce_min(locally_weighted_kernels, axis=[4, 5], keep_dims=True)
