@@ -20,8 +20,9 @@ from tflearn.layers.conv import conv_2d, max_pool_2d
 from tflearn.layers.normalization import local_response_normalization
 from tflearn.layers.estimator import regression
 
+import matplotlib.pylab as plt
 from deeprl.approximators.layers import spatialsoftmax
-
+import tensorflow as tf
 # Data loading and preprocessing
 import tflearn.datasets.mnist as mnist
 X, Y, testX, testY = mnist.load_data(one_hot=True)
@@ -33,14 +34,14 @@ network = input_data(shape=[None, 28, 28, 1], name='input')
 network = conv_2d(network, 32, 3, activation='elu', regularizer="L2")
 network = max_pool_2d(network, 2)
 network = local_response_normalization(network)
-network = conv_2d(network, 64, 3, activation='linear', regularizer="L2")
-ss = spatialsoftmax(network, epsilon=0.5)
+network = conv_2d(network, 64, 3, activation='linear', regularizer="L2")#, bias=False)
+ss = spatialsoftmax(tf.reshape(network, (-1, 14, 14, 64)), epsilon=0.1)
 #network = max_pool_2d(network, 2)
 #network = local_response_normalization(network)
 network = fully_connected(ss, 128, activation='elu')
-network = dropout(network, 0.8)
-network = fully_connected(network, 256, activation='elu')
-network = dropout(network, 0.8)
+network = dropout(network, 0.5)
+network = fully_connected(network, 128, activation='elu')
+network = dropout(network, 0.5)
 network = fully_connected(network, 10, activation='softmax')
 network = regression(network, optimizer='adam', learning_rate=0.01,
                      loss='categorical_crossentropy', name='target')
@@ -48,9 +49,16 @@ network = regression(network, optimizer='adam', learning_rate=0.01,
 
 # Training
 model = tflearn.DNN(network, tensorboard_verbose=0, tensorboard_dir='/home/jos/tensorflowlogs/mnist/ss')
-print(model.session.run(ss, feed_dict={model.inputs[0]: X[:1]}))
-model.fit({'input': X}, {'target': Y}, n_epoch=20,
-           validation_set=({'input': testX}, {'target': testY}),
-           snapshot_step=100, show_metric=True, run_id='convnet_mnist')
+model.fit({'input': X}, {'target': Y}, n_epoch=10,
+           validation_set=({'input': testX}, {'target': testY}), show_metric=True, run_id='convnet_mnist')
 
-print(model.session.run(ss, feed_dict={model.inputs[0]: X[:1]}))
+softmax_features = model.session.run(ss.sm, feed_dict={model.inputs[0]: X[:10]})
+
+for i in range(10):
+    for j in range(64):
+        print(softmax_features[i, :, :, j].sum())
+        #print("x: {}, y: {}".format(pos[i, j], pos[i, j+64]))
+        plt.imshow(softmax_features[i, :, :, j], cmap='gray', vmin=0., vmax=1.)
+        plt.show()
+
+#print(model.session.run(ss, feed_dict={model.inputs[0]: X[:1]}))
