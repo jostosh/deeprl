@@ -17,7 +17,7 @@ import pprint
 import plotly.plotly as py
 import plotly.graph_objs as go
 
-
+from matplotlib import cm
 
 mpl.rc('text', usetex=True)
 mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman'], 'size': 14})
@@ -35,7 +35,7 @@ colorscalen.append((0., 0., 0.))
 colorscalen.append((1., 0., 0.))
 
 
-def event_arrays_to_np_arrays(event_array):
+def event_arrays_to_mean_and_errors(event_array):
     value_by_step = {}
     np_arrays_x = []
     np_arrays_y = []
@@ -104,7 +104,8 @@ def event_arrays_to_np_arrays(event_array):
 def obtain_name(hp):
     function_by_name = {
         'idx': lambda p: 'Fold ' + hp['idx'],
-        'model': lambda p: {'default': 'Default CNN', 'spatial': 'SIWS CNN'}[hp[p]]
+        'model': lambda p: {'default': 'Default CNN', 'spatial': 'SIWS CNN'}[hp[p]],
+        'per_feature': lambda p: '/F' if (p in hp and hp[p] == True) else ''
     }
 
     if args.trace_by:
@@ -183,6 +184,10 @@ def export_plots():
         handles = []
 
         data_objs = []
+
+        all_scores = []
+        all_xticks = []
+        all_surfaces = []
         for hyper_parameters_str, event_files in sorted(event_files_by_hp.items()):
             hyper_parameters = json.loads(hyper_parameters_str)
             events_by_scalar = {}
@@ -204,35 +209,43 @@ def export_plots():
                         events_by_scalar[scalar].append(items)
 
             for scalar, event_arrays in events_by_scalar.items():
-                steps, values, errors, np_arrays_x, np_arrays_y = event_arrays_to_np_arrays(event_arrays)
+                steps, values, errors, np_arrays_x, np_arrays_y = event_arrays_to_mean_and_errors(event_arrays)
 
-                steps, values, errors = zip(*sorted(zip(steps, values, errors)))
-                steps = np.asarray(steps)
-                values = np.asarray(values)
-                errors = np.asarray(errors)
+                if args.mode == 'mean':
+                    steps, values, errors = zip(*sorted(zip(steps, values, errors)))
+                    steps = np.asarray(steps)
+                    values = np.asarray(values)
+                    errors = np.asarray(errors)
 
-                print(errors)
+                    plt.fill_between(steps, values - errors, values + errors, facecolor=colorscalen[hp_idx], alpha=0.2)
 
-                plt.fill_between(steps, values - errors, values + errors, facecolor=colorscalen[hp_idx], alpha=0.2)
+                    handles.append(plt.plot(steps, values, linewidth=2.0, color=colorscalen[hp_idx],
+                                                label=obtain_name(hyper_parameters))[0])
+                    trace = go.Scatter(
+                        x=np.concatenate([steps, steps[::-1]]),
+                        y=np.concatenate([values + errors, (values - errors)[::-1]]),
+                        fill='tozerox',
+                        fillcolor=colorscale[hp_idx].replace('rgb', 'rgba').replace(')', ',0.2)'),  # 'rgba(0,100,80,0.2)',
+                        line=go.Line(color='transparent'),
+                        showlegend=False
+                    )
+                    line = go.Scatter(
+                        x=steps,
+                        y=values,
+                        line=go.Line(color=colorscale[hp_idx], width=4),
+                        mode='lines',
+                        name=obtain_name(hyper_parameters)
+                    )
+                    data_objs += [trace, line]
 
-                handles.append(plt.plot(steps, values, linewidth=2.0, color=colorscalen[hp_idx],
-                                            label=obtain_name(hyper_parameters))[0])
-                trace = go.Scatter(
-                    x=np.concatenate([steps, steps[::-1]]),
-                    y=np.concatenate([values + errors, (values - errors)[::-1]]),
-                    fill='tozerox',
-                    fillcolor=colorscale[hp_idx].replace('rgb', 'rgba').replace(')', ',0.2)'),  # 'rgba(0,100,80,0.2)',
-                    line=go.Line(color='transparent'),
-                    showlegend=False
-                )
-                line = go.Scatter(
-                    x=steps,
-                    y=values,
-                    line=go.Line(color=colorscale[hp_idx], width=4),
-                    mode='lines',
-                    name=obtain_name(hyper_parameters)
-                )
-                data_objs += [trace, line]
+                elif args.mode == 'sweep':
+                    if len(args.trace_by) == 1:
+                        all_scores += [np.mean(y_arr[-10:]) for y_arr in np_arrays_y]
+                        all_surfaces += [np.sum(y_arr) for y_arr in np_arrays_y]
+
+                        all_xticks += [np.log10(hyper_parameters[args.trace_by[0]]) for _ in range(len(np_arrays_y))]
+                    else:
+                        raise ValueError("Currently not able to trace param sweep by two or more params")
 
             hp_idx += 1
 
@@ -244,23 +257,67 @@ def export_plots():
             'adience': 'lower right'
         }
 
-        data = go.Data(data_objs)
-        layout.title = env.replace('-v0', '') if not args.title else args.title
-        fig = go.Figure(data=data, layout=layout)
-        py.plot(fig, filename=env.replace('-v0', '') + args.image_suffix + '.html')
+        if args.mode == 'mean':
 
-        plt.xlabel(args.xlabel)
-        plt.ylabel(args.ylabel)
-        plt.title(env.replace('-v0', '') if not args.title else args.title)
-        if args.xrange:
-            plt.xlim(args.xrange)
-        if args.yrange:
-            plt.ylim(args.yrange)
-        plt.legend(handles=handles, loc=position_by_env[env], framealpha=0.)
+            data = go.Data(data_objs)
+            layout.title = env.replace('-v0', '') if not args.title else args.title
+            fig = go.Figure(data=data, layout=layout)
+            py.plot(fig, filename=env.replace('-v0', '') + args.image_suffix + '.html')
 
-        plt.savefig(os.path.join(args.output_dir, env.replace('-v0', '') + args.image_suffix + '.pdf'))
-        plt.clf()
+            plt.xlabel(args.xlabel)
+            plt.ylabel(args.ylabel)
+            plt.title(env.replace('-v0', '') if not args.title else args.title)
+            if args.xrange:
+                plt.xlim(args.xrange)
+            if args.yrange:
+                plt.ylim(args.yrange)
+            plt.legend(handles=handles, loc=position_by_env[env], framealpha=0.)
 
+            plt.savefig(os.path.join(args.output_dir, env.replace('-v0', '') + args.image_suffix + '.pdf'))
+            plt.clf()
+        else:
+
+            trace = go.Scatter(
+                x=all_xticks,
+                y=all_scores,
+                mode='markers',
+                marker=go.Marker(
+                    size='14',
+                    color=all_surfaces,
+                    colorscale='Viridis',
+                    showscale=True
+                )
+            )
+            xlab = args.trace_by[0].split('_').title() if not args.xlabel else args.xlabel
+            ylab = args.scalar_subset[0].split('/')[-1].title() if not args.ylabel else args.ylabel
+            title = env.replace('-v0', '') if not args.title else args.title
+
+            layout.xaxis.title = xlab
+            #layout.xaxis.type = 'log'
+            layout.yaxis.title = ylab
+            layout.title = title
+
+            fig, ax = plt.subplots()
+            ax.set_xlabel(xlab)
+            ax.set_ylabel(ylab)
+            ax.set_title(title)
+            if args.xrange:
+                ax.set_xlim(args.xrange)
+            if args.yrange:
+                ax.set_ylim(args.yrange)
+
+            cax = ax.scatter(all_xticks, all_scores, s=80, c=all_surfaces, cmap=cm.viridis)
+
+            cb = fig.colorbar(cax)
+            cb.ax.set_title("$\sum_i s_i$")
+
+            plt.savefig(os.path.join(args.output_dir, title.lower().replace(' ', '_') + '.pdf'))
+            plt.clf()
+
+            #data = go.Data([trace])
+            #fig = go.Figure(data=data, layout=layout)
+
+            #py.plot(fig, filename=env.replace('-v0', '' if not args.title else args.title))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -276,6 +333,7 @@ if __name__ == "__main__":
     parser.add_argument("--xrange", nargs='+', default=[], type=int)
     parser.add_argument("--yrange", nargs='+', default=[], type=int)
     parser.add_argument("--trace_by", nargs='+', default=[])
+    parser.add_argument("--mode", default='mean', choices=['mean', 'sweep'])
     args = parser.parse_args()
 
     print(args.xrange)
