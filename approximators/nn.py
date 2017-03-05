@@ -131,11 +131,11 @@ class ActorCriticNN(object):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers'):
-            net = conv_layer(net, 32, 8, 4, activation=self.hp.activation, name='Conv1')
+            net = conv_layer(net, 32, 5, 3, activation=self.hp.activation, name='Conv1')
             self._add_trainable(net)
-            net = conv_layer(net, 128, 3, 1, activation=tf.identity, name='Conv2')
+            net = conv_layer(net, 64, 3, 2, activation=tf.identity, name='Conv2')
             self._add_trainable(net)
-            net = spatialsoftmax(net, epsilon=self.hp.ss_epsilon)
+            net = spatialsoftmax(net, epsilon=self.hp.ss_epsilon, hierarchical=True)
             net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
             self._add_trainable(net)
             self.embedding_layer = net
