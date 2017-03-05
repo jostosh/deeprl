@@ -49,6 +49,15 @@ presets = {
     '4': {
         'model': 'a3c_ff',
         'activation': 'elu'
+    },
+    '5': {
+        'model': 'a3c_ff_ss',
+        'safe_softmax': True
+    },
+    '6': {
+        'model': 'a3c_ff_ss',
+        'safe_softmax': True,
+        'activation': 'elu'
     }
 }
 

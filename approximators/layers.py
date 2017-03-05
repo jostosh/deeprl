@@ -140,7 +140,8 @@ def conv_transpose(incoming, nb_filter, size, stride, activation=tf.nn.elu):
     return out
 
 
-def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=False, name='SpatialSoftmax', hierarchical=False):
+def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='SpatialSoftmax', hierarchical=True,
+                   safe_softmax=True):
     # Get the incoming dimensions (should be a 4D tensor)
     _, h, w, c = incoming.get_shape().as_list()
 
@@ -154,7 +155,11 @@ def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=False, name='Sp
         temperature = tf.Variable(initial_value=tf.ones(c), dtype=tf.float32, trainable=trainable_temperature)
 
         # Compute the softmax numerator
-        numerator_softmax = tf.exp(incoming, name='Numerator') / tf.reshape(temperature, (1, 1, 1, c))
+        if safe_softmax:
+            incoming_ = incoming - tf.stop_gradient(tf.reduce_max(incoming, reduction_indices=[1, 2], keep_dims=True))
+            numerator_softmax = tf.exp(incoming_, name='Numerator') / tf.reshape(temperature, (1, 1, 1, c))
+        else:
+            numerator_softmax = tf.exp(incoming, name='Numerator') / tf.reshape(temperature, (1, 1, 1, c))
         # The denominator is computed by computing the sum per channel
         # Again, the '1's in the reshaping are to ensure broadcasting along those dimensions
         denominator_softmax = tf.reshape(tf.reduce_sum(numerator_softmax, reduction_indices=[1, 2]), (-1, 1, 1, c),
@@ -168,13 +173,19 @@ def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=False, name='Sp
         y_coordinates = tf.reduce_sum(tf.mul(cartesian_y, softmax_per_channel), reduction_indices=[1, 2], name='yOut')
 
         if hierarchical:
-
+            temperature_patch = tf.Variable(initial_value=tf.ones(c * 4), dtype=tf.float32,
+                                            trainable=trainable_temperature)
             patched = tf.concat(3, [
-                numerator_softmax[:,        :h//2,          :w//2,     :],
-                numerator_softmax[:,    h//2:2*(h//2),      :w//2,     :],
-                numerator_softmax[:,    h//2:2*(h//2),  w//2:2*(w//2), :],
-                numerator_softmax[:,        :h//2,      w//2:2*(w//2), :]
+                incoming[:,        :h//2,          :w//2,     :],
+                incoming[:,    h//2:2*(h//2),      :w//2,     :],
+                incoming[:,    h//2:2*(h//2),  w//2:2*(w//2), :],
+                incoming[:,        :h//2,      w//2:2*(w//2), :]
             ])
+            if safe_softmax:
+                patched -= tf.stop_gradient(
+                    tf.reduce_max(patched, reduction_indices=[1, 2], keep_dims=True))
+
+            patched /= tf.reshape(temperature_patch, (1, 1, 1, 4*c))
 
             denominator_softmax = tf.reshape(tf.reduce_sum(patched, reduction_indices=[1, 2]), (-1, 1, 1, c * 4))
             softmax_per_channel = tf.div(patched, denominator_softmax)
@@ -190,7 +201,7 @@ def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=False, name='Sp
         # Concatenate the resulting tensors to get the output
         o = tf.concat(1, [x_coordinates, y_coordinates] + ([x_coordinates_s, y_coordinates_s] if hierarchical else []),
                       name="Output")
-        o.b = temperature
+        o.b = temperature if not hierarchical else tf.concat(0, [temperature, temperature_patch])
         tf.add_to_collection(tf.GraphKeys.LAYER_VARIABLES + '/' + name, o.b)
         o.sm = softmax_per_channel
 
