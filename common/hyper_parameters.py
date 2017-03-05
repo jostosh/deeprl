@@ -45,7 +45,9 @@ config1 = {
     'optimizer': 'rmsprop',
     'beta1': 0.9,
     'beta2': 0.999,
-    'adam_epsilon': 1e-4
+    'adam_epsilon': 1e-4,
+    'safe_softmax': False,
+    'logprefix': ''
 }
 
 param_sweep = {
@@ -134,3 +136,5 @@ class HyperParameters(object):
         self.optimizer = params.optimizer
         self.beta1 = params.beta1
         self.beta2 = params.beta2
+        self.safe_softmax = params.safe_softmax
+        self.logprefix = params.logprefix

@@ -61,16 +61,12 @@ def event_arrays_to_mean_and_errors(event_array):
 
         for i in range(len(x_arr) - 1):
             xc_arr.append(np.linspace(x_arr[i], x_arr[i+1], x_arr[i+1] - x_arr[i] + 1, dtype=np.int64)[:-1])
-            print(xc_arr[-1])
             yc_arr.append(np.linspace(y_arr[i], y_arr[i+1], x_arr[i+1] - x_arr[i] + 1)[:-1])
         xc_arr.append(np.asarray([x_arr[-1]]))
         yc_arr.append(np.asarray([y_arr[-1]]))
 
         continuous_arrays_x.append(np.concatenate(xc_arr))
         continuous_arrays_y.append(np.concatenate(yc_arr))
-
-        print(continuous_arrays_x[-1][-1] - continuous_arrays_x[-1][0], len(continuous_arrays_x[-1]),
-              len(continuous_arrays_y[-1]))
 
     c_arrays_y = []
     for x_arr, y_arr in zip(continuous_arrays_x, continuous_arrays_y):
@@ -154,11 +150,17 @@ def export_plots():
         print(root, dir, files)
 
         if any([IsTensorFlowEventsFile(f) for f in files]) and 'hyper_parameters.pkl' in files:
-            with open(os.path.join(root, 'hyper_parameters.pkl'), 'rb') as f:
-                hyper_parameters = pickle.load(f)
+            try:
+                with open(os.path.join(root, 'hyper_parameters.pkl'), 'rb') as f:
+                    hyper_parameters = pickle.load(f)
+            except Exception as e:
+                continue
             hyper_parameters = hyper_parameters.__dict__ if isinstance(hyper_parameters, HyperParameters) \
                 else hyper_parameters
             hyper_parameters['idx'] = str(file_count)
+
+            #if any(t not in hyper_parameters for t in args.trace_by):
+            #    continue
 
             for param in args.ignore_params:
                 if param in hyper_parameters:
@@ -187,6 +189,7 @@ def export_plots():
 
         all_scores = []
         all_xticks = []
+        all_yticks = []
         all_surfaces = []
         for hyper_parameters_str, event_files in sorted(event_files_by_hp.items()):
             hyper_parameters = json.loads(hyper_parameters_str)
@@ -202,7 +205,6 @@ def export_plots():
                     #if scalar != 'Evaluation/Score':
                     #    continue
                     items = ea.Scalars(scalar)
-                    print(items)
                     if scalar not in events_by_scalar:
                         events_by_scalar[scalar] = [items]
                     else:
@@ -239,13 +241,16 @@ def export_plots():
                     data_objs += [trace, line]
 
                 elif args.mode == 'sweep':
-                    if len(args.trace_by) == 1:
+                    if 1 <= len(args.trace_by) <= 2:
                         all_scores += [np.mean(y_arr[-10:]) for y_arr in np_arrays_y]
                         all_surfaces += [np.sum(y_arr) for y_arr in np_arrays_y]
 
                         all_xticks += [np.log10(hyper_parameters[args.trace_by[0]]) for _ in range(len(np_arrays_y))]
                     else:
-                        raise ValueError("Currently not able to trace param sweep by two or more params")
+                        raise ValueError("No support for sweep plot for more than two parameters")
+
+                    if len(args.trace_by) == 2:
+                        all_yticks += [hyper_parameters[args.trace_by[1]] for _ in range(len(np_arrays_y))]
 
             hp_idx += 1
 
@@ -276,48 +281,70 @@ def export_plots():
             plt.savefig(os.path.join(args.output_dir, env.replace('-v0', '') + args.image_suffix + '.pdf'))
             plt.clf()
         else:
-
-            trace = go.Scatter(
-                x=all_xticks,
-                y=all_scores,
-                mode='markers',
-                marker=go.Marker(
-                    size='14',
-                    color=all_surfaces,
-                    colorscale='Viridis',
-                    showscale=True
+            if len(args.trace_by) == 1:
+                trace = go.Scatter(
+                    x=all_xticks,
+                    y=all_scores,
+                    mode='markers',
+                    marker=go.Marker(
+                        size='14',
+                        color=all_surfaces,
+                        colorscale='Viridis',
+                        showscale=True
+                    )
                 )
-            )
-            xlab = args.trace_by[0].split('_').title() if not args.xlabel else args.xlabel
-            ylab = args.scalar_subset[0].split('/')[-1].title() if not args.ylabel else args.ylabel
-            title = env.replace('-v0', '') if not args.title else args.title
+                xlab = args.trace_by[0].split('_').title() if not args.xlabel else args.xlabel
+                ylab = args.scalar_subset[0].split('/')[-1].title() if not args.ylabel else args.ylabel
+                title = env.replace('-v0', '') if not args.title else args.title
 
-            layout.xaxis.title = xlab
-            #layout.xaxis.type = 'log'
-            layout.yaxis.title = ylab
-            layout.title = title
+                layout.xaxis.title = xlab
+                #layout.xaxis.type = 'log'
+                layout.yaxis.title = ylab
+                layout.title = title
 
-            fig, ax = plt.subplots()
-            ax.set_xlabel(xlab)
-            ax.set_ylabel(ylab)
-            ax.set_title(title)
-            if args.xrange:
-                ax.set_xlim(args.xrange)
-            if args.yrange:
-                ax.set_ylim(args.yrange)
+                fig, ax = plt.subplots()
+                ax.set_xlabel(xlab)
+                ax.set_ylabel(ylab)
+                ax.set_title(title)
+                if args.xrange:
+                    ax.set_xlim(args.xrange)
+                if args.yrange:
+                    ax.set_ylim(args.yrange)
 
-            cax = ax.scatter(all_xticks, all_scores, s=80, c=all_surfaces, cmap=cm.viridis)
+                cax = ax.scatter(all_xticks, all_scores, s=80, c=all_surfaces, cmap=cm.viridis)
 
-            cb = fig.colorbar(cax)
-            cb.ax.set_title("$\sum_i s_i$")
+                cb = fig.colorbar(cax)
+                cb.ax.set_title("$\sum_i s_i$")
+                plt.show()
 
-            plt.savefig(os.path.join(args.output_dir, title.lower().replace(' ', '_') + '.pdf'))
-            plt.clf()
+                plt.savefig(os.path.join(args.output_dir, title.lower().replace(' ', '_') + '.pdf'))
+                plt.clf()
 
-            #data = go.Data([trace])
-            #fig = go.Figure(data=data, layout=layout)
+                #data = go.Data([trace])
+                #fig = go.Figure(data=data, layout=layout)
 
-            #py.plot(fig, filename=env.replace('-v0', '' if not args.title else args.title))
+                #py.plot(fig, filename=env.replace('-v0', '' if not args.title else args.title))
+            else:
+                trace = go.Scatter3d(
+                    x=all_xticks,
+                    y=all_yticks,
+                    z=all_scores,
+                    mode='markers',
+                    marker=dict(
+                        size=12,
+                        color=all_surfaces,  # set color to an array/list of desired values
+                        colorscale='Viridis',  # choose a colorscale
+                        opacity=0.8
+                    )
+                )
+
+                layout.xaxis.title = args.xlabel
+                layout.yaxis.title = args.ylabel
+
+                data = go.Data([trace])
+                fig = go.Figure(data=data, layout=layout)
+
+                py.plot(fig, filename=env.replace('-v0', '' if not args.title else args.title))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

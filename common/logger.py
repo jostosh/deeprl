@@ -6,9 +6,16 @@ VERSION = 'v0.9.5'
 LOGDIRBASE = "/data/s2098407/tensorflowlogs/{}".format(VERSION) #"{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
 
 
+def logprefixed(base, hp):
+    if hp.logprefix:
+        return os.path.join(base, hp.logprefix)
+    return base
+
+
 def get_log_dir(hyper_parameters):
+
     try:
-        path = os.path.join(LOGDIRBASE,
+        path = os.path.join(logprefixed(LOGDIRBASE, hyper_parameters),
                             hyper_parameters.env,
                             hyper_parameters.model,
                             'prediction={}'.format(hyper_parameters.frame_prediction),
@@ -19,9 +26,11 @@ def get_log_dir(hyper_parameters):
         # Check if base directory exists, if not create it
         os.makedirs(path, exist_ok=True)
     except PermissionError as e: # "{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
-        path = os.path.join(os.path.expanduser("~"),
-                            "tensorflowlogs",
-                            VERSION,
+        basepath = logprefixed(os.path.join(
+            os.path.expanduser("~"),
+            VERSION
+        ), hyper_parameters)
+        path = os.path.join(basepath,
                             hyper_parameters.env,
                             hyper_parameters.model,
                             'prediction={}'.format(hyper_parameters.frame_prediction),
