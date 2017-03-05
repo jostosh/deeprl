@@ -310,8 +310,14 @@ class ActorCriticNN(object):
 
         with tf.name_scope("Outputs"):
             with tf.name_scope("Policy"):
-                self.pi = fc_layer(net, num_actions, activation='softmax', name='pi_sa')
-                self._add_trainable(self.pi)
+                if self.hp.safe_softmax:
+                    self.pi = fc_layer(net, num_actions, activation='linear', name='pi_sa')
+                    self._add_trainable(self.pi)
+                    self.pi -= tf.stop_gradient(tf.expand_dims(tf.reduce_max(self.pi, reduction_indices=[1]), 1))
+                    self.pi = tf.nn.softmax(self.pi)
+                else:
+                    self.pi = fc_layer(net, num_actions, activation='softmax', name='pi_sa')
+                    self._add_trainable(self.pi)
             with tf.name_scope("Value"):
                 if self.policy_weighted_val:
                     q_val = fc_layer(net, num_actions, activation='linear', name='q_sa')
