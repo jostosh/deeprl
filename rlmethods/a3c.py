@@ -7,7 +7,7 @@ from deeprl.approximators.nn import ActorCriticNN
 from deeprl.common.environments import get_env, AtariEnvironment
 from deeprl.common.hyper_parameters import *
 from deeprl.common.tensorboard import writer_new_event, make_summary_from_python_var
-from deeprl.approximators.optimizers import RMSPropCustom
+from deeprl.approximators.optimizers import RMSPropShared, AdamShared
 import time
 import pickle
 from random import shuffle
@@ -292,11 +292,15 @@ if __name__ == "__main__":
 
     learning_rate_ph = tf.placeholder(tf.float32)
 
-    shared_optimizer = RMSPropCustom(session,
-                                     learning_rate_ph,
-                                     decay=hyperparameters.rms_decay,
-                                     epsilon=hyperparameters.rms_epsilon,
-                                     feedback=hyperparameters.feedback)
+    if hyperparameters.optimizer == "rmsprop":
+        shared_optimizer = RMSPropShared(session,
+                                         learning_rate_ph,
+                                         decay=hyperparameters.rms_decay,
+                                         epsilon=hyperparameters.rms_epsilon,
+                                         feedback=hyperparameters.feedback)
+    else:
+        shared_optimizer = AdamShared(session, learning_rate_ph, beta1=hyperparameters.beta1,
+                                      beta2=hyperparameters.beta2, feedback=hyperparameters.feedback)
 
     global_network = ActorCriticNN(num_actions=num_actions,
                                    agent_name='GLOBAL',
@@ -329,7 +333,7 @@ if __name__ == "__main__":
     projector.visualize_embeddings(writer, embedding_config)
 
     saver = tf.train.Saver({var.name: var for var in
-                            global_network.theta + shared_optimizer.mean_square + [T_var, embedding_var]})
+                            global_network.theta + shared_optimizer.ms + [T_var, embedding_var]})
     weights_path = os.path.join(writer.get_logdir(), 'model.ckpt')
     os.makedirs(os.path.dirname(weights_path), exist_ok=True)
 

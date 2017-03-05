@@ -41,7 +41,11 @@ config1 = {
     'feedback': False,
     'fp_decay': 0.99999,
     'activation': 'relu',
-    'ss_epsilon': 0.5
+    'ss_epsilon': 0.5,
+    'optimizer': 'rmsprop',
+    'beta1': 0.9,
+    'beta2': 0.999,
+    'adam_epsilon': 1e-4
 }
 
 param_sweep = {
@@ -127,3 +131,6 @@ class HyperParameters(object):
         self.fp_decay = params.fp_decay
         self.activation = activation_fn[params.activation]
         self.ss_epsilon = params.ss_epsilon
+        self.optimizer = params.optimizer
+        self.beta1 = params.beta1
+        self.beta2 = params.beta2
