@@ -140,7 +140,7 @@ def conv_transpose(incoming, nb_filter, size, stride, activation=tf.nn.elu):
     return out
 
 
-def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=False, name='SpatialSoftmax'):
+def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=False, name='SpatialSoftmax', hierarchical=False):
     # Get the incoming dimensions (should be a 4D tensor)
     _, h, w, c = incoming.get_shape().as_list()
 
@@ -151,14 +151,8 @@ def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=False, name='Sp
         # Note that each '1' in the reshape is to enforce broadcasting along that dimension
         cartesian_y = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, h), (1, h, 1, 1), name="CartesianY")
         cartesian_x = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, w), (1, 1, w, 1), name="CartesianX")
-
         temperature = tf.Variable(initial_value=tf.ones(c), dtype=tf.float32, trainable=trainable_temperature)
 
-        #cartesian_x, cartesian_y = tf.meshgrid(tf.linspace(0., 1 - epsilon, w), tf.linspace(0., 1 - epsilon, h))
-        #cartesian_x = tf.reshape(cartesian_x, (1, 1, w, 1))
-        #cartesian_y = tf.reshape(cartesian_y, (1, h, 1, 1))
-
-        #'''
         # Compute the softmax numerator
         numerator_softmax = tf.exp(incoming, name='Numerator') / tf.reshape(temperature, (1, 1, 1, c))
         # The denominator is computed by computing the sum per channel
@@ -167,20 +161,35 @@ def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=False, name='Sp
                                          name='Denominator')
         # Now we compute the softmax per channel
         softmax_per_channel = tf.div(numerator_softmax, denominator_softmax, name='SoftmaxPerChannel')
-        #'''
-
-        #flattened_channels = tf.reshape(tf.transpose(incoming, (0, 3, 1, 2)), (-1, c * h * w))
-        #softmax_per_channel = tf.transpose(tf.reshape(tf.nn.softmax(flattened_channels), (-1, c, h, w)), (0, 2, 3, 1))
-        #softmax_per_channel = tf.clip_by_norm(softmax_per_channel, 1.0, axes=[1, 2])
-
 
         # Compute the x coordinates by element-wise multiplicatoin of the cartesion coordinates with the softmax
         # activations and summing the result
         x_coordinates = tf.reduce_sum(tf.mul(cartesian_x, softmax_per_channel), reduction_indices=[1, 2], name='xOut')
         y_coordinates = tf.reduce_sum(tf.mul(cartesian_y, softmax_per_channel), reduction_indices=[1, 2], name='yOut')
 
+        if hierarchical:
+
+            patched = tf.concat(3, [
+                numerator_softmax[:,        :h//2,          :w//2,     :],
+                numerator_softmax[:,    h//2:2*(h//2),      :w//2,     :],
+                numerator_softmax[:,    h//2:2*(h//2),  w//2:2*(w//2), :],
+                numerator_softmax[:,        :h//2,      w//2:2*(w//2), :]
+            ])
+
+            denominator_softmax = tf.reshape(tf.reduce_sum(patched, reduction_indices=[1, 2]), (-1, 1, 1, c * 4))
+            softmax_per_channel = tf.div(patched, denominator_softmax)
+
+            cartesian_y = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, h//2), (1, h//2, 1, 1))
+            cartesian_x = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, w//2), (1, 1, w//2, 1))
+
+            x_coordinates_s = tf.reduce_sum(tf.mul(cartesian_x, softmax_per_channel), reduction_indices=[1, 2],
+                                            name='xOut_s')
+            y_coordinates_s = tf.reduce_sum(tf.mul(cartesian_y, softmax_per_channel), reduction_indices=[1, 2],
+                                            name='yOut_s')
+
         # Concatenate the resulting tensors to get the output
-        o = tf.concat(1, [x_coordinates, y_coordinates], "Output")
+        o = tf.concat(1, [x_coordinates, y_coordinates] + ([x_coordinates_s, y_coordinates_s] if hierarchical else []),
+                      name="Output")
         o.b = temperature
         tf.add_to_collection(tf.GraphKeys.LAYER_VARIABLES + '/' + name, o.b)
         o.sm = softmax_per_channel
@@ -294,7 +303,7 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
 
     if color_coding:
         assert incoming.get_shape().as_list()[-1] == 1, "Color coding is only supported for singleton input features"
-        assert np.prod(n_centroids) <= 12, "Color coding is only supported for n_centroids <= 12"
+        assert np.prod(n_centroids) <= 9, "Color coding is only supported for n_centroids <= 9"
 
         try:
             import colorlover as cl
@@ -422,14 +431,9 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
             if color_coding:
                 colors_numeric = [list(c) for c in cl.to_numeric(cl.scales['9']['qual']['Set1'][:n_centroids])]
                 colors = tf.reshape(colors_numeric, (1, 1, 3, 1, 1, 1, n_centroids))
-                #current_filter_shape[2] *= 3
-                weights_stacked *= colors
-
-                #bsz = tf.shape()
-                print("SHAPE::::  ", euclidian_dist_reshaped.get_shape())
                 color_distance = tf.tile(tf.reduce_sum(
                     euclidian_dist_reshaped * colors, axis=6), current_filter_shape[:-1] + 3*[1])
-                locally_weighted_kernels = tf.concat(2, [color_distance, locally_weighted_kernels])
+                locally_weighted_kernels = tf.concat(2, [color_distance, 1. - locally_weighted_kernels])
 
                 current_filter_shape[2] = 4
 
