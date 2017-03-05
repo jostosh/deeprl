@@ -15,17 +15,20 @@ def uniform(lo, hi, rate):
 
 func_by_param = {
     'learning_rate': log_uniform,
-    'ss_epsilon': uniform
+    'ss_epsilon': uniform,
+    'global_clip_norm': log_uniform
 }
 
 lo_by_param = {
     'learning_rate': 1e-6,
-    'ss_epsilon': 0.1
+    'ss_epsilon': 0.1,
+    'global_clip_norm': 0.5
 }
 
 hi_by_param = {
     'learning_rate': 1e-2,
-    'ss_epsilon': 0.99
+    'ss_epsilon': 0.99,
+    'global_clip_norm': 10.0
 }
 
 presets = {
@@ -58,6 +61,15 @@ presets = {
         'model': 'a3c_ff_ss',
         'safe_softmax': True,
         'activation': 'elu'
+    },
+    '7': {
+        'model': 'a3c_ff_ss',
+        'safe_softmax': True,
+        'global_clipping': True
+    },
+    '8': {
+        'model': 'a3c_conv_lstm',
+        'global_clipping': True
     }
 }
 
@@ -70,7 +82,7 @@ def convert_preset_to_params(preset):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default='a3c_ff_ss')
-    parser.add_argument("--params", nargs='+', default=['learning_rate', 'ss_epsilon'])
+    parser.add_argument("--params", nargs='+', default=['learning_rate', 'ss_epsilon', 'global_clip_norm'])
     parser.add_argument("--a3c_args", nargs='+', default=[])
     parser.add_argument("--preset", default=None)
     args = parser.parse_args()

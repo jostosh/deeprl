@@ -1,12 +1,13 @@
 import tensorflow as tf
 from tensorflow.python.framework import constant_op
 from tensorflow.python.training import training_ops
+import numpy as np
 
 
 class RMSPropShared(object):
 
     def __init__(self, session, learning_rate, decay=0.99, epsilon=1e-8, theta=None, momentum=0., feedback=False,
-                 thl=0.5, thu=2., feedback_decay=0.99):
+                 thl=0.5, thu=2., feedback_decay=0.99, global_clipping=False, global_clip_norm=1.0):
         self.learning_rate = learning_rate
         self.decay = decay
 
@@ -32,6 +33,8 @@ class RMSPropShared(object):
         self.t = tf.Variable(0, dtype=tf.int32, trainable=False)
         self.feedback_decay = feedback_decay
         self.updates = []
+        self.global_clipping = global_clipping
+        self.global_clip_norm = global_clip_norm
 
 
     '''
@@ -65,7 +68,10 @@ class RMSPropShared(object):
         assert self.global_theta and self.ms and self.mom
 
         with tf.name_scope("GradientInput"):
-            grads = [tf.clip_by_norm(grad, 40.0) for grad in tf.gradients(loss, theta)]
+            if self.global_clipping:
+                grads, _ = tf.clip_by_global_norm(tf.gradients(loss, theta), self.global_clip_norm)
+            else:
+                grads = [tf.clip_by_norm(grad, 40.0) for grad in tf.gradients(loss, theta)]
 
         #return tf.group(*[training_ops.apply_rms_prop(
         #    var=t, ms=ms, mom=mom, lr=self.learning_rate, rho=self.decay_tensor, momentum=self.momentum_tensor,
@@ -144,18 +150,24 @@ class AdamShared(object):
         self.global_theta = theta
         self._init_from_prototype(theta)
 
+    def _clip_grad(self, grad):
+        shape = grad.get_shape().as_list()
+        if len(shape) == 4:
+            return tf.clip_by_norm(grad, 40.0/np.prod(shape[:-1]), axes=-1)
+        if len(shape) == 2:
+            return tf.clip_by_norm(grad, 40.0/shape[0], axes=-1)
+        if len(shape) == 1:
+            return tf.clip_by_norm(grad, 10.0)
+
     def build_update_from_vars(self, theta, loss):
         assert self.global_theta and self.ms and self.vs
 
         with tf.name_scope("GradientInput"):
-            grads = [tf.clip_by_norm(grad, 40.0) for grad in tf.gradients(loss, theta)]
+            grads = [self._clip_grad(grad) for grad in tf.gradients(loss, theta)]
 
 
 
-        #return tf.group(*[training_ops.apply_rms_prop(
-        #    var=t, ms=ms, mom=mom, lr=self.learning_rate, rho=self.decay_tensor, momentum=self.momentum_tensor,
-        #    epsilon=self.epsilon_tensor, grad=g, use_locking=False
-        #) for t, ms, mom, g in zip(self.global_theta, self.g_moving_average, self.mom, grads)], name="RMSPropUpdate")
+
         other_updates = []
         d_t = None
         if self.feedback:

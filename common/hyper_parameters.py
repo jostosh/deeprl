@@ -47,7 +47,9 @@ config1 = {
     'beta2': 0.999,
     'adam_epsilon': 1e-4,
     'safe_softmax': False,
-    'logprefix': ''
+    'logprefix': '',
+    'global_clipping': False,
+    'global_clip_norm': 1.0
 }
 
 param_sweep = {
@@ -138,3 +140,5 @@ class HyperParameters(object):
         self.beta2 = params.beta2
         self.safe_softmax = params.safe_softmax
         self.logprefix = params.logprefix
+        self.global_clipping = params.global_clipping
+        self.global_clip_norm = params.global_clip_norm
