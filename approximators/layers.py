@@ -201,7 +201,7 @@ def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='Spa
         # Concatenate the resulting tensors to get the output
         o = tf.concat(1, [x_coordinates, y_coordinates] + ([x_coordinates_s, y_coordinates_s] if hierarchical else []),
                       name="Output")
-        o.b = temperature if not hierarchical else tf.concat(0, [temperature, temperature_patch])
+        o.b = [temperature] if not hierarchical else [temperature, temperature_patch]
         tf.add_to_collection(tf.GraphKeys.LAYER_VARIABLES + '/' + name, o.b)
         o.sm = softmax_per_channel
 
