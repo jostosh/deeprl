@@ -127,7 +127,7 @@ print("Sigmas: \n{}\n".format(model.session.run(bias)[-9:]))
 for i in range(weighted_filters.shape[0]):
     #image = Image.fromarray(weighted_filters[i, :, :, 0]).convert('RGB')
     #image.save('mnist_logs/weighted_filters{0}.png'.format(i), format='png')
-    scipy.misc.imsave('mnist_logs/weighted_filters{0}.png'.format(i), weighted_filters[i, :, :, 0])
+    scipy.misc.imsave('mnist_logs/weighted_filters{0}.png'.format(i), weighted_filters[i, :, :, :])
 
     for j, W in enumerate(Ws):
         scipy.misc.imsave('mnist_logs/plain_filter{0}_{1}.png'.format(i, j), W[:, :, 0, i])
