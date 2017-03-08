@@ -140,18 +140,20 @@ def conv_transpose(incoming, nb_filter, size, stride, activation=tf.nn.elu):
     return out
 
 
-def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='SpatialSoftmax', hierarchical=True,
-                   safe_softmax=True):
+def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='SpatialSoftmax', hierarchical=False,
+                   safe_softmax=False):
     # Get the incoming dimensions (should be a 4D tensor)
     _, h, w, c = incoming.get_shape().as_list()
+
+    edge = 1 / (c*2) if not hierarchical else 1 / (c*6)
 
     with tf.name_scope(name):
         # First we create a linspace from -1 + epsilon to 1 - epsilon. Epsilon is needed to ensure that the output is
         # actually in the range (-1, 1) and not greater than 1 or smaller than -1.
         #
         # Note that each '1' in the reshape is to enforce broadcasting along that dimension
-        cartesian_y = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, h), (1, h, 1, 1), name="CartesianY")
-        cartesian_x = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, w), (1, 1, w, 1), name="CartesianX")
+        cartesian_y = tf.reshape(tf.linspace(-edge + epsilon*edge, edge - epsilon*edge, h), (1, h, 1, 1), name="CartesianY")
+        cartesian_x = tf.reshape(tf.linspace(-edge + epsilon*edge, edge - epsilon*edge, w), (1, 1, w, 1), name="CartesianX")
         temperature = tf.Variable(initial_value=tf.ones(c), dtype=tf.float32, trainable=trainable_temperature)
 
         # Compute the softmax numerator
@@ -190,8 +192,8 @@ def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='Spa
             denominator_softmax = tf.reshape(tf.reduce_sum(patched, reduction_indices=[1, 2]), (-1, 1, 1, c * 4))
             softmax_per_channel = tf.div(patched, denominator_softmax)
 
-            cartesian_y = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, h//2), (1, h//2, 1, 1))
-            cartesian_x = tf.reshape(tf.linspace(-1 + epsilon, 1 - epsilon, w//2), (1, 1, w//2, 1))
+            cartesian_y = tf.reshape(tf.linspace(-edge + epsilon*edge, edge - epsilon*edge, h//2), (1, h//2, 1, 1))
+            cartesian_x = tf.reshape(tf.linspace(-edge + epsilon*edge, edge - epsilon*edge, w//2), (1, 1, w//2, 1))
 
             x_coordinates_s = tf.reduce_sum(tf.mul(cartesian_x, softmax_per_channel), reduction_indices=[1, 2],
                                             name='xOut_s')
