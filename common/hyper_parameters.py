@@ -45,11 +45,12 @@ config1 = {
     'optimizer': 'rmsprop',
     'beta1': 0.9,
     'beta2': 0.999,
-    'adam_epsilon': 1e-4,
+    'adam_epsilon': 1e-8,
     'safe_softmax': False,
     'logprefix': '',
     'global_clipping': False,
-    'global_clip_norm': 1.0
+    'global_clip_norm': 1.0,
+    'mbc': False
 }
 
 param_sweep = {
@@ -142,3 +143,4 @@ class HyperParameters(object):
         self.logprefix = params.logprefix
         self.global_clipping = params.global_clipping
         self.global_clip_norm = params.global_clip_norm
+        self.mbc = params.mbc
