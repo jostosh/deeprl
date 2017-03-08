@@ -27,8 +27,8 @@ lo_by_param = {
 
 hi_by_param = {
     'learning_rate': 1e-2,
-    'ss_epsilon': 0.99,
-    'global_clip_norm': 10.0
+    'ss_epsilon': 0.5,
+    'global_clip_norm': 2.0
 }
 
 presets = {
@@ -70,6 +70,34 @@ presets = {
     '8': {
         'model': 'a3c_conv_lstm',
         'global_clipping': True
+    },
+    # -------------------------------- 08-03
+    '9': {
+        'model': 'a3c_ff_ss',
+        'global_clipping': True
+    },
+    '10': {
+        'model': 'a3c_ff',
+        'optimizer': 'adam'
+    },
+    '11': {
+        'model': 'a3c_ff',
+        'optimizer': 'adam',
+        'feedback': True
+    },
+    '12': {
+        'model': 'a3c_ff',
+        'global_clipping': True
+    },
+    '13': {
+        'model': 'a3c_ff'
+    },
+    '14': {
+        'model': 'a3c_ff',
+        'mbc': True
+    },
+    '15': {
+        'model': 'a3c_ff_ss'
     }
 }
 
