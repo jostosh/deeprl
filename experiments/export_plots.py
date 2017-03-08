@@ -311,13 +311,13 @@ def export_plots():
                 if args.yrange:
                     ax.set_ylim(args.yrange)
 
-                cax = ax.scatter(all_xticks, all_scores, s=80, c=all_surfaces, cmap=cm.viridis)
+                cax = ax.scatter(all_xticks, all_scores, s=80, c=all_surfaces, cmap=cm.winter)
 
                 cb = fig.colorbar(cax)
                 cb.ax.set_title("$\sum_i s_i$")
+                plt.savefig(os.path.join(args.output_dir, title.lower().replace(' ', '_') + '.pdf'))
                 plt.show()
 
-                plt.savefig(os.path.join(args.output_dir, title.lower().replace(' ', '_') + '.pdf'))
                 plt.clf()
 
                 #data = go.Data([trace])
