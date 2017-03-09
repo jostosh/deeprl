@@ -3,6 +3,7 @@ import tflearn
 import numpy as np
 from deeprl.common.logger import logger
 from deeprl.approximators.layers import spatialsoftmax, custom_lstm, convolutional_lstm, conv_layer, fc_layer
+from deeprl.approximators.sisws import spatial_weight_sharing
 from tensorflow.python.ops.rnn_cell import LSTMStateTuple
 from copy import deepcopy
 
@@ -15,6 +16,8 @@ class ModelNames:
     A3C_FF_SS   = 'a3c_ff_ss'
     A3C_LSTM_SS = 'a3c_lstm_ss'
     A3C_CONV_LSTM = 'a3c_conv_lstm'
+    A3C_SISWS   = 'a3c_sisws'
+    A3C_SISWS_S = 'a3c_sisws_s'
 
 
 class ActorCriticNN(object):
@@ -75,6 +78,7 @@ class ActorCriticNN(object):
         with tf.name_scope('HiddenLayers') as scope:
             # Add first convolutional layer
             net = conv_layer(net, 32, 8, 4, activation='linear', name='Conv1')
+
             self._add_trainable(net)
             net = self.hp.activation(net)
 
@@ -89,6 +93,52 @@ class ActorCriticNN(object):
             self.embedding_layer = net
 
         return net, scope
+
+    def _a3c_sisws(self):
+        with tf.name_scope(self.forward_input_scope):
+            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+
+        with tf.name_scope('HiddenLayers') as scope:
+            # Add first convolutional layer
+            net = spatial_weight_sharing(net, 3, n_filters=32, filter_size=8, strides=4, activation=self.hp.activation,
+                                         name='Conv1', centroids_trainable=True, per_feature=True)
+            self._add_trainable(net)
+
+            # Add second convolutional layer
+            net = spatial_weight_sharing(net, 3, n_filters=32, filter_size=4, strides=2, activation=self.hp.activation,
+                                         name='Conv2', centroids_trainable=True, per_feature=True)
+            self._add_trainable(net)
+
+            net = tflearn.flatten(net)
+            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
+            self._add_trainable(net)
+
+            self.embedding_layer = net
+
+        return net
+
+    def _a3c_sisws_s(self):
+        with tf.name_scope(self.forward_input_scope):
+            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+
+        with tf.name_scope('HiddenLayers') as scope:
+            # Add first convolutional layer
+            net = spatial_weight_sharing(net, [2, 2], n_filters=32, filter_size=8, strides=4,
+                                         activation=self.hp.activation, name='Conv1')
+            self._add_trainable(net)
+
+            # Add second convolutional layer
+            net = spatial_weight_sharing(net, [2, 2], n_filters=32, filter_size=4, strides=2,
+                                         activation=self.hp.activation, name='Conv2')
+            self._add_trainable(net)
+
+            net = tflearn.flatten(net)
+            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
+            self._add_trainable(net)
+
+            self.embedding_layer = net
+
+        return net
 
     def _nature_model(self):
         """
@@ -281,7 +331,12 @@ class ActorCriticNN(object):
         if name:
             self.theta += tflearn.get_layer_variables_by_name(name)
         else:
-            self.theta += [layer.W] + ([layer.b] if layer.b else [])
+            self.theta.append(layer.W)
+            if layer.b:
+                if isinstance(layer.b, list):
+                    self.theta += layer.b
+                else:
+                    self.theta.append(layer.b)
         #logger.info('{}: {}'.format(layer.name, [t.name for t in self.theta]))
 
 
@@ -306,8 +361,14 @@ class ActorCriticNN(object):
             net = self._a3c_lstm_ss()
         elif self.model_name == ModelNames.A3C_CONV_LSTM:
             net = self._a3c_conv_lstm()
-        else:
+        elif self.model_name == ModelNames.A3C_SISWS:
+            net = self._a3c_sisws()
+        elif self.model_name == ModelNames.SMALL_FCN:
             net = self._small_fcn()
+        elif self.model_name == ModelNames.A3C_SISWS_S:
+            net = self._a3c_sisws_s()
+        else:
+            raise ValueError("Unknown model name {}".format(self.model_name))
 
         with tf.name_scope("Outputs"):
             with tf.name_scope("Policy"):

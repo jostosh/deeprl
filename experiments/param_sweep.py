@@ -28,7 +28,7 @@ lo_by_param = {
     'global_clip_norm': 0.5,
     'otc': 2.0 ** (-8),
     'fplc': 1e-5,
-    'fp_decay': 0.99
+    'fp_decay': 0.999
 }
 
 hi_by_param = {
@@ -113,6 +113,25 @@ presets = {
     },
     '17': {
         'model': 'a3c_lstm'
+    },
+    '18': {
+        'model': 'a3c_ff',
+        'frame_prediction': True,
+    },
+    '19': {
+        'model': 'a3c_ff',
+        'frame_prediction': True,
+        'residual_prediction': True
+    },
+    '20': {
+        'model': 'a3c_ff',
+        'optimality_tightening': True
+    },
+    '21': {
+        'model': 'a3c_sisws'
+    },
+    '22': {
+        'model': 'a3c_sisws_s'
     }
 }
 
