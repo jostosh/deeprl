@@ -302,10 +302,13 @@ if __name__ == "__main__":
                                          global_clip_norm=hyperparameters.global_clip_norm,
                                          ms_bias_correction=hyperparameters.mbc)
     else:
-        shared_optimizer = AdamShared(session, learning_rate_ph, beta1=hyperparameters.beta1,
-                                      beta2=hyperparameters.beta2, feedback=hyperparameters.feedback,
+        shared_optimizer = AdamShared(session, learning_rate_ph,
+                                      beta1=hyperparameters.beta1,
+                                      beta2=hyperparameters.beta2,
+                                      feedback=hyperparameters.feedback,
                                       global_clipping=hyperparameters.global_clipping,
-                                      global_clip_norm=hyperparameters.global_clip_norm)
+                                      global_clip_norm=hyperparameters.global_clip_norm,
+                                      epsilon=hyperparameters.adam_epsilon)
 
     global_network = ActorCriticNN(num_actions=num_actions,
                                    agent_name='GLOBAL',
