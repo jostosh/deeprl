@@ -36,8 +36,8 @@ config1 = {
     'optimality_tightening': False,
     'param_sweep': "",
     'score_at_10m': -10.,
-    'fplc': 1.,
-    'otc': 1.,
+    'fplc': 1.0,
+    'otc': 0.25,
     'feedback': False,
     'fp_decay': 0.99999,
     'activation': 'relu',
@@ -45,7 +45,7 @@ config1 = {
     'optimizer': 'rmsprop',
     'beta1': 0.9,
     'beta2': 0.999,
-    'adam_epsilon': 1e-8,
+    'adam_epsilon': 0.1,
     'safe_softmax': False,
     'logprefix': '',
     'global_clipping': False,
@@ -144,3 +144,4 @@ class HyperParameters(object):
         self.global_clipping = params.global_clipping
         self.global_clip_norm = params.global_clip_norm
         self.mbc = params.mbc
+        self.adam_epsilon = params.adam_epsilon

@@ -16,19 +16,28 @@ def uniform(lo, hi, rate):
 func_by_param = {
     'learning_rate': log_uniform,
     'ss_epsilon': uniform,
-    'global_clip_norm': log_uniform
+    'global_clip_norm': log_uniform,
+    'otc': log_uniform,
+    'fplc': log_uniform,
+    'fp_decay': log_uniform
 }
 
 lo_by_param = {
     'learning_rate': 1e-6,
     'ss_epsilon': 0.1,
-    'global_clip_norm': 0.5
+    'global_clip_norm': 0.5,
+    'otc': 2.0 ** (-8),
+    'fplc': 1e-5,
+    'fp_decay': 0.99
 }
 
 hi_by_param = {
     'learning_rate': 1e-2,
     'ss_epsilon': 0.5,
-    'global_clip_norm': 2.0
+    'global_clip_norm': 2.0,
+    'otc': 2.0,
+    'fplc': 1.0,
+    'fp_decay': 0.99999999
 }
 
 presets = {
@@ -98,6 +107,12 @@ presets = {
     },
     '15': {
         'model': 'a3c_ff_ss'
+    },
+    '16': {
+        'model': 'a3c_conv_lstm'
+    },
+    '17': {
+        'model': 'a3c_lstm'
     }
 }
 
