@@ -61,23 +61,41 @@ def fc_layer(incoming, n_out, activation, name):
 
 
 def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_filter_size=None, forget_bias=1.0,
-                       activation=tf.nn.tanh, padding='VALID', inner_depthwise=False):
+                       activation=tf.nn.tanh, padding='VALID', inner_depthwise=False, outer_init='torch',
+                       inner_init='orthogonal', inner_act=tf.nn.sigmoid):
     n_input_features = incoming.get_shape().as_list()[-1]
 
     with tf.name_scope("ConvLSTM"):
 
         with tf.name_scope("ConvLSTMWeights"):
-            def get_conv_W(filter_size, n_in_features, n_out_features, name, depthwise=False):
-                d = 1.0 / np.sqrt(filter_size * filter_size * (n_in_features if not depthwise else 1))
-                weights_init = tf.random_uniform([filter_size, filter_size, n_in_features, n_out_features], minval=-d,
-                                                 maxval=d)
+            def get_conv_W(filter_size, n_in_features, n_out_features, name, depthwise=False, init='torch'):
+                if init == 'torch':
+                    d = 1.0 / np.sqrt(filter_size * filter_size * (n_in_features if not depthwise else 1))
+                    weights_init = tf.random_uniform([filter_size, filter_size, n_in_features, n_out_features],
+                                                     minval=-d, maxval=d)
+                elif init == 'orthogonal':
+                    weights_all = []
+                    for i in range(4 if depthwise else 1):
+                        X = np.random.random((n_out_features // (4 if depthwise else 1),
+                                              n_in_features * filter_size * filter_size))
+                        _, _, Vt = np.linalg.svd(X, full_matrices=False)
+                        assert np.allclose(np.dot(Vt, Vt.T), np.eye(Vt.shape[0]))
+                        weights_all.append(np.transpose(
+                            np.reshape(Vt, (n_out_features, n_in_features, filter_size, filter_size)),
+                            (2, 3, 1, 0)
+                        ))
+                    weights_init = np.concatenate(weights_all, axis=3).astype('float32')
+                else:
+                    raise ValueError("Unknown initialization: {}".format(init))
                 return tf.Variable(weights_init, name=name)
 
-            W_x_to_ijfo = get_conv_W(outer_filter_size, n_input_features, num_features * 4, name='Wh')
+            W_x_to_ijfo = get_conv_W(outer_filter_size, n_input_features, num_features * 4, name='Wh', init='torch')
             if inner_depthwise:
-                W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, 4, name='Wx', depthwise=True)
+                W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, 4, name='Wx', depthwise=True,
+                                         init=inner_init)
             else:
-                W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, num_features * 4, name='Wx')
+                W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, num_features * 4, name='Wx',
+                                         init=inner_init)
 
             b = tf.Variable(tf.zeros(4 * num_features), dtype=tf.float32, name='Bias')
 
@@ -95,9 +113,8 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_
                 # i = input_gate, j = new_input, f = forget_gate, o = output_gate
                 i, j, f, o = tf.split(3, 4, concat)
 
-                new_c = (c * tf.nn.sigmoid(f + forget_bias) + tf.nn.sigmoid(i) *
-                         activation(j))
-                new_h = activation(new_c) * tf.nn.sigmoid(o)
+                new_c = (c * inner_act(f + forget_bias) + inner_act(i) * activation(j))
+                new_h = activation(new_c) * inner_act(o)
 
                 return tf.concat(3, [new_c, new_h])
 
