@@ -125,7 +125,8 @@ def convert_preset_to_params(preset):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default='a3c_ff_ss')
-    parser.add_argument("--params", nargs='+', default=['learning_rate', 'ss_epsilon', 'global_clip_norm'])
+    parser.add_argument("--params", nargs='+', default=['learning_rate', 'ss_epsilon', 'global_clip_norm',
+                                                        'otc', 'fplc', 'fp_decay'])
     parser.add_argument("--a3c_args", nargs='+', default=[])
     parser.add_argument("--preset", default=None)
     args = parser.parse_args()
