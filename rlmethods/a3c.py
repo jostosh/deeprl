@@ -195,9 +195,10 @@ class A3CAgent(object):
                     mean_score = self.evaluate(50)
 
                 last_checkpoint = T // (self.hp.evaluation_interval / 10) * (self.hp.evaluation_interval / 10) # round to the nearest 1e6
-                logger.info("Storing weights at {}".format(weights_path))
-                saver.save(session, weights_path, global_step=T_var)
-                logger.info("Stored weights!")
+                if isinstance(self.env, AtariEnvironment):
+                    logger.info("Storing weights at {}".format(weights_path))
+                    saver.save(session, weights_path, global_step=T_var)
+                    logger.info("Stored weights!")
 
     def evaluate(self, num_episodes):
         """
@@ -242,31 +243,8 @@ class A3CAgent(object):
 
             t += 1
 
-        zipped_embeddings = list(zip(embeddings, embedding_images))
-        shuffle(zipped_embeddings)
-        embeddings, embedding_images = zip(*zipped_embeddings[:100])
-        embeddings = list(embeddings)
-        embedding_images = list(embedding_images)
-
-        frame_height = embedding_images[0].shape[0]
-        frame_width = embedding_images[0].shape[1]
-        sprite_image = np.empty((10 * frame_height, 10 * frame_width) + ((3,) if isinstance(self.env, AtariEnvironment) else tuple()))
-
-        def create_sprite_im():
-            image_index = 0
-            for i in range(0, sprite_image.shape[0], frame_height):
-                for j in range(0, sprite_image.shape[1], frame_width):
-                    sprite_image[i:i+frame_height, j:j+frame_width] = embedding_images[image_index]
-                    image_index += 1
-                    if image_index == len(embedding_images):
-                        return
-        create_sprite_im()
-
-        if len(embedding_images) < 100:
-            embeddings += (100 - len(embedding_images)) * [np.zeros_like(embeddings[0])]
-
-        scipy.misc.imsave(os.path.join(writer.get_logdir(), 'embedding_sprite.png'), sprite_image)
-        session.run(embedding_assign, feed_dict={embedding_placeholder: np.concatenate(embeddings, axis=0)})
+        if isinstance(self.env, AtariEnvironment):
+            self.store_embeddings(embedding_images, embeddings)
 
         logger.info("Mean score {}".format(np.mean(returns)))
         writer.add_summary(make_summary_from_python_var('Evaluation/Score', np.mean(returns)), self.train_episode)
@@ -275,6 +253,33 @@ class A3CAgent(object):
         self.env.set_train()
 
         return np.mean(returns)
+
+    def store_embeddings(self, embedding_images, embeddings):
+        zipped_embeddings = list(zip(embeddings, embedding_images))
+        shuffle(zipped_embeddings)
+        embeddings, embedding_images = zip(*zipped_embeddings[:100])
+        embeddings = list(embeddings)
+        embedding_images = list(embedding_images)
+        frame_height = embedding_images[0].shape[0]
+        frame_width = embedding_images[0].shape[1]
+        sprite_image = np.empty(
+            (10 * frame_height, 10 * frame_width) + ((3,) if isinstance(self.env, AtariEnvironment) else tuple()))
+
+        def create_sprite_im():
+            image_index = 0
+            for i in range(0, sprite_image.shape[0], frame_height):
+                for j in range(0, sprite_image.shape[1], frame_width):
+                    sprite_image[i:i + frame_height, j:j + frame_width] = embedding_images[image_index]
+                    image_index += 1
+                    if image_index == len(embedding_images):
+                        return
+
+        create_sprite_im()
+        if len(embedding_images) < 100:
+            embeddings += (100 - len(embedding_images)) * [np.zeros_like(embeddings[0])]
+        scipy.misc.imsave(os.path.join(writer.get_logdir(), 'embedding_sprite.png'), sprite_image)
+        session.run(embedding_assign, feed_dict={embedding_placeholder: np.concatenate(embeddings, axis=0)})
+
 
 if __name__ == "__main__":
 
