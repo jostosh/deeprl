@@ -98,7 +98,7 @@ class RMSPropShared(object):
             lr_t = self.learning_rate if not self.ms_bias_correction \
                 else self.learning_rate * (1 - tf.pow(self.decay, self.t+1))
             minimize = tf.group(*([tf.assign_add(t, -lr_t *
-                                      tf.div(grad, tf.sqrt(ms + self.epsilon) * (d_t if self.feedback else 1.)),
+                                      tf.div(grad, tf.sqrt(ms * (d_t if self.feedback else 1.) + self.epsilon)),
                                       use_locking=False)
                                    for t, grad, ms in zip(self.global_theta, grads, g_update)] + other_updates),
                                 name='minimize')
@@ -108,7 +108,7 @@ class RMSPropShared(object):
 class AdamShared(object):
 
     def __init__(self, session, learning_rate, epsilon=1e-8, theta=None, feedback=False, global_clipping=False,
-                 thl=0.1, thu=10., feedback_decay=0.99, beta1=0.9, beta2=0.999, d_clip_lo=0.2, d_clip_hi=5,
+                 thl=0.1, thu=10., feedback_decay=0.99, beta1=0.9, beta2=0.999, d_clip_lo=0.1, d_clip_hi=10,
                  global_clip_norm=1.0):
         self.beta1 = tf.convert_to_tensor(beta1)
         self.beta2 = tf.convert_to_tensor(beta2)
@@ -203,7 +203,7 @@ class AdamShared(object):
         with tf.name_scope("RMSPropMinimize"):
             minimize = tf.group(
                 *([
-                    tf.assign_add(p, -lr_t * m / (tf.sqrt(v) * (d_t if d_t is not None else 1) + self.epsilon))
+                    tf.assign_add(p, -lr_t * m / (tf.sqrt(v * (d_t if d_t is not None else 1) + self.epsilon)))
                     for p, m, v in zip(self.global_theta, m_t, v_t)
                 ] + other_updates)
             )
