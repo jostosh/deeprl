@@ -34,7 +34,7 @@ lo_by_param = {
 hi_by_param = {
     'learning_rate': 1e-2,
     'ss_epsilon': 0.5,
-    'global_clip_norm': 2.0,
+    'global_clip_norm': 40.0,
     'otc': 2.0,
     'fplc': 1.0,
     'fp_decay': 0.99999999
