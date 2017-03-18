@@ -250,7 +250,8 @@ def export_plots():
                         raise ValueError("No support for sweep plot for more than two parameters")
 
                     if len(args.trace_by) == 2:
-                        all_yticks += [hyper_parameters[args.trace_by[1]] for _ in range(len(np_arrays_y))]
+                        fun = np.log10 if args.log_scale else lambda s: s
+                        all_yticks += [fun(hyper_parameters[args.trace_by[1]]) for _ in range(len(np_arrays_y))]
 
             hp_idx += 1
 
@@ -325,26 +326,65 @@ def export_plots():
 
                 #py.plot(fig, filename=env.replace('-v0', '' if not args.title else args.title))
             else:
-                trace = go.Scatter3d(
-                    x=all_xticks,
-                    y=all_yticks,
-                    z=all_scores,
-                    mode='markers',
-                    marker=dict(
-                        size=12,
-                        color=all_surfaces,  # set color to an array/list of desired values
-                        colorscale='Viridis',  # choose a colorscale
-                        opacity=0.8
-                    )
-                )
+                from matplotlib.mlab import griddata
+                from mpl_toolkits.mplot3d import Axes3D
 
-                layout.xaxis.title = args.xlabel
-                layout.yaxis.title = args.ylabel
+                min_x, max_x = np.min(all_xticks), np.max(all_xticks)
+                min_y, max_y = np.min(all_yticks), np.max(all_yticks)
+                xi = np.linspace(min_x, max_x)
+                yi = np.linspace(min_y, max_y)
+                zi = griddata(all_xticks, all_yticks, all_scores, xi, yi)
+
+                trace = go.Surface(
+                    x=xi,
+                    y=yi,
+                    z=zi,
+                    #vertexcolor=all_surfaces,
+                    #mode='markers',
+                    #marker=dict(
+                    #    size=12,
+                    #    color=all_surfaces,  # set color to an array/list of desired values
+                    #    colorscale='Viridis',  # choose a colorscale
+                    #    opacity=0.8
+                    #)
+                )
+                title = env.replace('-v0', '') if not args.title else args.title
+
+                layout.xaxis.title = xlab = args.xlabel
+                layout.yaxis.title = ylab = args.ylabel
 
                 data = go.Data([trace])
                 fig = go.Figure(data=data, layout=layout)
 
-                py.plot(fig, filename=env.replace('-v0', '' if not args.title else args.title))
+                #py.plot(fig, filename=env.replace('-v0', '' if not args.title else args.title))
+
+                fig, ax = plt.subplots()
+                #ax = fig.add_subplot(111, projection='3d')
+                ax.set_xlabel(xlab)
+                ax.set_ylabel(ylab)
+                ax.set_title(title)
+                if args.xrange:
+                    ax.set_xlim(args.xrange)
+                if args.yrange:
+                    ax.set_ylim(args.yrange)
+
+                #cax = ax.scatter(all_xticks, all_scores, s=80, c=all_surfaces, cmap=cm.winter)
+                CS = ax.contour(xi, yi, zi, 15, linewidths=0.5, colors='k')
+                CS = ax.contourf(xi, yi, zi, 15, cmap=cm.viridis)
+                sc = ax.scatter(all_xticks, all_yticks, c='k')
+                #plt.colorbar()  # draw colorbar
+                #xx, yy = np.meshgrid(xi, yi)
+                #ax.plot_surface(xx, yy, np.reshape(zi, (50, 50)))
+
+                cb = fig.colorbar(CS)
+                cb.ax.set_title("Score")
+                plt.tight_layout()
+                plt.savefig(os.path.join(args.output_dir, title.lower().replace(' ', '_') + '.pdf'))
+
+                if args.display:
+                    plt.show()
+
+                plt.clf()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -353,9 +393,12 @@ if __name__ == "__main__":
     parser.add_argument("--scalar_subset", nargs='+', default=['Evaluation/Score'])
     parser.add_argument("--ignore_params", nargs='+', default=['git_description'])
     parser.add_argument("--interpolate", dest='interpolate', action='store_true')
+    parser.add_argument("--log_scale", dest='log_scale', action='store_true')
+    parser.add_argument("--display", dest='display', action='store_true')
     parser.add_argument("--image_suffix", default="")
     parser.add_argument("--xlabel", default="Train episode")
     parser.add_argument("--ylabel", default="Score")
+    parser.add_argument("--zlabel", default="Score")
     parser.add_argument("--title", default=None)
     parser.add_argument("--xrange", nargs='+', default=[], type=int)
     parser.add_argument("--yrange", nargs='+', default=[], type=int)
