@@ -25,8 +25,8 @@ class RMSPropShared(object):
         self.global_theta = None
         self.mom = None
 
-        self.thl = thl #tf.Variable(thl, dtype=tf.float32, trainable=False)
-        self.thu = thu # tf.Variable(thu, dtype=tf.float32, trainable=False)
+        self.thl = tf.convert_to_tensor(thl) #tf.Variable(thl, dtype=tf.float32, trainable=False)
+        self.thu = tf.convert_to_tensor(thu) # tf.Variable(thu, dtype=tf.float32, trainable=False)
         self.d = tf.Variable(1., dtype=tf.float32, trainable=False)
 
         self.loss_prev = tf.Variable(0., dtype=tf.float32, trainable=False)
@@ -75,7 +75,7 @@ class RMSPropShared(object):
             loss_ch_fact = tf.minimum(loss_ch_fact, ch_fact_ubound)
             loss_hat = tf.cond(not_first_iter, lambda: loss_hat_prev * loss_ch_fact, lambda: loss)
 
-            d_den = tf.minimum(loss_hat, loss_hat_prev) + 1e-8  # tf.cond(tf.greater(loss_hat, loss_prev), )
+            d_den = tf.minimum(loss_hat, loss_hat_prev) + tf.constant(1e-8)  # tf.cond(tf.greater(loss_hat, loss_prev), )
             d_t = (self.feedback_decay * self.d) + (1. - self.feedback_decay) * tf.abs((loss_hat - loss_hat_prev) / d_den)
             d_t = tf.clip_by_value(
                 tf.cond(not_first_iter, lambda: d_t, lambda: tf.constant(1.)),
