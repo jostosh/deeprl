@@ -132,6 +132,11 @@ presets = {
     },
     '22': {
         'model': 'a3c_sisws_s'
+    },
+    # ---------- 18-03
+    '23': {
+        'model': 'a3c_ff',
+        'feedback': True
     }
 }
 

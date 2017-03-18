@@ -7,7 +7,7 @@ import numpy as np
 class RMSPropShared(object):
 
     def __init__(self, session, learning_rate, decay=0.99, epsilon=1e-8, theta=None, momentum=0., feedback=False,
-                 thl=0.5, thu=2., feedback_decay=0.99, global_clipping=False, global_clip_norm=1.0, d_clip_lo=0.1,
+                 thl=0.1, thu=10., feedback_decay=0.99, global_clipping=False, global_clip_norm=1.0, d_clip_lo=0.1,
                  d_clip_hi=10, ms_bias_correction=False):
         self.learning_rate = learning_rate
         self.decay = decay
@@ -75,7 +75,7 @@ class RMSPropShared(object):
             loss_ch_fact = tf.minimum(loss_ch_fact, ch_fact_ubound)
             loss_hat = tf.cond(not_first_iter, lambda: loss_hat_prev * loss_ch_fact, lambda: loss)
 
-            d_den = tf.minimum(loss_hat, loss_hat_prev)  # tf.cond(tf.greater(loss_hat, loss_prev), )
+            d_den = tf.minimum(loss_hat, loss_hat_prev) + 1e-8  # tf.cond(tf.greater(loss_hat, loss_prev), )
             d_t = (self.feedback_decay * self.d) + (1. - self.feedback_decay) * tf.abs((loss_hat - loss_hat_prev) / d_den)
             d_t = tf.clip_by_value(
                 tf.cond(not_first_iter, lambda: d_t, lambda: tf.constant(1.)),
