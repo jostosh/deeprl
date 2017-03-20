@@ -266,7 +266,7 @@ class ConvLSTM2D(ConvRecurrent2D):
                  dim_ordering='default',
                  border_mode='valid', subsample=(1, 1),
                  W_regularizer=None, U_regularizer=None, b_regularizer=None,
-                 dropout_W=0., dropout_U=0., **kwargs):
+                 dropout_W=0., dropout_U=0., nb_row_i=None, nb_col_i=None, **kwargs):
 
         if dim_ordering == 'default':
             dim_ordering = K.image_dim_ordering()
@@ -275,6 +275,8 @@ class ConvLSTM2D(ConvRecurrent2D):
         self.nb_filter = nb_filter
         self.nb_row = nb_row
         self.nb_col = nb_col
+        self.nb_row_i = nb_row_i
+        self.nb_col_i = nb_col_i
         self.init = initializations.get(init)
         self.inner_init = initializations.get(inner_init)
         self.forget_bias_init = initializations.get(forget_bias_init)
@@ -320,11 +322,13 @@ class ConvLSTM2D(ConvRecurrent2D):
         else:
             raise ValueError('Invalid dim_ordering:', self.dim_ordering)
 
+        nb_row = self.nb_row if not self.nb_row_i else self.nb_row_i
+        nb_col = self.nb_col if not self.nb_col_i else self.nb_col_i
         if self.dim_ordering == 'th':
             self.W_shape1 = (self.nb_filter, self.nb_filter,
-                             self.nb_row, self.nb_col)
+                             nb_row, nb_col)
         elif self.dim_ordering == 'tf':
-            self.W_shape1 = (self.nb_row, self.nb_col,
+            self.W_shape1 = (nb_row, nb_col,
                              self.nb_filter, self.nb_filter)
 
         if self.stateful:

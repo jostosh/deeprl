@@ -312,7 +312,7 @@ class ActorCriticNN(object):
             #                                                        stride=2, inner_filter_size=5, inner_depthwise=False,
             #                                                        forget_bias=1.)
             convlstm_layer = ConvLSTM2D(nb_filter=64, nb_row=4, nb_col=4, subsample=(2, 2), dim_ordering='tf',
-                                        state_ph=self.initial_state, return_sequences=True,
+                                        state_ph=self.initial_state, return_sequences=True, nb_row_i=3, nb_col_i=3,
                                         inner_activation=tf.nn.sigmoid)
             net = convlstm_layer(net)
 
