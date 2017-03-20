@@ -6,7 +6,7 @@ from deeprl.approximators.layers import spatialsoftmax, custom_lstm, convolution
 from deeprl.approximators.sisws import spatial_weight_sharing
 from tensorflow.python.ops.rnn_cell import LSTMStateTuple
 from copy import deepcopy
-
+from deeprl.approximators.convlstm import ConvLSTM2D
 
 class ModelNames:
     A3C_FF      = 'a3c_ff'
@@ -16,8 +16,10 @@ class ModelNames:
     A3C_FF_SS   = 'a3c_ff_ss'
     A3C_LSTM_SS = 'a3c_lstm_ss'
     A3C_CONV_LSTM = 'a3c_conv_lstm'
+    A3C_CONV_LSTM_K = 'a3c_conv_lstm_k'
     A3C_SISWS   = 'a3c_sisws'
     A3C_SISWS_S = 'a3c_sisws_s'
+
 
 
 class ActorCriticNN(object):
@@ -32,7 +34,8 @@ class ActorCriticNN(object):
         self.agent_name = agent_name
         self.model_name = hyper_parameters.model
         self.clip_advantage = hyper_parameters.clip_advantage
-        self.recurrent = self.model_name in [ModelNames.A3C_LSTM, ModelNames.A3C_LSTM_SS, ModelNames.A3C_CONV_LSTM]
+        self.recurrent = self.model_name in [ModelNames.A3C_LSTM, ModelNames.A3C_LSTM_SS, ModelNames.A3C_CONV_LSTM,
+                                             ModelNames.A3C_CONV_LSTM_K]
         self.t_max = hyper_parameters.t_max
         self.input_shape = hyper_parameters.input_shape
         self.policy_weighted_val = hyper_parameters.policy_weighted_val
@@ -284,6 +287,46 @@ class ActorCriticNN(object):
 
         return net
 
+
+    def _a3c_conv_lstm_k(self):
+        """
+        This is an experimental architecture that uses convolutional LSTM layers.
+        """
+        with tf.name_scope('Inputs'):
+            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+
+        with tf.name_scope('LSTMInput'):
+            # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
+            # 'h' (256), which are both influencing the layer in the forward/backward pass.
+            self.n_steps = tf.placeholder(tf.int32, shape=[1])
+
+        with tf.name_scope('HiddenLayers'):
+            net = conv_layer(net, 32, 8, 4, activation=self.hp.activation, name='Conv1')
+            self._add_trainable(net)
+            net = tf.reshape(net, [-1, 1] + net.get_shape().as_list()[1:])
+
+            self.initial_state = LSTMStateTuple(c=tf.placeholder(tf.float32, [None, 9, 9, 64]),
+                                                h=tf.placeholder(tf.float32, [None, 9, 9, 64]))
+
+            #net, new_state, self.initial_state = convolutional_lstm(net, outer_filter_size=4, num_features=64,
+            #                                                        stride=2, inner_filter_size=5, inner_depthwise=False,
+            #                                                        forget_bias=1.)
+            convlstm_layer = ConvLSTM2D(nb_filter=64, nb_row=4, nb_col=4, subsample=(2, 2), dim_ordering='tf',
+                                        state_ph=self.initial_state, return_sequences=True,
+                                        inner_activation=tf.nn.sigmoid)
+            net = convlstm_layer(net)
+
+            self.theta += convlstm_layer.trainable_weights
+            self.lstm_state_variable = convlstm_layer.state_out
+
+            net = tf.reshape(net, [-1, 9 * 9 * 64])
+            #self.lstm_state_variable = new_state
+            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
+            self.embedding_layer = net
+
+        return net
+
+
     def _small_fcn(self):
         """
         This network works with the CartPole-v0/v1 environments (sort of)
@@ -302,24 +345,25 @@ class ActorCriticNN(object):
                 self.lstm_state_numeric = np.zeros(self.initial_state.get_shape().as_list())
                 self.lstm_first_state_since_update = np.zeros(self.initial_state.get_shape().as_list())
             else:
+                shape = [1] + self.initial_state.c.get_shape().as_list()[1:]
                 self.lstm_state_numeric = LSTMStateTuple(
-                    np.zeros([1, 256], dtype='float32'),
-                    np.zeros([1, 256], dtype='float32')
+                    np.zeros(shape, dtype='float32'),
+                    np.zeros(shape, dtype='float32')
                 )
                 self.lstm_first_state_since_update = LSTMStateTuple(
-                    np.zeros([1, 256], dtype='float32'),
-                    np.zeros([1, 256], dtype='float32')
+                    np.zeros(shape, dtype='float32'),
+                    np.zeros(shape, dtype='float32')
                 )
         else:
             if self.model_name == ModelNames.A3C_CONV_LSTM:
                 self.lstm_first_state_since_update.fill(0.)
                 self.lstm_state_numeric.fill(0.)
             else:
-                self.lstm_state_numeric.c.fill(0.)
-                self.lstm_state_numeric.h.fill(0.)
+                self.lstm_state_numeric[0].fill(0.)
+                self.lstm_state_numeric[1].fill(0.)
 
-                self.lstm_first_state_since_update.c.fill(0.)
-                self.lstm_first_state_since_update.h.fill(0.)
+                self.lstm_first_state_since_update[0].fill(0.)
+                self.lstm_first_state_since_update[1].fill(0.)
 
     def reset(self):
         if self.recurrent:
@@ -361,6 +405,8 @@ class ActorCriticNN(object):
             net = self._a3c_lstm_ss()
         elif self.model_name == ModelNames.A3C_CONV_LSTM:
             net = self._a3c_conv_lstm()
+        elif self.model_name == ModelNames.A3C_CONV_LSTM_K:
+            net = self._a3c_conv_lstm_k()
         elif self.model_name == ModelNames.A3C_SISWS:
             net = self._a3c_sisws()
         elif self.model_name == ModelNames.SMALL_FCN:
@@ -549,6 +595,7 @@ class ActorCriticNN(object):
                     self.n_steps: [1]
                 }
             )
+            #print(self.lstm_state_numeric[0])
         else:
             pi = session.run(self.pi, feed_dict={self.inputs: [state]})
 
