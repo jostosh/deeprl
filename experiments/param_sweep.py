@@ -94,10 +94,6 @@ presets = {
         'optimizer': 'adam',
         'feedback': True
     },
-    '12': {
-        'model': 'a3c_ff',
-        'global_clipping': True
-    },
     '13': {
         'model': 'a3c_ff'
     },
@@ -137,7 +133,27 @@ presets = {
     '23': {
         'model': 'a3c_ff',
         'feedback': True
-    }
+    },
+    '24': {
+        'model': 'a3c_conv_lstm_k'
+    },
+    '25': {
+        'model': 'a3c_ff',
+        'frame_prediction': True,
+        'residual_prediction': True,
+        'fplc': 3.16e-5,
+        'fp_decay': 0.99919,
+    },
+    '26': {
+        'model': 'a3c_ff',
+        'frame_prediction': True,
+        'fplc': 0.05,
+        'fp_decay': 0.9995
+    },
+    '12': {
+        'model': 'a3c_ff',
+        'global_clipping': True
+    },
 }
 
 
