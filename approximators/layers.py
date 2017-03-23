@@ -158,11 +158,11 @@ def conv_transpose(incoming, nb_filter, size, stride, activation=tf.nn.elu):
 
 
 def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='SpatialSoftmax', hierarchical=False,
-                   safe_softmax=False):
+                   safe_softmax=False, use_softmax_only=False):
     # Get the incoming dimensions (should be a 4D tensor)
     _, h, w, c = incoming.get_shape().as_list()
 
-    edge = 1 / (c*2) if not hierarchical else 1 / (c*6)
+    edge = 1 #1 / (c*2) if not hierarchical else 1 / (c*6)
 
     with tf.name_scope(name):
         # First we create a linspace from -1 + epsilon to 1 - epsilon. Epsilon is needed to ensure that the output is
@@ -171,20 +171,23 @@ def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='Spa
         # Note that each '1' in the reshape is to enforce broadcasting along that dimension
         cartesian_y = tf.reshape(tf.linspace(-edge + epsilon*edge, edge - epsilon*edge, h), (1, h, 1, 1), name="CartesianY")
         cartesian_x = tf.reshape(tf.linspace(-edge + epsilon*edge, edge - epsilon*edge, w), (1, 1, w, 1), name="CartesianX")
-        temperature = tf.Variable(initial_value=tf.ones(c), dtype=tf.float32, trainable=trainable_temperature)
+        temperature = tf.Variable(initial_value=tf.ones(c) / 10, dtype=tf.float32, trainable=trainable_temperature)
 
         # Compute the softmax numerator
         if safe_softmax:
             incoming_ = incoming - tf.stop_gradient(tf.reduce_max(incoming, reduction_indices=[1, 2], keep_dims=True))
-            numerator_softmax = tf.exp(incoming_, name='Numerator') / tf.reshape(temperature, (1, 1, 1, c))
+            numerator_softmax = tf.exp(incoming_ / tf.reshape(temperature, (1, 1, 1, c)), name='Numerator')
         else:
-            numerator_softmax = tf.exp(incoming, name='Numerator') / tf.reshape(temperature, (1, 1, 1, c))
+            numerator_softmax = tf.exp(incoming / tf.reshape(temperature, (1, 1, 1, c)), name='Numerator')
         # The denominator is computed by computing the sum per channel
         # Again, the '1's in the reshaping are to ensure broadcasting along those dimensions
         denominator_softmax = tf.reshape(tf.reduce_sum(numerator_softmax, reduction_indices=[1, 2]), (-1, 1, 1, c),
                                          name='Denominator')
         # Now we compute the softmax per channel
         softmax_per_channel = tf.div(numerator_softmax, denominator_softmax, name='SoftmaxPerChannel')
+
+        if use_softmax_only:
+            return tf.reshape(softmax_per_channel, (-1, h * w * c))
 
         # Compute the x coordinates by element-wise multiplicatoin of the cartesion coordinates with the softmax
         # activations and summing the result

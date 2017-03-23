@@ -50,7 +50,9 @@ config1 = {
     'logprefix': '',
     'global_clipping': False,
     'global_clip_norm': 1.0,
-    'mbc': False
+    'mbc': False,
+    'trainable_temp': False,
+    'softmax_only': False
 }
 
 param_sweep = {
@@ -145,3 +147,5 @@ class HyperParameters(object):
         self.global_clip_norm = params.global_clip_norm
         self.mbc = params.mbc
         self.adam_epsilon = params.adam_epsilon
+        self.trainable_temp = params.trainable_temp
+        self.softmax_only = params.softmax_only

@@ -154,6 +154,18 @@ presets = {
         'model': 'a3c_ff',
         'global_clipping': True
     },
+    # 23-03
+    '27': {
+        'model': 'a3c_ff_ss',
+    },
+    '28': {
+        'model': 'a3c_ff_ss',
+        'trainable_temp': True
+    },
+    '29': {
+        'model': 'a3c_ff_ss',
+        'softmax_only': True
+    }
 }
 
 
