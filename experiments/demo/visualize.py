@@ -1,16 +1,17 @@
-import tensorflow as tf
-from argparse import ArgumentParser
-from deeprl.rlmethods.a3c import A3CAgent
-import pickle
 import os
-from deeprl.common.hyper_parameters import HyperParameters
-from deeprl.common.environments import get_env
+import pickle
 import pprint
-from tensorflow.contrib.framework.python.framework.checkpoint_utils import list_variables
-import time
-import numpy as np
+from argparse import ArgumentParser
+
 import cv2
+import numpy as np
+import tensorflow as tf
 from matplotlib import pyplot as plt
+
+from deeprl.train import A3CAgent
+from deeprl.common.environments import get_env
+from deeprl.common.hyper_parameters import HyperParameters
+
 plt.style.use('ggplot')
 import matplotlib as mpl
 import signal
@@ -27,9 +28,6 @@ mpl.rc('xtick', labelsize=14, color='white')
 mpl.rc('ytick', labelsize=14, color='white')
 mpl.rc('figure', facecolor="#000000")
 mpl.rc('axes', facecolor='#111111', labelcolor='white', labelsize=16, titlesize=20, prop_cycle=mpl.cycler(color=['ffff00']))
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.figure import Figure
-
 
 if __name__ == "__main__":
     parser = ArgumentParser()

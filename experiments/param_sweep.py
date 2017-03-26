@@ -188,13 +188,13 @@ if __name__ == "__main__":
     for i in range(100):
         if args.preset:
             preset_str = convert_preset_to_params(presets[args.preset])
-            command = ["python3", "mproj/deeprl/rlmethods/a3c.py", '--env=Catch',
+            command = ["python3", "mproj/deeprl/rlmethods/train.py", '--env=Catch',
                        '--evaluation_interval=50000', '--T_max=1000000', '--n_threads=12',
                        '--logprefix=sweep/preset{}'.format(args.preset)] + preset_str + \
                       ["--{}={}".format(p, func_by_param[p](lo_by_param[p], hi_by_param[p], np.random.rand()))
                        for p in args.params]
         else:
-            command = ["python3", "mproj/deeprl/rlmethods/a3c.py", '--env=Catch', '--model={}'.format(args.model),
+            command = ["python3", "mproj/deeprl/rlmethods/train.py", '--env=Catch', '--model={}'.format(args.model),
                        '--evaluation_interval=50000', '--T_max=1000000',  '--n_threads=12'] + a3c_args + \
                       ["--{}={}".format(p, func_by_param[p](lo_by_param[p], hi_by_param[p], np.random.rand()))
                        for p in args.params]

@@ -319,7 +319,7 @@ if __name__ == "__main__":
                                    agent_name='GLOBAL',
                                    hyper_parameters=hyperparameters,
                                    optimizer=shared_optimizer)
-    shared_optimizer.set_global_theta(global_network.theta) #.build_update(global_network.theta)
+    shared_optimizer.set_global_theta(global_network.theta) #.build_update(global_approximator.theta)
 
     agents = [A3CAgent(env_name, global_network, 'Agent_%d' % i, session, optimizer=shared_optimizer, hp=hyperparameters)
               for i in range(n_threads)]

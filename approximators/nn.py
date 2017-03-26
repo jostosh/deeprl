@@ -1,12 +1,15 @@
+from copy import deepcopy
+
+import numpy as np
 import tensorflow as tf
 import tflearn
-import numpy as np
-from deeprl.common.logger import logger
-from deeprl.approximators.layers import spatialsoftmax, custom_lstm, convolutional_lstm, conv_layer, fc_layer
-from deeprl.approximators.sisws import spatial_weight_sharing
 from tensorflow.python.ops.rnn_cell import LSTMStateTuple
-from copy import deepcopy
-from deeprl.approximators.convlstm import ConvLSTM2D
+
+from deeprl.approximators.layers import spatialsoftmax, custom_lstm, convolutional_lstm, conv_layer, fc_layer
+from deeprl.approximators.layers.convlstm import ConvLSTM2D
+from deeprl.approximators.layers.sisws import spatial_weight_sharing
+from deeprl.common.logger import logger
+
 
 class ModelNames:
     A3C_FF      = 'a3c_ff'
