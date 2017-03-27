@@ -2,7 +2,7 @@ import logging
 from os.path import expanduser
 import os
 
-VERSION = 'v0.9.5'
+VERSION = 'v0.9.7'
 LOGDIRBASE = "/data/s2098407/tensorflowlogs/{}".format(VERSION) #"{}/tensorflowlogs/{}".format(expanduser('~'), VERSION)
 
 
