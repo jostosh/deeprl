@@ -4,7 +4,7 @@ import numpy as np
 from copy import deepcopy
 import tensorflow as tf
 from deeprl.common.catch import CatchEnv
-
+from gym.envs.atari.atari_env import ACTION_MEANING
 
 def get_env(env, frames_per_state=4, output_shape=None, session=None):
     if env in ['Breakout-v0', 'Pong-v0', 'BeamRider-v0', 'Qbert-v0', 'SpaceInvaders-v0']:
@@ -43,6 +43,7 @@ class ClassicControl(object):
     def reset_random(self):
         return self.reset()
 
+
 class AtariEnvironment(object):
 
     def __init__(self, env_name, frames_per_state=4, action_repeat=4, output_shape=(84, 84), session=None):
@@ -61,17 +62,16 @@ class AtariEnvironment(object):
         self.env.ale.setFloat(b'repeat_action_probability', 0.)
         #self.env.ale.setBool(b'color_averaging', True)
         self.real_actions = self.env.ale.getMinimalActionSet()
+        if 'Breakout' in env_name or 'Pong' in env_name:
+            self.real_actions = np.asarray([
+                a for a in self.real_actions
+                if self.env.get_action_meanings()[np.where(self.real_actions == a)[0]] not in
+                   ['FIRE', 'LEFTFIRE', 'RIGHTFIRE']
+            ])
+
         self._screen = np.empty((210, 160, 1), dtype=np.uint8)
         assert action_repeat > 0
 
-        self.session = session
-        if session:
-            with tf.name_scope("FramePreprocessing"):
-                self.raw_image = tf.placeholder(tf.float32, [210, 160, 3])
-                self.prev_image = tf.placeholder(tf.float32, [210, 160, 3])
-                without_artifacts = tf.maximum(self.raw_image, self.prev_image, name="WithoutArtifacts")
-                gray_scale = tf.image.rgb_to_grayscale(tf.reshape(self.raw_image, [1, 210, 160, 3]))
-                self.preprocessed = tf.reshape(tf.image.resize_images(gray_scale, [84, 84]), [84, 84])
 
     def _preprocess_observation(self, observation):
         """
@@ -80,58 +80,26 @@ class AtariEnvironment(object):
         :param observation: the raw observation
         :return: a preprocessed observation
         """
-        if self.session:
-            return self.session.run(self.preprocessed, feed_dict={self.raw_image: observation,
-                                                                  self.prev_image: self.last_observation})
-
         def rgb2gray(rgb):
             return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
 
         # Remove Atari artifacts
-        preprocessed_observation = np.maximum(self.last_observation, observation)
+        # preprocessed_observation = np.maximum(self.last_observation, observation)
         # Convert to gray scale and resize
-        return imresize(np.reshape(preprocessed_observation, (210, 160)), self.output_shape) / 255. #(84, 84))
+        return imresize(np.reshape(observation, (210, 160)), self.output_shape) / 255. #(84, 84))
 
     def step(self, action):
-        step_reward = 0
         step_terminal = False
-
-        #lives = deepcopy(self.env.ale.lives())
-
-        '''
-        for _ in range(self.action_repeat - 1):
-            if not step_terminal:
-                # Only if we are not already at a terminal state we actually perform an action and preprocess the
-                # observation, as well as a check whether the current state is terminal
-                observation, reward, terminal, info = self.env.step(action)
-                step_reward += reward
-
-                step_terminal = max(terminal, step_terminal)
-                self.last_observation = observation
-
-                if self.is_training and self.env.ale.lives() < lives:
-                    step_terminal = True
-
-        # preprocessed_observation must be set and should be added to the buffer whether it is terminal or not
-        if not step_terminal:
-            observation, reward, terminal, info = self.env.step(action)
-            step_reward += reward
-            step_terminal = max(terminal, step_terminal)
-        '''
-        #observation, reward, step_terminal, info = self.env.step(action)
 
         reward = 0
         for i in range(self.action_repeat):
-            if i == self.action_repeat - 1:
-                self.env.ale.getScreenGrayscale(self.last_observation)
             reward += self.env.ale.act(self.real_actions[action])
 
-        if self.env.ale.game_over(): #or (self.is_training and self.env.ale.lives() < lives):
+        if self.env.ale.game_over():
             step_terminal = True
         self.env.ale.getScreenGrayscale(self._screen)
 
         preprocessed_observation = self._preprocess_observation(self._screen).astype(dtype='float32')
-        #self.last_observation = self._screen.copy()
         [self.state.append(preprocessed_observation) for _ in range(self.frames_per_state - len(self.state) + 1)]
 
         self.state = self.state[-self.frames_per_state:]
@@ -153,7 +121,7 @@ class AtariEnvironment(object):
         return tuple([self.frames_per_state] + self.output_shape)
 
     def num_actions(self):
-        return len(self.real_actions) #self.env.action_space.n
+        return len(self.real_actions)
 
     def set_train(self):
         self.is_training = True
@@ -170,3 +138,6 @@ class AtariEnvironment(object):
         #    state, _, _, _ = self.step(action)
 
         return state
+
+    def get_action_meanings(self):
+        return [ACTION_MEANING[a] for a in self.real_actions]

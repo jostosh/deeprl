@@ -7,14 +7,16 @@ import cv2
 
 session = tf.Session()
 
-env = get_env('Catch', output_shape=[84, 84])
+env = get_env('Pong-v0', output_shape=[84, 84])
 #plt.ion()
 
 state = env.reset_random()
 #plt.imshow(state[-1], cmap='gray')
 #plt.pause(0.01)
+
+print(env.real_actions, env.get_action_meanings())
 while True:
-    action = 1#np.random.randint(3)#env.env.action_space.sample()
+    action = np.random.randint(env.num_actions()) #env.env.action_space.sample()
 
     state, r, terminal, i = env.step(action)
     if terminal:
