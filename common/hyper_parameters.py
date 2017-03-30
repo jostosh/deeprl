@@ -52,7 +52,8 @@ config1 = {
     'global_clip_norm': 1.0,
     'mbc': False,
     'trainable_temp': False,
-    'softmax_only': False
+    'softmax_only': False,
+    'force_store': False
 }
 
 param_sweep = {
@@ -149,3 +150,4 @@ class HyperParameters(object):
         self.adam_epsilon = params.adam_epsilon
         self.trainable_temp = params.trainable_temp
         self.softmax_only = params.softmax_only
+        self.force_store = params.force_store

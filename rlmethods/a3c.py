@@ -195,7 +195,7 @@ class A3CAgent(object):
                     mean_score = self.evaluate(50)
 
                 last_checkpoint = T // (self.hp.evaluation_interval / 10) * (self.hp.evaluation_interval / 10) # round to the nearest 1e6
-                if isinstance(self.env, AtariEnvironment):
+                if isinstance(self.env, AtariEnvironment) or self.hp.force_store:
                     logger.info("Storing weights at {}".format(weights_path))
                     saver.save(session, weights_path, global_step=T_var)
                     logger.info("Stored weights!")

@@ -165,6 +165,12 @@ presets = {
     '29': {
         'model': 'a3c_ff_ss',
         'softmax_only': True
+    },
+    # 30-03
+    '30': {
+        'model': 'a3c_ff_ss',
+        'trainable_temp': True,
+        'force_store': True
     }
 }
 
