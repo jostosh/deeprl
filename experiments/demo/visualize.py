@@ -30,27 +30,14 @@ mpl.rc('axes', facecolor='#111111', labelcolor='white', labelsize=16, titlesize=
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 
+def execute():
 
-if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-d", "--model_dir")
     parser.add_argument("-n", "--n_episodes", default=5)
     args = parser.parse_args()
 
-    sess = tf.Session()
-
-    with open(os.path.join(args.model_dir, 'hyper_parameters.pkl'), 'rb') as f:
-        hp_raw = pickle.load(f)
-        hp = HyperParameters(hp_raw) if not isinstance(hp_raw, HyperParameters) else hp_raw
-
-    agent = A3CAgent(env_name=hp.env, global_network=None, agent_name='GLOBAL', session=sess, optimizer=None, hp=hp)
-    checkpoint = tf.train.get_checkpoint_state(args.model_dir)
-    model_checkpoint_path = os.path.join(args.model_dir, os.path.basename(checkpoint.model_checkpoint_path))
-
-    vars = {v.name: v for v in agent.local_network.theta}
-    saver = tf.train.Saver(var_list=agent.local_network.theta)
-    sess.run(tf.global_variables_initializer())
-    saver.restore(sess, model_checkpoint_path)
+    agent, hp, sess, vars = load_agent(args.model_dir)
 
     fourcc = cv2.VideoWriter_fourcc(*'MP4V')
     video_out = os.path.join(args.model_dir, 'video.mp4')
@@ -207,3 +194,20 @@ if __name__ == "__main__":
             episode_step += 1
 
 
+def load_agent(model_dir):
+    sess = tf.Session()
+    with open(os.path.join(model_dir, 'hyper_parameters.pkl'), 'rb') as f:
+        hp_raw = pickle.load(f)
+        hp = HyperParameters(hp_raw) if not isinstance(hp_raw, HyperParameters) else hp_raw
+    agent = A3CAgent(env_name=hp.env, global_network=None, agent_name='GLOBAL', session=sess, optimizer=None, hp=hp)
+    checkpoint = tf.train.get_checkpoint_state(model_dir)
+    model_checkpoint_path = os.path.join(model_dir, os.path.basename(checkpoint.model_checkpoint_path))
+    vars = {v.name: v for v in agent.local_network.theta}
+    saver = tf.train.Saver(var_list=agent.local_network.theta)
+    sess.run(tf.global_variables_initializer())
+    saver.restore(sess, model_checkpoint_path)
+    return agent, hp, sess, vars
+
+
+if __name__ == "__main__":
+    execute()
