@@ -158,7 +158,7 @@ def conv_transpose(incoming, nb_filter, size, stride, activation=tf.nn.elu):
 
 
 def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='SpatialSoftmax', hierarchical=False,
-                   safe_softmax=False, use_softmax_only=False):
+                   safe_softmax=False, use_softmax_only=False, temp_init=0.05):
     # Get the incoming dimensions (should be a 4D tensor)
     _, h, w, c = incoming.get_shape().as_list()
 
@@ -171,7 +171,8 @@ def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='Spa
         # Note that each '1' in the reshape is to enforce broadcasting along that dimension
         cartesian_y = tf.reshape(tf.linspace(-edge + epsilon*edge, edge - epsilon*edge, h), (1, h, 1, 1), name="CartesianY")
         cartesian_x = tf.reshape(tf.linspace(-edge + epsilon*edge, edge - epsilon*edge, w), (1, 1, w, 1), name="CartesianX")
-        temperature = tf.Variable(initial_value=tf.ones(c) / 10, dtype=tf.float32, trainable=trainable_temperature)
+        temperature = tf.Variable(initial_value=tf.ones(c) * temp_init, dtype=tf.float32,
+                                  trainable=trainable_temperature, name='SoftmaxTemperature')
 
         # Compute the softmax numerator
         if safe_softmax:
@@ -223,8 +224,9 @@ def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='Spa
         # Concatenate the resulting tensors to get the output
         o = tf.concat(1, [x_coordinates, y_coordinates] + ([x_coordinates_s, y_coordinates_s] if hierarchical else []),
                       name="Output")
-        o.b = [temperature] if not hierarchical else [temperature, temperature_patch]
-        tf.add_to_collection(tf.GraphKeys.LAYER_VARIABLES + '/' + name, o.b)
+        if trainable_temperature:
+            o.b = [temperature] if not hierarchical else [temperature, temperature_patch]
+            [tf.add_to_collection(tf.GraphKeys.LAYER_VARIABLES + '/' + name + var.name, var) for var in o.b]
         o.sm = softmax_per_channel
 
     return o

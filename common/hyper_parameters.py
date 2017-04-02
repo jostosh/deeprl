@@ -53,7 +53,8 @@ config1 = {
     'mbc': False,
     'trainable_temp': False,
     'softmax_only': False,
-    'force_store': False
+    'force_store': False,
+    'ss_temp': 0.01
 }
 
 param_sweep = {
@@ -151,3 +152,4 @@ class HyperParameters(object):
         self.trainable_temp = params.trainable_temp
         self.softmax_only = params.softmax_only
         self.force_store = params.force_store
+        self.ss_temp = params.ss_temp

@@ -19,7 +19,8 @@ func_by_param = {
     'global_clip_norm': log_uniform,
     'otc': log_uniform,
     'fplc': log_uniform,
-    'fp_decay': log_uniform
+    'fp_decay': log_uniform,
+    'ss_temp': log_uniform
 }
 
 lo_by_param = {
@@ -28,7 +29,8 @@ lo_by_param = {
     'global_clip_norm': 0.5,
     'otc': 2.0 ** (-8),
     'fplc': 1e-5,
-    'fp_decay': 0.999
+    'fp_decay': 0.999,
+    'ss_temp': 0.1
 }
 
 hi_by_param = {
@@ -182,6 +184,11 @@ presets = {
         'model': 'a3c_conv_lstm_k',
         'global_clipping': True,
         'global_clip_norm': 21.3796
+    },
+    # 02-04
+    '33': {
+        'model': 'a3c_ff_ss',
+        'trainable_temp': True
     }
 }
 
@@ -194,7 +201,7 @@ def convert_preset_to_params(preset):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default='a3c_ff_ss')
-    parser.add_argument("--params", nargs='+', default=['learning_rate', 'ss_epsilon', 'otc', 'fplc', 'fp_decay'])
+    parser.add_argument("--params", nargs='+', default=['learning_rate', 'otc', 'fplc', 'fp_decay', 'ss_temp'])
     parser.add_argument("--a3c_args", nargs='+', default=[])
     parser.add_argument("--preset", default=None)
     args = parser.parse_args()

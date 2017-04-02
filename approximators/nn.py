@@ -189,7 +189,8 @@ class ActorCriticNN(object):
             net = conv_layer(net, 64, 3, 2, activation=tf.identity, name='Conv2')
             self._add_trainable(net)
             net = spatialsoftmax(net, epsilon=self.hp.ss_epsilon, trainable_temperature=self.hp.trainable_temp,
-                                 safe_softmax=self.hp.trainable_temp, use_softmax_only=self.hp.softmax_only)
+                                 safe_softmax=self.hp.trainable_temp, use_softmax_only=self.hp.softmax_only,
+                                 temp_init=self.hp.ss_temp)
             if self.hp.trainable_temp:
                 self.theta += net.b
             net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
