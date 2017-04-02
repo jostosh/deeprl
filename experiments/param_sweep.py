@@ -30,7 +30,7 @@ lo_by_param = {
     'otc': 2.0 ** (-8),
     'fplc': 1e-5,
     'fp_decay': 0.999,
-    'ss_temp': 0.1
+    'ss_temp': 0.01
 }
 
 hi_by_param = {
@@ -39,7 +39,8 @@ hi_by_param = {
     'global_clip_norm': 40.0,
     'otc': 2.0,
     'fplc': 1.0,
-    'fp_decay': 0.99999999
+    'fp_decay': 0.99999999,
+    'ss_temp': 1.0
 }
 
 presets = {
