@@ -65,7 +65,7 @@ class AtariEnvironment(object):
         if 'Breakout' in env_name or 'Pong' in env_name:
             self.real_actions = np.asarray([
                 a for a in self.real_actions
-                if self.env.get_action_meanings()[np.where(self.real_actions == a)[0]] not in
+                if np.array(self.env.get_action_meanings())[np.where(self.real_actions == a)[0]] not in
                    ['FIRE', 'LEFTFIRE', 'RIGHTFIRE']
             ])
 
