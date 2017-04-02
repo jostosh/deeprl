@@ -158,7 +158,7 @@ def conv_transpose(incoming, nb_filter, size, stride, activation=tf.nn.elu):
 
 
 def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='SpatialSoftmax', hierarchical=False,
-                   safe_softmax=False, use_softmax_only=False, temp_init=0.05):
+                   safe_softmax=True, use_softmax_only=False, temp_init=0.05):
     # Get the incoming dimensions (should be a 4D tensor)
     _, h, w, c = incoming.get_shape().as_list()
 
@@ -196,8 +196,8 @@ def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='Spa
         y_coordinates = tf.reduce_sum(tf.mul(cartesian_y, softmax_per_channel), reduction_indices=[1, 2], name='yOut')
 
         if hierarchical:
-            temperature_patch = tf.Variable(initial_value=tf.ones(c * 4), dtype=tf.float32,
-                                            trainable=trainable_temperature)
+            temperature_patch = tf.Variable(initial_value=tf.ones(c * 4) * temp_init, dtype=tf.float32,
+                                            trainable=trainable_temperature, name='SoftmaxTemperaturePatch')
             patched = tf.concat(3, [
                 incoming[:,        :h//2,          :w//2,     :],
                 incoming[:,    h//2:2*(h//2),      :w//2,     :],
