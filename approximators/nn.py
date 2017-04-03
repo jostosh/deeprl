@@ -453,11 +453,22 @@ class ActorCriticNN(object):
 
         with tf.name_scope("Outputs"):
             with tf.name_scope("Policy"):
-                if self.hp.safe_softmax:
-                    self.pi = fc_layer(net, num_actions, activation='linear', name='pi_sa')
-                    self._add_trainable(self.pi)
-                    self.pi -= tf.stop_gradient(tf.expand_dims(tf.reduce_max(self.pi, reduction_indices=[1]), 1))
-                    self.pi = tf.nn.softmax(self.pi)
+                if self.hp.policy_quantization:
+                    num_prototypes = 100 * self.num_actions
+
+                    head_shape = net.get_shape().as_list()[-1]
+                    prototypes = tf.Variable(tf.random_uniform((1, num_prototypes, head_shape)), name='Prototypes')
+                    diff = tf.reshape(tf.expand_dims(net, 1) - prototypes, (-1, head_shape))
+                    relevance_mat = tf.Variable(tf.eye(head_shape, head_shape), name='RelevanceMatrix')
+                    diff_warped = tf.reshape(tf.matmul(diff, relevance_mat), (-1, num_prototypes, head_shape))
+                    similarity = -tf.reduce_sum(tf.square(diff_warped), axis=2)
+                    self.pi = tf.reduce_sum(
+                        tf.reshape(
+                            tf.nn.softmax(similarity), (-1, self.num_actions, num_prototypes // self.num_actions)
+                        ),
+                        axis=2
+                    )
+                    self.theta += [prototypes, relevance_mat]
                 else:
                     self.pi = fc_layer(net, num_actions, activation='softmax', name='pi_sa')
                     self._add_trainable(self.pi)

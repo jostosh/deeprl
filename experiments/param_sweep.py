@@ -196,6 +196,10 @@ presets = {
     },
     '35': {
         'model': 'a3c_conv_gru'
+    },
+    '36': {
+        'model': 'a3c_ff',
+        'policy_quantization': True
     }
 }
 
