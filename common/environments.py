@@ -62,13 +62,6 @@ class AtariEnvironment(object):
         self.env.ale.setFloat(b'repeat_action_probability', 0.)
         #self.env.ale.setBool(b'color_averaging', True)
         self.real_actions = self.env.ale.getMinimalActionSet()
-        if 'Breakout' in env_name or 'Pong' in env_name:
-            self.real_actions = np.asarray([
-                a for a in self.real_actions
-                if np.array(self.env.get_action_meanings())[np.where(self.real_actions == a)[0]] not in
-                   ['FIRE', 'LEFTFIRE', 'RIGHTFIRE']
-            ])
-
         self._screen = np.empty((210, 160, 1), dtype=np.uint8)
         assert action_repeat > 0
 
