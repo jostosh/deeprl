@@ -216,7 +216,6 @@ def export_plots():
         all_scores = []
         all_xticks = []
         all_yticks = []
-        data_by_label = {}
         all_surfaces = []
         for hyper_parameters_str, event_files in sorted(event_files_by_hp.items()):
             hyper_parameters = json.loads(hyper_parameters_str)
@@ -243,7 +242,6 @@ def export_plots():
                                                                                       hyper_parameters, np_arrays_y)
 
             hp_idx += 1
-            data_by_label[args.labels[label_idx]] = (all_scores, all_surfaces, all_xticks, all_yticks)
 
 
         position_by_env = {
@@ -257,29 +255,6 @@ def export_plots():
             render_mean_score_plotly(data_objs, env, layout)
             render_mean_score_mpl(env, handles, position_by_env)
         else:
-            if len(args.input_dir) > 1:
-                fig, ax = plt.subplots()
-                ax.set_xlabel(args.xlabel)
-                ax.set_ylabel(args.ylabel)
-                ax.set_title(args.title)
-                ax.set_xlim(args.xrange)
-                ax.set_ylim(args.yrange)
-
-                for label, (scores, surfaces, xticks, yticks) in data_by_label.items():
-                    xi = np.linspace(args.xrange[0], args.xrange[1])
-
-                    indices = np.argsort(xticks)
-                    yi = spline([xticks[i] for i in indices], [scores[i] for i in indices], xi, order=1)
-
-                    ysmoothed = savgol_filter(yi, window_length=5, polyorder=3)
-
-                    handles.append(plt.plot(xi, ysmoothed, linewidth=2.0, label=args.labels[label_idx] + " Smoothed")[0])
-                    handles.append(plt.scatter(xticks, scores, label=args.labels[label_idx] + " Data"))
-
-                plt.legend(handles=handles, loc=args.legend_at, framealpha=0.)
-                plt.show()
-                exit(0)
-
             if len(args.trace_by) == 1:
                 xlab = args.trace_by[0].split('_').title() if not args.xlabel else args.xlabel
                 ylab = args.scalar_subset[0].split('/')[-1].title() if not args.ylabel else args.ylabel
@@ -496,5 +471,5 @@ if __name__ == "__main__":
     parser.add_argument("--legend_at", default='upper right')
     args = parser.parse_args()
 
-    print(args.xrange)
+    print(args.input_dir)
     export_plots()
