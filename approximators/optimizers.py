@@ -99,7 +99,7 @@ class RMSPropShared(object):
                 else self.learning_rate * (1 - tf.pow(self.decay, self.t+1))
             def get_lr(var):
                 if 'Prototypes' in var.name:
-                    return 0.05
+                    return 10 * lr_t
                 return lr_t
 
             minimize = tf.group(*([tf.assign_add(t, -get_lr(t) *

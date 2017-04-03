@@ -684,6 +684,7 @@ class ActorCriticNN(object):
                 [self.value, self.pi],
                 feed_dict={self.inputs: [state]})
 
+        print(pi[0])
         action = np.random.choice(self.num_actions, p=pi[0])
         return value[0], action
 
