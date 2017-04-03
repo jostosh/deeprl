@@ -190,6 +190,9 @@ presets = {
     '33': {
         'model': 'a3c_ff_ss',
         'trainable_temp': True
+    },
+    '34': {
+        'model': 'a3c_ff_ss'
     }
 }
 
