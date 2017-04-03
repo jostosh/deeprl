@@ -139,6 +139,84 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_
     return outputs, new_state[-1:], initial_state
 
 
+
+
+def convolutional_gru(incoming, outer_filter_size, num_features, stride, inner_filter_size=None, forget_bias=1.0,
+                       activation=tf.nn.tanh, padding='VALID', outer_init='torch',
+                       inner_init='orthogonal', inner_act=tf.nn.sigmoid):
+    n_input_features = incoming.get_shape().as_list()[-1]
+
+    with tf.name_scope("ConvGRU"):
+
+        with tf.name_scope("ConvGRUWeights"):
+            def get_conv_W(filter_size, n_in_features, n_out_features, name, depthwise=False, init='torch'):
+                if init == 'torch':
+                    d = 1.0 / np.sqrt(filter_size * filter_size * (n_in_features if not depthwise else 1))
+                    weights_init = tf.random_uniform([filter_size, filter_size, n_in_features, n_out_features],
+                                                     minval=-d, maxval=d)
+                elif init == 'orthogonal':
+                    weights_all = []
+                    for i in range(4 if depthwise else 1):
+                        X = np.random.random((n_out_features // (3 if depthwise else 1),
+                                              n_in_features * filter_size * filter_size))
+                        _, _, Vt = np.linalg.svd(X, full_matrices=False)
+                        assert np.allclose(np.dot(Vt, Vt.T), np.eye(Vt.shape[0]))
+                        weights_all.append(np.transpose(
+                            np.reshape(Vt, (n_out_features, n_in_features, filter_size, filter_size)),
+                            (2, 3, 1, 0)
+                        ))
+                    weights_init = np.concatenate(weights_all, axis=3).astype('float32')
+                else:
+                    raise ValueError("Unknown initialization: {}".format(init))
+                return tf.Variable(weights_init, name=name)
+
+            W_x_to_zrh = get_conv_W(outer_filter_size, n_input_features, num_features * 3, name='Wh', init='torch')
+            W_h_to_zrh = get_conv_W(inner_filter_size, num_features, num_features * 3, name='Wx',
+                                     init=inner_init)
+
+            b = tf.Variable(tf.zeros(3 * num_features), dtype=tf.float32, name='Bias')
+            W_h_to_z, W_h_to_r, W_h_to_h = tf.split(3, 3, W_h_to_zrh)
+
+        def gru_step(gru_state_prev, x):
+            with tf.name_scope("ConvGRUStep"):
+                #c, h = tf.split(3, 2, gru_state)
+
+                # Compute input to hidden convolutions
+                conv_x = tf.nn.conv2d(x, W_x_to_zrh, strides=[1, stride, stride, 1], padding=padding)
+                conv_x_z, conv_x_r, conv_x_h = tf.split(3, 3, conv_x)
+
+                # Compute hidden to hidden convolutions
+                bias_z, bias_r, bias_h = tf.split(0, 3, b)
+                conv_s_z = tf.nn.conv2d(gru_state_prev, W_h_to_z, strides=4 * [1], padding='SAME')
+                conv_s_r = tf.nn.conv2d(gru_state_prev, W_h_to_r, strides=4 * [1], padding='SAME')
+                r = inner_act(tf.nn.bias_add(conv_x_r + conv_s_r, bias_r))
+                conv_s_h = tf.nn.conv2d(gru_state_prev * r, W_h_to_h, strides=4*[1], padding='SAME')
+
+                z = inner_act(tf.nn.bias_add(conv_x_z + conv_s_z, bias_z))
+                h = activation(tf.nn.bias_add(conv_x_h + conv_s_h * r, bias_h))
+
+                new_gru_state = (1 - z) * h + z * gru_state_prev
+
+                return new_gru_state
+
+        with tf.name_scope("Reshaping"):
+            _, batch_size, h, w, _ = incoming.get_shape().as_list()
+            n_pad = 2 * (outer_filter_size // 2) if padding == 'SAME' else 0
+            state_shape = [batch_size,
+                           (h - outer_filter_size + n_pad) // stride + 1,
+                           (w - outer_filter_size + n_pad) // stride + 1,
+                           num_features]
+            output_shape = [-1] + state_shape[1:]
+            #print(state_shape)
+
+            initial_state = tf.placeholder(tf.float32, state_shape, name='ConvGRUState')
+            outputs = tf.reshape(tf.scan(gru_step, incoming, initializer=initial_state), output_shape)
+            outputs.W = [W_h_to_zrh, W_x_to_zrh]
+            outputs.b = b
+
+    return outputs, outputs[-1:], initial_state
+
+
 def conv_transpose(incoming, nb_filter, size, stride, activation=tf.nn.elu):
     _, h, w, n_in = incoming.get_shape().as_list()
     #print(h,w,n_in)

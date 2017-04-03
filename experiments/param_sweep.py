@@ -193,6 +193,9 @@ presets = {
     },
     '34': {
         'model': 'a3c_ff_ss'
+    },
+    '35': {
+        'model': 'a3c_conv_gru'
     }
 }
 

@@ -2,7 +2,8 @@ import tensorflow as tf
 import tflearn
 import numpy as np
 from deeprl.common.logger import logger
-from deeprl.approximators.layers import spatialsoftmax, custom_lstm, convolutional_lstm, conv_layer, fc_layer
+from deeprl.approximators.layers import \
+    spatialsoftmax, custom_lstm, convolutional_lstm, conv_layer, fc_layer, convolutional_gru
 from deeprl.approximators.sisws import spatial_weight_sharing
 from tensorflow.python.ops.rnn_cell import LSTMStateTuple
 from copy import deepcopy
@@ -19,6 +20,7 @@ class ModelNames:
     A3C_CONV_LSTM_K = 'a3c_conv_lstm_k'
     A3C_SISWS   = 'a3c_sisws'
     A3C_SISWS_S = 'a3c_sisws_s'
+    A3C_CONV_GRU = 'a3c_conv_gru'
 
 
 
@@ -35,7 +37,7 @@ class ActorCriticNN(object):
         self.model_name = hyper_parameters.model
         self.clip_advantage = hyper_parameters.clip_advantage
         self.recurrent = self.model_name in [ModelNames.A3C_LSTM, ModelNames.A3C_LSTM_SS, ModelNames.A3C_CONV_LSTM,
-                                             ModelNames.A3C_CONV_LSTM_K]
+                                             ModelNames.A3C_CONV_LSTM_K, ModelNames.A3C_CONV_GRU]
         self.t_max = hyper_parameters.t_max
         self.input_shape = hyper_parameters.input_shape
         self.policy_weighted_val = hyper_parameters.policy_weighted_val
@@ -291,6 +293,34 @@ class ActorCriticNN(object):
         return net
 
 
+    def _a3c_conv_gru(self):
+        """
+        This is an experimental architecture that uses convolutional LSTM layers.
+        """
+        with tf.name_scope('Inputs'):
+            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+
+        with tf.name_scope('LSTMInput'):
+            # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
+            # 'h' (256), which are both influencing the layer in the forward/backward pass.
+            self.n_steps = tf.placeholder(tf.int32, shape=[1])
+
+        with tf.name_scope('HiddenLayers'):
+            net = conv_layer(net, 32, 8, 4, activation=self.hp.activation, name='Conv1')
+            self._add_trainable(net)
+            net = tf.reshape(net, [-1, 1] + net.get_shape().as_list()[1:])
+
+            net, new_state, self.initial_state = convolutional_gru(net, outer_filter_size=4, num_features=64,
+                                                                   stride=2, inner_filter_size=5)
+            self.theta += net.W + [net.b]
+
+            net = tf.reshape(net, [-1, 9 * 9 * 64])
+            self.lstm_state_variable = new_state
+            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
+            self.embedding_layer = net
+
+        return net
+
     def _a3c_conv_lstm_k(self):
         """
         This is an experimental architecture that uses convolutional LSTM layers.
@@ -344,7 +374,7 @@ class ActorCriticNN(object):
 
     def reset_lstm_state(self):
         if self.lstm_state_numeric is None and self.lstm_first_state_since_update is None:
-            if self.model_name == ModelNames.A3C_CONV_LSTM:
+            if self.model_name in [ModelNames.A3C_CONV_LSTM, ModelNames.A3C_CONV_GRU]:
                 self.lstm_state_numeric = np.zeros(self.initial_state.get_shape().as_list())
                 self.lstm_first_state_since_update = np.zeros(self.initial_state.get_shape().as_list())
             else:
@@ -358,7 +388,7 @@ class ActorCriticNN(object):
                     np.zeros(shape, dtype='float32')
                 )
         else:
-            if self.model_name == ModelNames.A3C_CONV_LSTM:
+            if self.model_name in [ModelNames.A3C_CONV_LSTM, ModelNames.A3C_CONV_GRU]:
                 self.lstm_first_state_since_update.fill(0.)
                 self.lstm_state_numeric.fill(0.)
             else:
@@ -416,6 +446,8 @@ class ActorCriticNN(object):
             net = self._small_fcn()
         elif self.model_name == ModelNames.A3C_SISWS_S:
             net = self._a3c_sisws_s()
+        elif self.model_name == ModelNames.A3C_CONV_GRU:
+            net = self._a3c_conv_gru()
         else:
             raise ValueError("Unknown model name {}".format(self.model_name))
 
