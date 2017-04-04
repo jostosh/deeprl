@@ -462,11 +462,16 @@ class ActorCriticNN(object):
                     relevance_mat = tf.Variable(tf.eye(head_shape, head_shape), name='RelevanceMatrix')
                     diff_warped = tf.reshape(tf.matmul(diff, relevance_mat), (-1, num_prototypes, head_shape))
                     similarity = -tf.reduce_sum(tf.square(diff_warped), axis=2)
+
+                    # k_sim.shape == [batch, 20], k_ind.shape == [batch, 20]
+                    k_sim, k_ind = tf.nn.top_k(similarity, 20, False, name='KNN')
+                    # k_one_hot.shape == [batch, 20, num_actions]
+                    k_one_hot = tf.one_hot(tf.mod(k_ind, self.num_actions), self.num_actions, 1.0, 0.0)
+                    # softmax.shape == [batch, 20], softmax_expand_dims.shape == [batch, 20, num_actions]
+                    # pi.shape == [batch, num_actions]
+
                     self.pi = tf.reduce_sum(
-                        tf.reshape(
-                            tf.nn.softmax(similarity), (-1, self.num_actions, num_prototypes // self.num_actions)
-                        ),
-                        axis=2
+                        tf.expand_dims(tf.nn.softmax(k_sim), 2) * k_one_hot, axis=1
                     )
                     self.theta += [prototypes, relevance_mat]
                 else:
@@ -684,7 +689,6 @@ class ActorCriticNN(object):
                 [self.value, self.pi],
                 feed_dict={self.inputs: [state]})
 
-        print(pi[0])
         action = np.random.choice(self.num_actions, p=pi[0])
         return value[0], action
 
@@ -780,8 +784,7 @@ class ActorCriticNN(object):
             if include_summaries:
                 _, summaries = session.run([self.minimize, self.merged_summaries], feed_dict=fdict)
             else:
-                session.run(self.minimize, feed_dict=fdict)
-
+                _, g = session.run(self.minimize, feed_dict=fdict)
 
         return summaries
 

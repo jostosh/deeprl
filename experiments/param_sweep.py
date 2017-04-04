@@ -200,6 +200,10 @@ presets = {
     '36': {
         'model': 'a3c_ff',
         'policy_quantization': True
+    },
+    '37': {
+        'model': 'a3c_ff',
+        'policy_quantization': True
     }
 }
 
