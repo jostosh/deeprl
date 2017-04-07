@@ -255,9 +255,9 @@ def export_plots():
             render_mean_score_plotly(data_objs, env, layout)
             render_mean_score_mpl(env, handles, position_by_env)
         else:
+            xlab = args.trace_by[0].split('_').title() if not args.xlabel else args.xlabel
+            ylab = args.scalar_subset[0].split('/')[-1].title() if not args.ylabel else args.ylabel
             if len(args.trace_by) == 1:
-                xlab = args.trace_by[0].split('_').title() if not args.xlabel else args.xlabel
-                ylab = args.scalar_subset[0].split('/')[-1].title() if not args.ylabel else args.ylabel
                 title = env.replace('-v0', '') if not args.title else args.title
 
                 render_sweep1d_mpl(all_scores, all_surfaces, all_xticks, title, xlab, ylab)
