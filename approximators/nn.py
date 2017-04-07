@@ -454,14 +454,14 @@ class ActorCriticNN(object):
         with tf.name_scope("Outputs"):
             with tf.name_scope("Policy"):
                 if self.hp.policy_quantization:
-                    num_prototypes = 100 * self.num_actions
+                    num_prototypes = 250 * self.num_actions
 
                     head_shape = net.get_shape().as_list()[-1]
                     prototypes = tf.Variable(tf.random_uniform((1, num_prototypes, head_shape)), name='Prototypes')
                     diff = tf.reshape(tf.expand_dims(net, 1) - prototypes, (-1, head_shape))
                     relevance_mat = tf.Variable(tf.eye(head_shape, head_shape), name='RelevanceMatrix')
                     diff_warped = tf.reshape(tf.matmul(diff, relevance_mat), (-1, num_prototypes, head_shape))
-                    similarity = -tf.reduce_sum(tf.square(diff_warped), axis=2)
+                    similarity = -tf.reduce_sum(tf.abs(diff_warped), axis=2)
 
                     # k_sim.shape == [batch, 20], k_ind.shape == [batch, 20]
                     k_sim, k_ind = tf.nn.top_k(similarity, 20, False, name='KNN')
@@ -784,7 +784,7 @@ class ActorCriticNN(object):
             if include_summaries:
                 _, summaries = session.run([self.minimize, self.merged_summaries], feed_dict=fdict)
             else:
-                _, g = session.run(self.minimize, feed_dict=fdict)
+                session.run(self.minimize, feed_dict=fdict)
 
         return summaries
 

@@ -97,12 +97,13 @@ class RMSPropShared(object):
         with tf.name_scope("RMSPropMinimize"):
             lr_t = self.learning_rate if not self.ms_bias_correction \
                 else self.learning_rate * (1 - tf.pow(self.decay, self.t+1))
-            def get_lr(var):
+            def get_lr(var, g):
                 if 'Prototypes' in var.name:
+                    self.prototype_g = g
                     return 10 * lr_t
                 return lr_t
 
-            minimize = tf.group(*([tf.assign_add(t, -get_lr(t) *
+            minimize = tf.group(*([tf.assign_add(t, -get_lr(t, grad) *
                                       tf.div(grad, tf.sqrt(ms * (d_t if self.feedback else 1.) + self.epsilon)),
                                       use_locking=False)
                                    for t, grad, ms in zip(self.global_theta, grads, g_update)] + other_updates),
