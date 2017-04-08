@@ -113,7 +113,8 @@ class A3CAgent(object):
                 # Increment time counters
                 self.t += 1
                 T = session.run(global_step)
-                current_lr = self.hp.learning_rate - self.hp.learning_rate / self.hp.T_max * T
+                current_lr = self.hp.learning_rate - (self.hp.learning_rate / self.hp.T_max * T
+                                                      if not self.hp.ignore_annealing else 0)
                 epr += rewards[i]
 
             if self.hp.clip_rewards:
@@ -305,7 +306,8 @@ if __name__ == "__main__":
                                          feedback=hyperparameters.feedback,
                                          global_clipping=hyperparameters.global_clipping,
                                          global_clip_norm=hyperparameters.global_clip_norm,
-                                         ms_bias_correction=hyperparameters.mbc)
+                                         ms_bias_correction=hyperparameters.mbc,
+                                         prototype_factor=hyperparameters.prototype_factor)
     else:
         shared_optimizer = AdamShared(session, learning_rate_ph,
                                       beta1=hyperparameters.beta1,

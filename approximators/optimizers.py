@@ -8,7 +8,7 @@ class RMSPropShared(object):
 
     def __init__(self, session, learning_rate, decay=0.99, epsilon=1e-8, theta=None, momentum=0., feedback=False,
                  thl=0.1, thu=10., feedback_decay=0.99, global_clipping=False, global_clip_norm=1.0, d_clip_lo=0.1,
-                 d_clip_hi=10, ms_bias_correction=False):
+                 d_clip_hi=10, ms_bias_correction=False, prototype_factor=10):
         self.learning_rate = learning_rate
         self.decay = decay
 
@@ -20,6 +20,7 @@ class RMSPropShared(object):
         if theta:
             self.build_update(theta)
         self.session = session
+        self.prototype_factor = prototype_factor
 
         self.ms = None
         self.global_theta = None
@@ -100,7 +101,7 @@ class RMSPropShared(object):
             def get_lr(var, g):
                 if 'Prototypes' in var.name:
                     self.prototype_g = g
-                    return 10 * lr_t
+                    return self.prototype_factor * lr_t
                 return lr_t
 
             minimize = tf.group(*([tf.assign_add(t, -get_lr(t, grad) *

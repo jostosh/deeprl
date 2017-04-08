@@ -55,8 +55,10 @@ config1 = {
     'trainable_temp': False,
     'softmax_only': False,
     'force_store': False,
-    'ss_temp': 0.07,
-    'policy_quantization': False
+    'ss_temp': 0.003162,
+    'policy_quantization': False,
+    'ignore_annealing': False,
+    'prototype_factor': 10.0
 }
 
 param_sweep = {
@@ -157,3 +159,5 @@ class HyperParameters(object):
         self.ss_temp = params.ss_temp
         self.ss_hierarchical = params.ss_hierarchical
         self.policy_quantization = params.policy_quantization
+        self.ignore_annealing = params.ignore_annealing
+        self.prototype_factor = params.prototype_factor
