@@ -215,8 +215,7 @@ presets = {
     },
     '39': {
         'model': 'a3c_ff_ss',
-        'ss_hierarchical': True,
-        'ss_temp': 0.003162
+        'ss_hierarchical': True
     },
     '40': {
         'model': 'a3c_ff_ss',
@@ -224,6 +223,11 @@ presets = {
     '41': {
         'model': 'a3c_ff',
         'policy_quantization': True
+    },
+    # 11-04
+    '42': {
+        'model': 'a3c_ff',
+        'weights_init': 'default'
     }
 }
 

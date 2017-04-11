@@ -55,10 +55,11 @@ config1 = {
     'trainable_temp': False,
     'softmax_only': False,
     'force_store': False,
-    'ss_temp': 0.003162,
+    'ss_temp': 0.60,
     'policy_quantization': False,
     'ignore_annealing': False,
-    'prototype_factor': 10.0
+    'prototype_factor': 10.0,
+    'weights_init': 'default'
 }
 
 param_sweep = {
@@ -161,3 +162,4 @@ class HyperParameters(object):
         self.policy_quantization = params.policy_quantization
         self.ignore_annealing = params.ignore_annealing
         self.prototype_factor = params.prototype_factor
+        self.weights_init = params.weights_init

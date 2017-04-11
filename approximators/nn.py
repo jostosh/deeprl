@@ -82,18 +82,18 @@ class ActorCriticNN(object):
 
         with tf.name_scope('HiddenLayers') as scope:
             # Add first convolutional layer
-            net = conv_layer(net, 32, 8, 4, activation='linear', name='Conv1')
+            net = conv_layer(net, 32, 8, 4, activation='linear', name='Conv1', init=self.hp.weights_init)
 
             self._add_trainable(net)
             net = self.hp.activation(net)
 
             # Add second convolutional layer
-            net = conv_layer(net, 64, 4, 2, activation='linear', name='Conv2')
+            net = conv_layer(net, 64, 4, 2, activation='linear', name='Conv2', init=self.hp.weights_init)
             self._add_trainable(net)
             net = self.hp.activation(net)
 
             net = tflearn.flatten(net)
-            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
+            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3', init=self.hp.weights_init)
             self._add_trainable(net)
             self.embedding_layer = net
 
@@ -454,37 +454,39 @@ class ActorCriticNN(object):
         with tf.name_scope("Outputs"):
             with tf.name_scope("Policy"):
                 if self.hp.policy_quantization:
-                    num_prototypes = 250 * self.num_actions
+                    num_prototypes = 100 * self.num_actions
 
                     head_shape = net.get_shape().as_list()[-1]
                     prototypes = tf.Variable(tf.random_uniform((1, num_prototypes, head_shape)), name='Prototypes')
-                    diff = tf.reshape(tf.expand_dims(net, 1) - prototypes, (-1, head_shape))
-                    relevance_mat = tf.Variable(tf.eye(head_shape, head_shape), name='RelevanceMatrix')
-                    diff_warped = tf.reshape(tf.matmul(diff, relevance_mat), (-1, num_prototypes, head_shape))
-                    similarity = -tf.reduce_sum(tf.abs(diff_warped), axis=2)
+                    diff = tf.expand_dims(net, 1) - prototypes
+                    #relevance_mat = tf.Variable(tf.eye(head_shape, head_shape), name='RelevanceMatrix')
+                    #diff_warped = tf.reshape(tf.matmul(diff, relevance_mat), (-1, num_prototypes, head_shape))
+                    similarity = -tf.reduce_sum(tf.square(diff), axis=2)
 
                     # k_sim.shape == [batch, 20], k_ind.shape == [batch, 20]
-                    k_sim, k_ind = tf.nn.top_k(similarity, 20, False, name='KNN')
+                    k_sim, k_ind = tf.nn.top_k(similarity, 7, sorted=False, name='KNN')
                     # k_one_hot.shape == [batch, 20, num_actions]
                     k_one_hot = tf.one_hot(tf.mod(k_ind, self.num_actions), self.num_actions, 1.0, 0.0)
                     # softmax.shape == [batch, 20], softmax_expand_dims.shape == [batch, 20, num_actions]
                     # pi.shape == [batch, num_actions]
 
+
+                    self.summaries.append(tf.summary.histogram("WinningPrototypes", k_ind))
                     self.pi = tf.reduce_sum(
                         tf.expand_dims(tf.nn.softmax(k_sim), 2) * k_one_hot, axis=1
                     )
-                    self.theta += [prototypes, relevance_mat]
+                    self.theta += [prototypes] # , relevance_mat]
                 else:
-                    self.pi = fc_layer(net, num_actions, activation='softmax', name='pi_sa')
+                    self.pi = fc_layer(net, num_actions, activation='softmax', name='pi_sa', init=self.hp.weights_init)
                     self._add_trainable(self.pi)
             with tf.name_scope("Value"):
                 if self.policy_weighted_val:
-                    q_val = fc_layer(net, num_actions, activation='linear', name='q_sa')
+                    q_val = fc_layer(net, num_actions, activation='linear', name='q_sa', init=self.hp.weights_init)
                     self._add_trainable(q_val)
                     self.value = tf.reduce_sum(tf.mul(q_val, tf.stop_gradient(self.pi)),
                                                reduction_indices=1, name='v_s')
                 else:
-                    self.value = fc_layer(net, 1, activation='linear', name='v_s')
+                    self.value = fc_layer(net, 1, activation='linear', name='v_s', init=self.hp.weights_init)
                     self._add_trainable(self.value)
                 self.value = tflearn.reshape(self.value, [-1], 'FlattenedValue')
 
