@@ -6,7 +6,8 @@ import numpy as np
 
 def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, strides, activation, name='SoftWeightConv',
                            scope=None, reuse=False, local_normalization=True, centroids_trainable=False, scaling=1.0,
-                           padding='same', sigma_trainable=None, per_feature=False, color_coding=False):
+                           padding='same', sigma_trainable=None, per_feature=False, color_coding=False,
+                           similarity_fn='Exp'):
     """
     Defines a soft weight sharing layer. The soft weight sharing is accomplished by performing multiple convolutions
     which are then combined by a local weighting locally depends on the distance to the 'centroid' of each convolution.
@@ -34,10 +35,14 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
                     centroids_trainable.
         :param per_feature      If True, the centroids are given per output feature.
         :param color_coding     If True, uses color coding for visual summary
+        :param similarity_fn    Similarity function to be used. Can be either 'Exp' or 'InvEuclidean'
     Return values:
         :return: A 4D Tensor with similar dimensionality as a normal conv_2d's output
     """
-
+    valid_fns = ['Exp', 'InvEuclidean']
+    if similarity_fn not in valid_fns:
+        raise ValueError("Invalid similarity function {}, must be either {}"
+                         .format(similarity_fn, ' or '.join(valid_fns)))
     try:
         vscope = tf.variable_scope(scope, default_name=name, values=[incoming],
                                    reuse=reuse)
@@ -133,7 +138,8 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
                                 y_diff * tf.reshape(cov22, centroid_broadcasting_shape))
 
             # Again, we use broadcasting. The result is of shape [1, m, n, 1, c]
-            similarities = tf.exp(-(x_diff2 + y_diff2), 'similarities')
+            similarities = tf.exp(-(x_diff2 + y_diff2), 'similarities') if similarity_fn == 'Exp' \
+                else tf.div(1.0, (1.0 + tf.sqrt(x_diff2 + y_diff2)), name='similarities')
 
             # Optionally, we will perform local normalization such that the weight coefficients add up to 1 for each
             # spatial cell.
