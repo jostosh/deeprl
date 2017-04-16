@@ -58,8 +58,10 @@ config1 = {
     'ss_temp': 0.60,
     'policy_quantization': False,
     'ignore_annealing': False,
-    'prototype_factor': 10.0,
-    'weights_init': 'default'
+    'prototype_factor': 1,
+    'weights_init': 'default',
+    'nwp': 7,
+    'ppa': 100
 }
 
 param_sweep = {
@@ -163,3 +165,5 @@ class HyperParameters(object):
         self.ignore_annealing = params.ignore_annealing
         self.prototype_factor = params.prototype_factor
         self.weights_init = params.weights_init
+        self.ppa = params.ppa
+        self.nwp = params.nwp

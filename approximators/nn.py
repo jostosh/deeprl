@@ -454,24 +454,24 @@ class ActorCriticNN(object):
         with tf.name_scope("Outputs"):
             with tf.name_scope("Policy"):
                 if self.hp.policy_quantization:
-                    num_prototypes = 100 * self.num_actions
+                    num_prototypes = self.hp.ppa * self.num_actions
 
                     head_shape = net.get_shape().as_list()[-1]
-                    prototypes = tf.Variable(tf.random_uniform((1, num_prototypes, head_shape)), name='Prototypes')
-                    diff = tf.expand_dims(net, 1) - prototypes
+                    self.head = net
+                    prototypes = tf.Variable(tf.random_uniform((num_prototypes, head_shape)), name='Prototypes')
+                    diff = tf.expand_dims(net, 1) - tf.expand_dims(prototypes, 0)
                     #relevance_mat = tf.Variable(tf.eye(head_shape, head_shape), name='RelevanceMatrix')
                     #diff_warped = tf.reshape(tf.matmul(diff, relevance_mat), (-1, num_prototypes, head_shape))
                     similarity = -tf.reduce_sum(tf.square(diff), axis=2)
 
                     # k_sim.shape == [batch, 20], k_ind.shape == [batch, 20]
-                    k_sim, k_ind = tf.nn.top_k(similarity, 7, sorted=False, name='KNN')
+                    k_sim, self.k_ind = tf.nn.top_k(similarity, self.hp.nwp, sorted=False, name='KNN')
                     # k_one_hot.shape == [batch, 20, num_actions]
-                    k_one_hot = tf.one_hot(tf.mod(k_ind, self.num_actions), self.num_actions, 1.0, 0.0)
+                    k_one_hot = tf.one_hot(tf.mod(self.k_ind, self.num_actions), self.num_actions, 1.0, 0.0)
                     # softmax.shape == [batch, 20], softmax_expand_dims.shape == [batch, 20, num_actions]
                     # pi.shape == [batch, num_actions]
 
-
-                    self.summaries.append(tf.summary.histogram("WinningPrototypes", k_ind))
+                    self.summaries.append(tf.summary.histogram("WinningPrototypes", self.k_ind))
                     self.pi = tf.reduce_sum(
                         tf.expand_dims(tf.nn.softmax(k_sim), 2) * k_one_hot, axis=1
                     )
@@ -578,6 +578,10 @@ class ActorCriticNN(object):
     def build_param_update(self):
         with tf.name_scope("ParamUpdate"):
             self.minimize = self.optimizer.build_update_from_vars(self.theta, self.loss)
+            #if self.hp.policy_quantization:
+            #    self.hist_update = self.optimizer.build_hist_update(self.k_ind, self.advantage_no_grad, self.actions,
+            #                                                        self.head, num_actions=self.num_actions,
+            #                                                        ppa=self.hp.ppa)
 
     def build_loss(self):
         """
@@ -590,12 +594,6 @@ class ActorCriticNN(object):
             # Rewards
             self.advantage_no_grad = tf.placeholder(tf.float32, [None], name="AdvantageNoGrad")
             self.n_step_returns = tf.placeholder(tf.float32, [None], name='NStepReturns')
-
-        if self.clip_advantage:
-            # I empirically found that it might help to clip the advantage that is used for the policy loss. This might
-            # improve stability and consistency of the gradients
-            logger.info("Clipping advantage in graph")
-            self.advantage_no_grad = tf.clip_by_value(self.advantage_no_grad, -1., 1., name="ClippedAdvantage")
 
         with tf.name_scope("PolicyLoss"):
             # action matrix is n x a where each row corresponds to a time step and each column to an action
@@ -784,9 +782,9 @@ class ActorCriticNN(object):
 
             # Update the parameters
             if include_summaries:
-                _, summaries = session.run([self.minimize, self.merged_summaries], feed_dict=fdict)
+                _, summaries, _ = session.run([self.minimize, self.merged_summaries], feed_dict=fdict)
             else:
-                session.run(self.minimize, feed_dict=fdict)
+                session.run([self.minimize], feed_dict=fdict)
 
         return summaries
 
