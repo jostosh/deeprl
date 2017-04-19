@@ -239,6 +239,11 @@ presets = {
     '43': {
         'model': 'a3c_ff',
         'policy_quantization': True
+    },
+    # 19-04
+    '44': {
+        'model': 'a3c_ff',
+        'policy_quantization': True
     }
 }
 
