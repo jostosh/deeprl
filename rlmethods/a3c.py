@@ -16,6 +16,14 @@ import scipy.misc
 import subprocess
 from copy import deepcopy
 from deeprl.common.catch import CatchEnv
+from tensorflow.python import debug as tf_debug
+from sklearn.mixture import GaussianMixture
+
+
+flags = tf.app.flags
+FLAGS = flags.FLAGS
+flags.DEFINE_boolean("debug", False,
+                     "Use debugger to track down bad values during training")
 
 
 class A3CAgent(object):
@@ -38,6 +46,7 @@ class A3CAgent(object):
                                            optimizer=optimizer,
                                            hyper_parameters=hp,
                                            global_network=global_network)
+        self.global_network = global_network
 
         self._train_thread = threading.Thread(target=self._train, name=agent_name)
         self.t = 1
@@ -255,6 +264,41 @@ class A3CAgent(object):
 
         return np.mean(returns)
 
+
+    def sample_head_space(self):
+        self.synchronize_thread_parameters()
+        self.last_state = self.env.reset_random()
+        self.local_network.reset()
+
+        heads = []
+        for t in range(self.hp.ppa * 100):
+
+            heads.append(self.local_network.get_embedding(self.last_state, session)[0])
+
+            action = self.local_network.get_action(self.last_state, session)
+            self.last_state, reward, terminal, info = self.env.step(action)
+
+            if terminal:
+                self.last_state = self.env.reset_random()
+                self.local_network.reset()
+
+        heads_stacked = np.stack(heads)
+
+        print("Fitting GMM for prototype initialization")
+        gmm = GaussianMixture(n_components=self.hp.ppa // 10, covariance_type='full')
+        gmm.fit(heads_stacked)
+        prototype_inits = gmm.sample(n_samples=self.num_actions * self.hp.ppa)[0]
+
+        mask = heads_stacked.max(axis=0) > 0
+        prototype_inits *= np.reshape(mask, (1, mask.shape[0]))
+
+        prototypes = self.global_network.prototypes
+
+        prototype_ph = tf.placeholder(tf.float32, prototypes.get_shape().as_list())
+        assign_prototypes = tf.assign(prototypes, prototype_ph)
+
+        self.session.run(assign_prototypes, feed_dict={prototype_ph: prototype_inits})
+
     def store_embeddings(self, embedding_images, embeddings):
         zipped_embeddings = list(zip(embeddings, embedding_images))
         shuffle(zipped_embeddings)
@@ -292,6 +336,13 @@ if __name__ == "__main__":
     n_threads = hyperparameters.n_threads
 
     session = tf.Session()
+    #
+    # session = tf_debug.LocalCLIDebugWrapperSession(session)
+    #session.add_tensor_filter('has_inf_or_nan', tf_debug.has_inf_or_nan)
+
+    if FLAGS.debug:
+        session = tf_debug.LocalCLIDebugWrapperSession(session)
+        session.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
 
     global_env = get_env(env_name)
     num_actions = global_env.num_actions()
@@ -354,6 +405,9 @@ if __name__ == "__main__":
 
     init = tf.global_variables_initializer()
     session.run(init)
+
+    if hyperparameters.policy_quantization:
+        agents[0].sample_head_space()
 
     for agent in agents:
         agent.train()

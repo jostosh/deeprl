@@ -476,6 +476,7 @@ class ActorCriticNN(object):
                         tf.expand_dims(tf.nn.softmax(k_sim), 2) * k_one_hot, axis=1
                     )
                     self.theta += [prototypes] # , relevance_mat]
+                    self.prototypes = prototypes
                 else:
                     self.pi = fc_layer(net, num_actions, activation='softmax', name='pi_sa', init=self.hp.weights_init)
                     self._add_trainable(self.pi)
@@ -578,10 +579,10 @@ class ActorCriticNN(object):
     def build_param_update(self):
         with tf.name_scope("ParamUpdate"):
             self.minimize = self.optimizer.build_update_from_vars(self.theta, self.loss)
-            #if self.hp.policy_quantization:
-            #    self.hist_update = self.optimizer.build_hist_update(self.k_ind, self.advantage_no_grad, self.actions,
-            #                                                        self.head, num_actions=self.num_actions,
-            #                                                        ppa=self.hp.ppa)
+            if self.hp.policy_quantization:
+                self.hist_update = self.optimizer.build_hist_update(self.k_ind, self.advantage_no_grad, self.actions,
+                                                                    self.head, num_actions=self.num_actions,
+                                                                    ppa=self.hp.ppa)
 
     def build_loss(self):
         """
@@ -782,7 +783,7 @@ class ActorCriticNN(object):
 
             # Update the parameters
             if include_summaries:
-                _, summaries, _ = session.run([self.minimize, self.merged_summaries], feed_dict=fdict)
+                _, summaries = session.run([self.minimize, self.merged_summaries], feed_dict=fdict)
             else:
                 session.run([self.minimize], feed_dict=fdict)
 

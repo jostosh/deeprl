@@ -61,7 +61,8 @@ config1 = {
     'prototype_factor': 1,
     'weights_init': 'default',
     'nwp': 7,
-    'ppa': 100
+    'ppa': 100,
+    'debug': False
 }
 
 param_sweep = {

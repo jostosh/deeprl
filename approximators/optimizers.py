@@ -56,7 +56,7 @@ class RMSPropShared(object):
         self._init_from_prototype(theta)
 
     def build_hist_update(self, k_ind, advantage, actions, head, num_actions, ppa):
-        num_prototypes = k_ind.get_shape().as_list()[-1]
+        num_prototypes = ppa * num_actions
         if not self.prototype_hist:
             self.prototype_hist = tf.Variable(tf.zeros([num_prototypes]), name='PrototypeHist')
 
@@ -80,7 +80,7 @@ class RMSPropShared(object):
         candidate_prototypes = tf.gather(hist_update, winning_action + na * tf.range(0, ppa, dtype=tf.int64))
         hist_winner = tf.argmin(candidate_prototypes, axis=0) * na + winning_action
 
-        return tf.scatter_update(self.prototypes, hist_winner, head[max_adv_ind]) # tf.cond(jump, lambda: tf.scatter_update(self.prototypes, hist_winner, head[max_adv_ind]), lambda: hist_update)
+        return tf.cond(jump, lambda: tf.scatter_update(self.prototypes, hist_winner, head[max_adv_ind]), lambda: hist_update)
 
 
 

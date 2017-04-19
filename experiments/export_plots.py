@@ -351,18 +351,29 @@ def render_mean_score_plotly(data_objs, env, layout):
     fig = go.Figure(data=data, layout=layout)
     py.plot(fig, filename=env.replace('-v0', '') + args.image_suffix + '.html')
 
+all_tick_combinations = []
 
 def get_sweep_data(all_scores, all_surfaces, all_xticks, all_yticks, hyper_parameters, np_arrays_y):
-    if 1 <= len(args.trace_by) <= 2:
+    if len(args.trace_by) == 1:
         all_scores += [np.mean(y_arr[-10:]) for y_arr in np_arrays_y]
         all_surfaces += [np.mean(y_arr) for y_arr in np_arrays_y]
 
         all_xticks += [np.log10(hyper_parameters[args.trace_by[0]]) for _ in range(len(np_arrays_y))]
+    elif len(args.trace_by) == 2:
+
+        if ((hyper_parameters[args.trace_by[0]], hyper_parameters[args.trace_by[1]]) not in all_tick_combinations):
+            all_scores += [np.mean(y_arr[-10:]) for y_arr in np_arrays_y]
+            all_surfaces += [np.mean(y_arr) for y_arr in np_arrays_y]
+
+            all_xticks += [np.log10(hyper_parameters[args.trace_by[0]]) for _ in range(len(np_arrays_y))]
+
+            fun = np.log10 if args.log_scale else lambda s: s
+            all_yticks += [fun(hyper_parameters[args.trace_by[1]]) for _ in range(len(np_arrays_y))]
+
+            all_tick_combinations.append((hyper_parameters[args.trace_by[0]], hyper_parameters[args.trace_by[1]]))
+
     else:
         raise ValueError("No support for sweep plot for more than two parameters")
-    if len(args.trace_by) == 2:
-        fun = np.log10 if args.log_scale else lambda s: s
-        all_yticks += [fun(hyper_parameters[args.trace_by[1]]) for _ in range(len(np_arrays_y))]
     return all_scores, all_surfaces, all_xticks, all_yticks
 
 
