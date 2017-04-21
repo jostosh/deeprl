@@ -17,6 +17,7 @@ import subprocess
 from copy import deepcopy
 from deeprl.common.catch import CatchEnv
 from tensorflow.python import debug as tf_debug
+from sklearn.cluster import AffinityPropagation
 from sklearn.mixture import GaussianMixture
 
 
@@ -271,11 +272,12 @@ class A3CAgent(object):
         self.local_network.reset()
 
         heads = []
-        for t in range(self.hp.ppa * 100):
+        for t in range(1000):
 
             heads.append(self.local_network.get_embedding(self.last_state, session)[0])
 
-            action = self.local_network.get_action(self.last_state, session)
+            _ = self.local_network.get_action(self.last_state, session)
+            action = np.random.randint(self.num_actions)
             self.last_state, reward, terminal, info = self.env.step(action)
 
             if terminal:
@@ -285,9 +287,15 @@ class A3CAgent(object):
         heads_stacked = np.stack(heads)
 
         print("Fitting GMM for prototype initialization")
-        gmm = GaussianMixture(n_components=self.hp.ppa // 10, covariance_type='full')
+        af = AffinityPropagation().fit(heads_stacked)
+        n_components = len(af.cluster_centers_indices_)
+        print("Found {} clusters".format(n_components))
+
+        gmm = GaussianMixture(n_components=n_components, covariance_type='full')
         gmm.fit(heads_stacked)
         prototype_inits = gmm.sample(n_samples=self.num_actions * self.hp.ppa)[0]
+
+        print(prototype_inits.shape)
 
         mask = heads_stacked.max(axis=0) > 0
         prototype_inits *= np.reshape(mask, (1, mask.shape[0]))
@@ -405,9 +413,6 @@ if __name__ == "__main__":
 
     init = tf.global_variables_initializer()
     session.run(init)
-
-    if hyperparameters.policy_quantization:
-        agents[0].sample_head_space()
 
     for agent in agents:
         agent.train()
