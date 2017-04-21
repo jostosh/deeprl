@@ -455,6 +455,7 @@ class ActorCriticNN(object):
             with tf.name_scope("Policy"):
                 if self.hp.policy_quantization:
                     num_prototypes = self.hp.ppa * self.num_actions
+                    n_winning_prototypes = np.ceil(self.hp.wpr * num_prototypes) if self.hp.wpr else self.hp.nwp
 
                     head_shape = net.get_shape().as_list()[-1]
                     self.head = net
@@ -465,7 +466,8 @@ class ActorCriticNN(object):
                     similarity = -tf.reduce_sum(tf.square(diff), axis=2)
 
                     # k_sim.shape == [batch, 20], k_ind.shape == [batch, 20]
-                    k_sim, self.k_ind = tf.nn.top_k(similarity, self.hp.nwp, sorted=False, name='KNN')
+                    k_sim, self.k_ind = tf.nn.top_k(similarity, n_winning_prototypes, sorted=False, name='KNN')
+                    logger.warn("N winning prototypes: {}".format(k_sim.get_shape().as_list()[-1]))
                     # k_one_hot.shape == [batch, 20, num_actions]
                     k_one_hot = tf.one_hot(tf.mod(self.k_ind, self.num_actions), self.num_actions, 1.0, 0.0)
                     # softmax.shape == [batch, 20], softmax_expand_dims.shape == [batch, 20, num_actions]

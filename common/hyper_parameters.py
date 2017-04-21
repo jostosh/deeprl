@@ -62,7 +62,8 @@ config1 = {
     'weights_init': 'default',
     'nwp': 7,
     'ppa': 100,
-    'debug': False
+    'debug': False,
+    'wpr': 0.0
 }
 
 param_sweep = {
@@ -168,3 +169,4 @@ class HyperParameters(object):
         self.weights_init = params.weights_init
         self.ppa = params.ppa
         self.nwp = params.nwp
+        self.wpr = params.wpr

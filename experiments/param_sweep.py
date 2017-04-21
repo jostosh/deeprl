@@ -23,7 +23,8 @@ func_by_param = {
     'ss_temp': log_uniform,
     'prototype_factor': log_uniform,
     'ppa': lambda l, h, r: int(log_uniform(l, h, r)),
-    'nwp': lambda l, h, r: int(log_uniform(l, h, r))
+    'nwp': lambda l, h, r: int(log_uniform(l, h, r)),
+    'wpr': uniform
 }
 
 lo_by_param = {
@@ -36,7 +37,8 @@ lo_by_param = {
     'ss_temp': 0.01,
     'prototype_factor': 1,
     'ppa': 10,
-    'nwp': 3
+    'nwp': 3,
+    'wpr': 0.1
 }
 
 hi_by_param = {
@@ -49,7 +51,8 @@ hi_by_param = {
     'ss_temp': 1.0,
     'prototype_factor': 100,
     'ppa': 200,
-    'nwp': 25
+    'nwp': 25,
+    'wpr': 1.0
 }
 
 presets = {
@@ -251,6 +254,10 @@ presets = {
         'policy_quantization': True,
         'ppa': 25,
         'nwp': 10
+    },
+    '46': {
+        'model': 'a3c_ff',
+        'policy_quantization': True
     }
 }
 
@@ -263,7 +270,7 @@ def convert_preset_to_params(preset):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default='a3c_ff_ss')
-    parser.add_argument("--params", nargs='+', default=['learning_rate', 'otc', 'fplc', 'fp_decay'])
+    parser.add_argument("--params", nargs='+', default=['learning_rate', 'otc', 'fplc', 'fp_decay', 'wpr'])
     parser.add_argument("--a3c_args", nargs='+', default=[])
     parser.add_argument("--preset", default=None)
     args = parser.parse_args()
