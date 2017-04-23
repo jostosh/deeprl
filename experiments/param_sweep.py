@@ -258,6 +258,13 @@ presets = {
     '46': {
         'model': 'a3c_ff',
         'policy_quantization': True
+    },
+    # 23-04
+    '47': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 15,
+        'wpr': 0.6
     }
 }
 
