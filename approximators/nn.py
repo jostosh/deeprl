@@ -1,13 +1,17 @@
+from copy import deepcopy
+
+import numpy as np
 import tensorflow as tf
 import tflearn
-import numpy as np
-from deeprl.common.logger import logger
+from tensorflow.python.ops.rnn_cell import LSTMStateTuple
+
+from deeprl.approximators.convlstm import ConvLSTM2D
 from deeprl.approximators.layers import \
     spatialsoftmax, custom_lstm, convolutional_lstm, conv_layer, fc_layer, convolutional_gru
+from deeprl.approximators.similarity_functions import similarity_functions
 from deeprl.approximators.sisws import spatial_weight_sharing
-from tensorflow.python.ops.rnn_cell import LSTMStateTuple
-from copy import deepcopy
-from deeprl.approximators.convlstm import ConvLSTM2D
+from deeprl.common.logger import logger
+
 
 class ModelNames:
     A3C_FF      = 'a3c_ff'
@@ -416,7 +420,6 @@ class ActorCriticNN(object):
                     self.theta.append(layer.b)
         #logger.info('{}: {}'.format(layer.name, [t.name for t in self.theta]))
 
-
     def build_network(self, num_actions, input_shape):
         logger.debug('Input shape: {}'.format(input_shape))
         with tf.name_scope('ForwardInputs') as scope:
@@ -454,20 +457,22 @@ class ActorCriticNN(object):
         with tf.name_scope("Outputs"):
             with tf.name_scope("Policy"):
                 if self.hp.policy_quantization:
+
                     num_prototypes = self.hp.ppa * self.num_actions
-                    n_winning_prototypes = np.ceil(self.hp.wpr * num_prototypes) if self.hp.wpr else self.hp.nwp
+                    n_winning_prototypes = np.ceil(self.hp.wpr * num_prototypes) if self.hp.wpr != 0.0 else self.hp.nwp
 
                     head_shape = net.get_shape().as_list()[-1]
                     self.head = net
                     prototypes = tf.Variable(tf.random_uniform((num_prototypes, head_shape)), name='Prototypes')
-                    diff = tf.expand_dims(net, 1) - tf.expand_dims(prototypes, 0)
+                    #diff = tf.expand_dims(net, 1) - tf.expand_dims(prototypes, 0)
                     #relevance_mat = tf.Variable(tf.eye(head_shape, head_shape), name='RelevanceMatrix')
                     #diff_warped = tf.reshape(tf.matmul(diff, relevance_mat), (-1, num_prototypes, head_shape))
-                    similarity = -tf.reduce_sum(tf.square(diff), axis=2)
+                    similarity_fn = similarity_functions[self.hp.pq_sim_fn]
+
+                    similarity, additional_variables = similarity_fn(net, prototypes) #-tf.reduce_sum(tf.square(diff), axis=2)
 
                     # k_sim.shape == [batch, 20], k_ind.shape == [batch, 20]
                     k_sim, self.k_ind = tf.nn.top_k(similarity, n_winning_prototypes, sorted=False, name='KNN')
-                    logger.warn("N winning prototypes: {}".format(k_sim.get_shape().as_list()[-1]))
                     # k_one_hot.shape == [batch, 20, num_actions]
                     k_one_hot = tf.one_hot(tf.mod(self.k_ind, self.num_actions), self.num_actions, 1.0, 0.0)
                     # softmax.shape == [batch, 20], softmax_expand_dims.shape == [batch, 20, num_actions]
@@ -477,7 +482,7 @@ class ActorCriticNN(object):
                     self.pi = tf.reduce_sum(
                         tf.expand_dims(tf.nn.softmax(k_sim), 2) * k_one_hot, axis=1
                     )
-                    self.theta += [prototypes] # , relevance_mat]
+                    self.theta += [prototypes] + additional_variables # , relevance_mat]
                     self.prototypes = prototypes
                 else:
                     self.pi = fc_layer(net, num_actions, activation='softmax', name='pi_sa', init=self.hp.weights_init)
@@ -790,4 +795,6 @@ class ActorCriticNN(object):
                 session.run([self.minimize], feed_dict=fdict)
 
         return summaries
+
+
 

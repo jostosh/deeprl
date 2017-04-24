@@ -63,7 +63,8 @@ config1 = {
     'nwp': 7,
     'ppa': 100,
     'debug': False,
-    'wpr': 0.0
+    'wpr': 0.0,
+    'pq_sim_fn': 'euc'
 }
 
 param_sweep = {
@@ -170,3 +171,4 @@ class HyperParameters(object):
         self.ppa = params.ppa
         self.nwp = params.nwp
         self.wpr = params.wpr
+        self.pq_sim_fn = params.pq_sim_fn

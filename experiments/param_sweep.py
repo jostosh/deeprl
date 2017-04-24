@@ -265,6 +265,27 @@ presets = {
         'policy_quantization': True,
         'ppa': 15,
         'wpr': 0.6
+    },
+    '48': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_sim_fn': 'cor',
+        'ppa': 15,
+        'wpr': 0.6
+    },
+    '49': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_sim_fn': 'man',
+        'ppa': 15,
+        'wpr': 0.6
+    },
+    '50': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_sim_fn': 'euc',
+        'ppa': 15,
+        'wpr': 0.6
     }
 }
 
@@ -277,7 +298,7 @@ def convert_preset_to_params(preset):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default='a3c_ff_ss')
-    parser.add_argument("--params", nargs='+', default=['learning_rate', 'otc', 'fplc', 'fp_decay', 'wpr'])
+    parser.add_argument("--params", nargs='+', default=['learning_rate', 'otc', 'fplc', 'fp_decay'])
     parser.add_argument("--a3c_args", nargs='+', default=[])
     parser.add_argument("--preset", default=None)
     args = parser.parse_args()
