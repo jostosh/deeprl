@@ -266,6 +266,7 @@ presets = {
         'ppa': 15,
         'wpr': 0.6
     },
+    # 24-04
     '48': {
         'model': 'a3c_ff',
         'policy_quantization': True,
@@ -286,6 +287,27 @@ presets = {
         'pq_sim_fn': 'euc',
         'ppa': 15,
         'wpr': 0.6
+    },
+    # 26-04
+    '51': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_sim_fn': 'cor'
+    },
+    '52': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_sim_fn': 'man'
+    },
+    '53': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_sim_fn': 'euc'
+    },
+    '54': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_sim_fn': 'sq_euc'
     }
 }
 

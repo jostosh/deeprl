@@ -463,14 +463,9 @@ class ActorCriticNN(object):
 
                     head_shape = net.get_shape().as_list()[-1]
                     self.head = net
-                    prototypes = tf.Variable(tf.random_uniform((num_prototypes, head_shape)), name='Prototypes')
-                    #diff = tf.expand_dims(net, 1) - tf.expand_dims(prototypes, 0)
-                    #relevance_mat = tf.Variable(tf.eye(head_shape, head_shape), name='RelevanceMatrix')
-                    #diff_warped = tf.reshape(tf.matmul(diff, relevance_mat), (-1, num_prototypes, head_shape))
-                    similarity_fn = similarity_functions[self.hp.pq_sim_fn]
-
-                    similarity, additional_variables = similarity_fn(net, prototypes) #-tf.reduce_sum(tf.square(diff), axis=2)
-
+                    d = 1.0 / np.sqrt(head_shape)
+                    prototypes = tf.Variable(tf.random_uniform((num_prototypes, head_shape), minval=-d, maxval=d), name='Prototypes')
+                    similarity, additional_variables = similarity_functions[self.hp.pq_sim_fn](net, prototypes)
                     # k_sim.shape == [batch, 20], k_ind.shape == [batch, 20]
                     k_sim, self.k_ind = tf.nn.top_k(similarity, n_winning_prototypes, sorted=False, name='KNN')
                     # k_one_hot.shape == [batch, 20, num_actions]
