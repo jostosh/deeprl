@@ -307,7 +307,7 @@ presets = {
     '54': {
         'model': 'a3c_ff',
         'policy_quantization': True,
-        'pq_sim_fn': 'sq_euc'
+        'pq_sim_fn': 'euc_sq'
     }
 }
 
