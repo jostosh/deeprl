@@ -311,6 +311,13 @@ presets = {
     }, # 05-05-17
     '55': {
         'model': 'a3c_ff'
+    },
+    '56': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 15,
+        'wpr': 0.6,
+        'pq_sim_fn': 'euc_sq'
     }
 }
 
