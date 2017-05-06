@@ -308,6 +308,9 @@ presets = {
         'model': 'a3c_ff',
         'policy_quantization': True,
         'pq_sim_fn': 'euc_sq'
+    }, # 05-05-17
+    '55': {
+        'model': 'a3c_ff'
     }
 }
 
