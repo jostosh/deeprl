@@ -272,7 +272,7 @@ def render_sweep2d_mpl(all_scores, all_xticks, all_yticks, env, xlab, ylab):
     min_y, max_y = np.min(all_yticks), np.max(all_yticks)
     xi = np.linspace(min_x, max_x)
     yi = np.linspace(min_y, max_y)
-    zi = griddata(all_xticks, all_yticks, all_scores, xi, yi)
+    zi = griddata(all_xticks, all_yticks, all_scores, xi, yi, interp='nn')
     title = env.replace('-v0', '') if not args.title else args.title
     fig, ax = plt.subplots()
     ax.set_xlabel(xlab)
@@ -282,8 +282,8 @@ def render_sweep2d_mpl(all_scores, all_xticks, all_yticks, env, xlab, ylab):
         ax.set_xlim(args.xrange)
     if args.yrange:
         ax.set_ylim(args.yrange)
-    CS = ax.contour(xi, yi, zi, 15, linewidths=0.5, colors='k')
-    CS = ax.contourf(xi, yi, zi, 15, cmap=cm.viridis)
+    CS = ax.contour(xi, yi, zi, 20, linewidths=0.5, colors='k')
+    CS = ax.contourf(xi, yi, zi, 20, cmap=cm.viridis)
     sc = ax.scatter(all_xticks, all_yticks, c='k')
     cb = fig.colorbar(CS)
     cb.ax.set_title("Score")

@@ -6,10 +6,10 @@ import tensorflow as tf
 from deeprl.common.catch import CatchEnv
 
 
-def get_env(env, frames_per_state=4, output_shape=None, session=None):
+def get_env(env, frames_per_state=4, output_shape=None, session=None, remove_artifacts=True):
     if env in ['Breakout-v0', 'Pong-v0', 'BeamRider-v0', 'Qbert-v0', 'SpaceInvaders-v0']:
         return AtariEnvironment(env.replace('-', 'Deterministic-'), frames_per_state, output_shape=output_shape,
-                                session=session)
+                                session=session, remove_artifacts=remove_artifacts)
     elif env == 'Catch':
         return CatchEnv(frames_per_state)
     return ClassicControl(env)
@@ -45,7 +45,8 @@ class ClassicControl(object):
 
 class AtariEnvironment(object):
 
-    def __init__(self, env_name, frames_per_state=4, action_repeat=4, output_shape=(84, 84), session=None):
+    def __init__(self, env_name, frames_per_state=4, action_repeat=4, output_shape=(84, 84), session=None,
+                 remove_artifacts=True):
         self.env = gym.make(env_name)
         self.last_observation = np.empty((210, 160, 1), dtype=np.uint8) #self.env.reset()
         self.frames_per_state = frames_per_state
@@ -63,6 +64,8 @@ class AtariEnvironment(object):
         self.real_actions = self.env.ale.getMinimalActionSet()
         self._screen = np.empty((210, 160, 1), dtype=np.uint8)
         assert action_repeat > 0
+
+        self.remove_artifacts = remove_artifacts
 
         self.session = session
         if session:
@@ -88,7 +91,10 @@ class AtariEnvironment(object):
             return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
 
         # Remove Atari artifacts
-        preprocessed_observation = np.maximum(self.last_observation, observation)
+        if self.remove_artifacts:
+            preprocessed_observation = np.maximum(self.last_observation, observation)
+        else:
+            preprocessed_observation = self.last_observation
         # Convert to gray scale and resize
         return imresize(np.reshape(preprocessed_observation, (210, 160)), self.output_shape) / 255. #(84, 84))
 
