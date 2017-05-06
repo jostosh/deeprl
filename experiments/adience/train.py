@@ -5,12 +5,11 @@ import argparse
 from deeprl.common.hyper_parameters import HyperParameters
 import pickle as pkl
 import os
-from deeprl.common.logger import get_log_dir
 import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
 from tensorflow.contrib.layers import convolution2d
-from deeprl.approximators.layers import spatial_weight_sharing
+from deeprl.approximators.sisws import spatial_weight_sharing
 
 
 class LogDir(object):
@@ -19,24 +18,37 @@ class LogDir(object):
         self._logdir_base = self._get_logdir()
 
     def _get_logdir(self):
-        hyperparameters = HyperParameters({
+        hyperparameters = {
             'model': args.model,
-            'env': 'adience',
-            'frame_prediction': False,
-            'feedback': False,
-            'optimality_tightening': False,
-            'residual_prediction': False,
             'per_feature': args.per_feature,
-            'trainable_centroids': args.trainable_centroids
-        })
-        logdir = os.path.join(get_log_dir(hyperparameters))
+            'trainable_centroids': args.trainable_centroids,
+            'distance_fn': args.distance_fn,
+            'random_inits': args.random_inits,
+            'n_centroids': ' x '.join([str(a) for a in args.n_centroids])
+        }
+
+        path = os.path.join(os.path.expanduser('~'), 'tensorflowlogs', 'v0.9.7', 'adience')
+        path = os.path.join(path, *['{}={}'.format(param, val) for param, val in hyperparameters.items()])
+        os.makedirs(path, exist_ok=True)
+        current_dirs = sorted([o for o in os.listdir(path) if os.path.isdir(os.path.join(path, o))])
+        # We're assuming at this point that we do not exceed 1M runs per version
+        if not current_dirs:
+            # If there are no dirs yet, start at 0
+            rundir = 'run000000'
+        else:
+            # Otherwise make a new one by incrementing the count
+            lastdir = current_dirs[-1]
+            lastrun = int(lastdir[3:])
+            rundir = "run%06d" % (lastrun + 1,)
+        logdir = os.path.join(path, rundir)
+
         os.makedirs(logdir, exist_ok=True)
 
         with open(os.path.join(logdir, 'hyper_parameters.pkl'), 'wb') as f:
-            hp = hyperparameters.__dict__
+            hp = hyperparameters
             os.chdir(os.path.expanduser("~") + "/mproj/deeprl")
             hp.update({'git_description': subprocess.check_output(["git", "describe", "--always"]).decode('utf8').strip()})
-            pkl.dump(hyperparameters.__dict__, f, pkl.HIGHEST_PROTOCOL)
+            pkl.dump(hyperparameters, f, pkl.HIGHEST_PROTOCOL)
         return logdir
 
     def crossval_dir(self, idx):
@@ -77,13 +89,20 @@ def network_spatial_interpolation(input):
     net = tflearn.layers.max_pool_2d(net, kernel_size=3, strides=2, padding='valid')
     net = tflearn.layers.local_response_normalization(net)
 
-    net = spatial_weight_sharing(net, n_centroids=[2, 2], n_filters=128, filter_size=5, strides=1, activation=tf.nn.elu,
-                                 per_feature=args.per_feature, centroids_trainable=args.trainable_centroids)
+    if args.random_inits != 0:
+        n_centroids = args.random_inits
+    else:
+        n_centroids = args.n_centroids
+
+    net = spatial_weight_sharing(net, n_centroids=n_centroids, n_filters=256, filter_size=5, strides=1, activation=tf.nn.elu,
+                                 per_feature=args.per_feature, centroids_trainable=args.trainable_centroids,
+                                 similarity_fn=args.distance_fn)
     net = tflearn.layers.max_pool_2d(net, kernel_size=3, strides=2, padding='valid')
     net = tflearn.layers.local_response_normalization(net)
 
-    net = spatial_weight_sharing(net, n_centroids=[2, 2], n_filters=192, filter_size=3, strides=1, activation=tf.nn.elu,
-                                 per_feature=args.per_feature, centroids_trainable=args.trainable_centroids)
+    net = spatial_weight_sharing(net, n_centroids=n_centroids, n_filters=384, filter_size=3, strides=1, activation=tf.nn.elu,
+                                 per_feature=args.per_feature, centroids_trainable=args.trainable_centroids,
+                                 similarity_fn=args.distance_fn)
     net = tflearn.layers.max_pool_2d(net, kernel_size=3, strides=2, padding='valid')
 
     net = tflearn.layers.fully_connected(net, 512, activation=tf.nn.elu)
@@ -137,10 +156,14 @@ if __name__ == "__main__":
     parser.add_argument("--trainable_centroids", dest='trainable_centroids', action='store_true')
     parser.add_argument("--verbosity", type=int, default=0)
     parser.add_argument("--batch_size", type=int, default=128)
-    parser.add_argument("--n_epochs", type=int, default=75)
+    parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--optimizer", type=str, default='adam')
     parser.add_argument("--learning_rate", type=float, default=1e-4)
+    parser.add_argument("--random_inits", type=int, default=0)
+    parser.add_argument("--distance_fn", type=str, default='Exp', choices=['Exp', 'InvEuclidean'])
+    parser.add_argument("--n_centroids", type=int, nargs='+', default=[2, 2])
     args = parser.parse_args()
 
     logdir = LogDir(args.model)
-    train(args.idx)
+    for i in range(5):
+        train(i)
