@@ -199,6 +199,32 @@ def export_plots():
 
         plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '.pdf'))
         plt.show()
+
+        plt.clf()
+        handles.clear()
+        fig, ax = plt.subplots()
+        ax.set_xlabel(args.xlabel)
+        ax.set_ylabel('Mean score final 5 evaluations')
+        ax.set_title(args.title)
+        ax.set_xlim(args.xrange)
+        ax.set_ylim(args.yrange)
+
+        for label, (scores, surfaces, xticks, yticks) in data_by_label.items():
+            xi = np.linspace(args.xrange[0], args.xrange[1])
+
+            indices = np.argsort(xticks)
+            yi = spline([xticks[i] for i in indices], [scores[i] for i in indices], xi, order=1)
+
+            ysmoothed = savgol_filter(yi, window_length=5, polyorder=3)
+
+            handles.append(plt.plot(xi, ysmoothed, linewidth=4.0, label=label)[0])
+            #handles.append(plt.scatter(xticks, scores, label=args.labels[label_idx] + " Data"))
+
+        plt.legend(handles=handles, loc=args.legend_at, framealpha=0.)
+
+        plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '_scores.pdf'))
+        plt.show()
+
         return
 
     input_dir = args.input_dir[0]
@@ -355,14 +381,14 @@ all_tick_combinations = []
 
 def get_sweep_data(all_scores, all_surfaces, all_xticks, all_yticks, hyper_parameters, np_arrays_y):
     if len(args.trace_by) == 1:
-        all_scores += [np.mean(y_arr[-10:]) for y_arr in np_arrays_y]
+        all_scores += [np.mean(y_arr[-5:]) for y_arr in np_arrays_y]
         all_surfaces += [np.mean(y_arr) for y_arr in np_arrays_y]
 
         all_xticks += [np.log10(hyper_parameters[args.trace_by[0]]) for _ in range(len(np_arrays_y))]
     elif len(args.trace_by) == 2:
 
         if ((hyper_parameters[args.trace_by[0]], hyper_parameters[args.trace_by[1]]) not in all_tick_combinations):
-            all_scores += [np.mean(y_arr[-10:]) for y_arr in np_arrays_y]
+            all_scores += [np.mean(y_arr[-5:]) for y_arr in np_arrays_y]
             all_surfaces += [np.mean(y_arr) for y_arr in np_arrays_y]
 
             all_xticks += [np.log10(hyper_parameters[args.trace_by[0]]) for _ in range(len(np_arrays_y))]
