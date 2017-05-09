@@ -59,7 +59,7 @@ config1 = {
     'policy_quantization': False,
     'ignore_annealing': False,
     'prototype_factor': 1,
-    'weights_init': 'default',
+    'weights_init': 'torch',
     'nwp': 7,
     'ppa': 100,
     'debug': False,

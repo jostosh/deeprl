@@ -38,7 +38,7 @@ lo_by_param = {
     'prototype_factor': 1,
     'ppa': 10,
     'nwp': 3,
-    'wpr': 0.1
+    'wpr': 0.01
 }
 
 hi_by_param = {
@@ -318,6 +318,29 @@ presets = {
         'ppa': 15,
         'wpr': 0.6,
         'pq_sim_fn': 'euc_sq'
+    }, # 08-05-17
+    '57': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 15,
+        'wpr': 0.6,
+        'pq_sim_fn': 'euc_sq'
+    },
+    '58': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 15,
+        'pq_sim_fn': 'euc_sq'
+    },
+    '59': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_sim_fn': 'inv_euc_sq'
+    },
+    '60': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_sim_fn': 'inv_euc'
     }
 }
 
