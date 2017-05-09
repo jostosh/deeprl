@@ -58,7 +58,7 @@ config1 = {
     'ss_temp': 0.60,
     'policy_quantization': False,
     'ignore_annealing': False,
-    'prototype_factor': 1,
+    'prototype_factor': 1.0,
     'weights_init': 'torch',
     'nwp': 7,
     'ppa': 100,
