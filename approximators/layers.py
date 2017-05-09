@@ -60,13 +60,13 @@ def fc_layer(incoming, n_out, activation, name, init='torch', bias_init=0.01):
     d = 1.0 / np.sqrt(n_in)
     if init == 'torch':
         weights_init = tf.random_uniform([n_in, n_out], minval=-d, maxval=d)
-        bias_init = tf.constant_initializer(bias_init)
+        bias_initializer = tf.constant_initializer(bias_init)
     else:
         weights_init = tf.contrib.layers.variance_scaling_initializer()
-        bias_init    = tf.constant_initializer(bias_init)
+        bias_initializer    = tf.constant_initializer(bias_init)
 
     return tflearn.fully_connected(incoming=incoming, n_units=n_out, activation=activation, weights_init=weights_init,
-                                   bias_init=bias_init, weight_decay=0.0, name=name)
+                                   bias_init=bias_initializer, weight_decay=0.0, name=name)
 
 
 def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_filter_size=None, forget_bias=1.0,
