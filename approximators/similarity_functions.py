@@ -19,11 +19,11 @@ def manhattan_neg(net, prototypes):
 
 def inv_euclidean_squared(net, prototypes):
     diff = tf.expand_dims(net, 1) - tf.expand_dims(prototypes, 0)
-    return tf.div(1.0, 1.0 + tf.reduce_sum(tf.square(diff))), []
+    return tf.div(1.0, 1.0 + tf.reduce_sum(tf.square(diff), axis=2)), []
 
 def inv_euclidean(net, prototypes):
     diff = tf.expand_dims(net, 1) - tf.expand_dims(prototypes, 0)
-    return tf.div(1.0, 1.0 + tf.sqrt(tf.reduce_sum(tf.square(diff)))), []
+    return tf.div(1.0, 1.0 + tf.sqrt(tf.reduce_sum(tf.square(diff), axis=2))), []
 
 similarity_functions = {
     'euc': euclidean_neg,
