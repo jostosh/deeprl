@@ -64,7 +64,9 @@ config1 = {
     'ppa': 100,
     'debug': False,
     'wpr': 0.0,
-    'pq_sim_fn': 'euc'
+    'pq_sim_fn': 'euc',
+    'pq_soft_labels': False,
+    'zpi': False
 }
 
 param_sweep = {
@@ -172,3 +174,5 @@ class HyperParameters(object):
         self.nwp = params.nwp
         self.wpr = params.wpr
         self.pq_sim_fn = params.pq_sim_fn
+        self.zpi = params.zpi
+        self.pq_soft_labels = params.pq_soft_labels

@@ -341,6 +341,18 @@ presets = {
         'model': 'a3c_ff',
         'policy_quantization': True,
         'pq_sim_fn': 'inv_euc'
+    }, # 11-05-2017
+    '61': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_sim_fn': 'euc_sq',
+        'pq_soft_labels': True
+    },
+    '62': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_sim_fn': 'euc_sq',
+        'zpi': True
     }
 }
 

@@ -86,18 +86,21 @@ class ActorCriticNN(object):
 
         with tf.name_scope('HiddenLayers') as scope:
             # Add first convolutional layer
-            net = conv_layer(net, 32, 8, 4, activation='linear', name='Conv1', init=self.hp.weights_init)
+            net = conv_layer(net, 32, 8, 4, activation='linear', name='{}/Conv1'.format(self.agent_name),
+                             init=self.hp.weights_init)
 
             self._add_trainable(net)
             net = self.hp.activation(net)
 
             # Add second convolutional layer
-            net = conv_layer(net, 64, 4, 2, activation='linear', name='Conv2', init=self.hp.weights_init)
+            net = conv_layer(net, 64, 4, 2, activation='linear', name='{}/Conv2'.format(self.agent_name),
+                             init=self.hp.weights_init)
             self._add_trainable(net)
             net = self.hp.activation(net)
 
             net = tflearn.flatten(net)
-            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3', init=self.hp.weights_init)
+            net = fc_layer(net, 256, activation=self.hp.activation, name='{}/FC3'.format(self.agent_name),
+                           init=self.hp.weights_init)
             self._add_trainable(net)
             self.embedding_layer = net
 
@@ -457,30 +460,46 @@ class ActorCriticNN(object):
         with tf.name_scope("Outputs"):
             with tf.name_scope("Policy"):
                 if self.hp.policy_quantization:
-
                     num_prototypes = self.hp.ppa * self.num_actions
                     n_winning_prototypes = np.ceil(self.hp.wpr * num_prototypes) if self.hp.wpr != 0.0 else self.hp.nwp
 
                     head_shape = net.get_shape().as_list()[-1]
                     self.head = net
                     d = 1.0 / np.sqrt(head_shape)
-                    prototypes = tf.Variable(tf.random_uniform((num_prototypes, head_shape), minval=-d, maxval=d), name='Prototypes')
+                    prototypes = tf.Variable(
+                        tf.random_uniform((num_prototypes, head_shape), minval=0.0 if self.hp.zpi else -d, maxval=d),
+                        name='Prototypes'
+                    )
                     similarity, additional_variables = similarity_functions[self.hp.pq_sim_fn](net, prototypes)
-                    # k_sim.shape == [batch, 20], k_ind.shape == [batch, 20]
+                    # k_sim.shape == [batch, k], k_ind.shape == [batch, k]
                     k_sim, self.k_ind = tf.nn.top_k(similarity, n_winning_prototypes, sorted=False, name='KNN')
-                    # k_one_hot.shape == [batch, 20, num_actions]
-                    k_one_hot = tf.one_hot(tf.mod(self.k_ind, self.num_actions), self.num_actions, 1.0, 0.0)
-                    # softmax.shape == [batch, 20], softmax_expand_dims.shape == [batch, 20, num_actions]
-                    # pi.shape == [batch, num_actions]
+                    if self.hp.pq_soft_labels:
+                        prototype_labels = tf.Variable(
+                            tf.random_uniform((num_prototypes, self.num_actions), -d, maxval=d),
+                            name='PrototypeLabels'
+                        )
+                        additional_variables.append(prototype_labels)
+                        # winning_labels.shape == [batch, k, num_actions]
+                        winning_labels = tf.gather(prototype_labels, self.k_ind)
+                        # score.shape == [batch, k, num_actions]
+                        score = tf.mul(winning_labels, tf.expand_dims(k_sim, 2))
+                        self.pi = tf.nn.softmax(tf.reduce_sum(score, axis=1))
+                    else:
+                        # k_one_hot.shape == [batch, 20, num_actions]
+                        k_one_hot = tf.one_hot(tf.mod(self.k_ind, self.num_actions), self.num_actions, 1.0, 0.0)
+                        # softmax.shape == [batch, 20], softmax_expand_dims.shape == [batch, 20, num_actions]
+                        # pi.shape == [batch, num_actions]
+                        self.pi = tf.reduce_sum(
+                            tf.expand_dims(tf.nn.softmax(k_sim), 2) * k_one_hot, axis=1
+                        )
 
                     self.summaries.append(tf.summary.histogram("WinningPrototypes", self.k_ind))
-                    self.pi = tf.reduce_sum(
-                        tf.expand_dims(tf.nn.softmax(k_sim), 2) * k_one_hot, axis=1
-                    )
+
                     self.theta += [prototypes] + additional_variables # , relevance_mat]
                     self.prototypes = prototypes
                 else:
-                    self.pi = fc_layer(net, num_actions, activation='softmax', name='pi_sa', init=self.hp.weights_init)
+                    self.pi = fc_layer(net, num_actions, activation='softmax', name='{}/pi_sa'.format(self.agent_name),
+                                       init=self.hp.weights_init, bias_init=0.0)
                     self._add_trainable(self.pi)
             with tf.name_scope("Value"):
                 if self.policy_weighted_val:
@@ -489,7 +508,8 @@ class ActorCriticNN(object):
                     self.value = tf.reduce_sum(tf.mul(q_val, tf.stop_gradient(self.pi)),
                                                reduction_indices=1, name='v_s')
                 else:
-                    self.value = fc_layer(net, 1, activation='linear', name='v_s', init=self.hp.weights_init)
+                    self.value = fc_layer(net, 1, activation='linear', name='{}/v_s'.format(self.agent_name),
+                                          init=self.hp.weights_init, bias_init=0.0)
                     self._add_trainable(self.value)
                 self.value = tflearn.reshape(self.value, [-1], 'FlattenedValue')
 
