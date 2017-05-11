@@ -463,8 +463,8 @@ class ActorCriticNN(object):
                     num_prototypes = self.hp.ppa * self.num_actions
                     n_winning_prototypes = np.ceil(self.hp.wpr * num_prototypes) if self.hp.wpr != 0.0 else self.hp.nwp
 
-                    head_shape = net.get_shape().as_list()[-1]
                     self.head = net
+                    head_shape = net.get_shape().as_list()[-1]
                     d = 1.0 / np.sqrt(head_shape)
                     prototypes = tf.Variable(
                         tf.random_uniform((num_prototypes, head_shape), minval=0.0 if self.hp.zpi else -d, maxval=d),
@@ -508,9 +508,32 @@ class ActorCriticNN(object):
                     self.value = tf.reduce_sum(tf.mul(q_val, tf.stop_gradient(self.pi)),
                                                reduction_indices=1, name='v_s')
                 else:
-                    self.value = fc_layer(net, 1, activation='linear', name='{}/v_s'.format(self.agent_name),
-                                          init=self.hp.weights_init, bias_init=0.0)
-                    self._add_trainable(self.value)
+                    if self.hp.value_quantization:
+                        head_shape = net.get_shape().as_list()[-1]
+                        d = 1.0 / np.sqrt(head_shape)
+
+                        prototypes = tf.Variable(
+                            tf.random_uniform((self.hp.vp, head_shape), minval=-d, maxval=d), name='VPrototypeCentroids'
+                        )
+                        prototype_values = tf.Variable(
+                            tf.random_uniform((self.hp.vp,), minval=-1.0, maxval=1.0), name='VPrototypeValues'
+                        )
+                        similarity, additional_variables = similarity_functions[self.hp.pq_sim_fn](net, prototypes)
+                        k_sim, k_ind = tf.nn.top_k(similarity, n_winning_prototypes, sorted=False, name='KNN')
+                        additional_variables.append(prototype_values)
+                        # winning_labels.shape == [batch, k]
+                        winning_values = tf.gather(prototype_values, k_ind)
+
+                        # score.shape == [batch, k]
+                        score = tf.mul(winning_values, tf.nn.softmax(k_sim))
+
+                        self.value = tf.reduce_sum(score, axis=1)
+
+                        self.theta += [prototypes, prototype_values]
+                    else:
+                        self.value = fc_layer(net, 1, activation='linear', name='{}/v_s'.format(self.agent_name),
+                                              init=self.hp.weights_init, bias_init=0.0)
+                        self._add_trainable(self.value)
                 self.value = tflearn.reshape(self.value, [-1], 'FlattenedValue')
 
         if self.agent_name == 'GLOBAL':

@@ -353,6 +353,11 @@ presets = {
         'policy_quantization': True,
         'pq_sim_fn': 'euc_sq',
         'zpi': True
+    },
+    '63': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'value_quantization': True
     }
 }
 
