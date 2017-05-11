@@ -123,7 +123,7 @@ class A3CAgent(object):
                 # Increment time counters
                 self.t += 1
                 T = session.run(global_step)
-                current_lr = self.hp.learning_rate - (self.hp.learning_rate / self.hp.T_max * T
+                current_lr = self.hp.learning_rate - ((self.hp.learning_rate / self.hp.T_max * T)
                                                       if not self.hp.ignore_annealing else 0)
                 epr += rewards[i]
 
