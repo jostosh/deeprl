@@ -3,11 +3,15 @@ from copy import deepcopy
 import numpy as np
 import tensorflow as tf
 import tflearn
-from tensorflow.python.ops.rnn_cell import LSTMStateTuple
+try:
+    from tensorflow.python.ops.rnn_cell import LSTMStateTuple
+except:
+    from tensorflow.contrib.rnn.python.ops.core_rnn_cell_impl import LSTMStateTuple
 
 from deeprl.approximators.convlstm import ConvLSTM2D
 from deeprl.approximators.layers import \
-    spatialsoftmax, custom_lstm, convolutional_lstm, conv_layer, fc_layer, convolutional_gru
+    spatialsoftmax, conv_layer, fc_layer
+from deeprl.approximators.recurrent import convolutional_lstm, convolutional_gru, custom_lstm
 from deeprl.approximators.similarity_functions import similarity_functions
 from deeprl.approximators.sisws import spatial_weight_sharing
 from deeprl.common.logger import logger

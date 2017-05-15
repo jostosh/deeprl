@@ -2,7 +2,8 @@ import tensorflow as tf
 import tflearn
 import numpy as np
 from deeprl.common.logger import logger
-from deeprl.approximators.layers import lstm, spatialsoftmax, custom_lstm
+from deeprl.approximators.layers import lstm, spatialsoftmax
+from deeprl.approximators.recurrent import custom_lstm
 from tensorflow.python.ops.rnn_cell import LSTMStateTuple
 from copy import deepcopy
 from deeprl.common.tensorflowutils import sequence_mask

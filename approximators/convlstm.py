@@ -8,8 +8,10 @@ from keras.engine import Layer
 from keras.engine import InputSpec
 from keras.utils.np_utils import conv_output_length
 import warnings
-from tensorflow.python.ops.rnn_cell import LSTMStateTuple
-
+try:
+    from tensorflow.python.ops.rnn_cell import LSTMStateTuple
+except:
+    from tensorflow.contrib.rnn.python.ops.core_rnn_cell_impl import LSTMStateTuple
 
 class ConvRecurrent2D(Layer):
     """Abstract base class for convolutional recurrent layers.

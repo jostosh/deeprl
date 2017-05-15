@@ -151,7 +151,7 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
 
         with tf.name_scope("SoftWeightSharing"):
             # Compute the distance-weighted output
-            dist_weighted = tf.mul(similarities, stacked_convs, name='DistanceWeighted')
+            dist_weighted = tf.multiply(similarities, stacked_convs, name='DistanceWeighted')
 
             # Apply non-linearity
             out = activation(tf.reduce_sum(dist_weighted, axis=4), name='Output')
@@ -172,8 +172,10 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
             summary_image = build_visualization(centroids_f, color_coding, convs, n_centroids, n_filters, per_feature,
                                                 similarities)
             out.visual_summary = summary_image
-            out.W_list = tf.split(3, n_centroids, convs.W)
-
+            try:
+                out.W_list = tf.split(3, n_centroids, convs.W)
+            except:
+                out.W_list = tf.split(convs.W, n_centroids * [n_filters], axis=3)
     # Add to collection for tflearn functionality
     tf.add_to_collection(tf.GraphKeys.LAYER_TENSOR + '/' + name, out)
     return out
@@ -195,7 +197,7 @@ def build_visualization(centroids_f, color_coding, conv_layer, n_centroids, n_fi
     # Now we stack the weights, that is, there is an extra axis for the centroids
     weights_stacked = tf.reshape(conv_layer.W, filter_shape + [1, 1, n_centroids])
     # Get the locally weighted kernels
-    locally_weighted_kernels = tf.reduce_sum(tf.mul(similarities_downsampled, weights_stacked), axis=6)
+    locally_weighted_kernels = tf.reduce_sum(tf.multiply(similarities_downsampled, weights_stacked), axis=6)
     # Normalize
     locally_weighted_kernels -= tf.reduce_min(locally_weighted_kernels, axis=[4, 5], keep_dims=True)
     locally_weighted_kernels /= tf.reduce_max(locally_weighted_kernels, axis=[4, 5], keep_dims=True)
