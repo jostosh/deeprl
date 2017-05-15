@@ -161,13 +161,14 @@ def export_plots():
                 all_surfaces = []
                 for hyper_parameters_str, event_files in sorted(event_files_by_hp.items()):
                     hyper_parameters = json.loads(hyper_parameters_str)
-                    print("Currently looking at {} event files".format(len(event_files)))
+                    #print("Currently looking at {} event files".format(len(event_files)))
                     pprint.pprint(hyper_parameters)
 
                     events_by_scalar = get_events_by_scalar(event_files)
 
                     for scalar, event_arrays in events_by_scalar.items():
                         steps, values, errors, np_arrays_x, np_arrays_y = event_arrays_to_mean_and_errors(event_arrays)
+
 
                         all_scores, all_surfaces, all_xticks, all_yticks = get_sweep_data(all_scores, all_surfaces,
                                                                                           all_xticks, all_yticks,
@@ -450,7 +451,7 @@ def get_event_files_by_hp_by_env(input_dir):
     event_files_by_hp_by_env = {}
     file_count = 0
     for root, dir, files in os.walk(input_dir):
-        print(root, dir, files)
+        #print(root, dir, files)
 
         if any([IsTensorFlowEventsFile(f) for f in files]) and 'hyper_parameters.pkl' in files:
             try:
