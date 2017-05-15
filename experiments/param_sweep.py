@@ -370,6 +370,10 @@ presets = {
         'pq_sim_fn': 'euc_sq',
         'pq_soft_labels': True
     },
+    '66': {
+        'model': 'a3c_ff',
+        'weights_init': 'tflearn'
+    }
 }
 
 

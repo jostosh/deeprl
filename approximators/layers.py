@@ -40,9 +40,12 @@ def conv_layer(incoming, n_filters, filter_size, stride, activation, name, paddi
     if init == 'torch':
         weight_init = tf.random_uniform([filter_size, filter_size, input_channels, n_filters], minval=-d, maxval=d)
         bias_init   = tf.constant_initializer(bias_init)
-    else:
+    elif init == 'default':
         weight_init = tf.contrib.layers.variance_scaling_initializer()
         bias_init   = tf.constant_initializer(bias_init)
+    else:
+        weight_init = 'uniform_scaling'
+        bias_init = 'zeros'
 
     return tflearn.conv_2d(incoming=incoming, nb_filter=n_filters, filter_size=filter_size, strides=stride,
                            padding=padding, activation=activation, weights_init=weight_init, bias_init=bias_init,
@@ -55,9 +58,12 @@ def fc_layer(incoming, n_out, activation, name, init='torch', bias_init=0.01):
     if init == 'torch':
         weights_init = tf.random_uniform([n_in, n_out], minval=-d, maxval=d)
         bias_initializer = tf.constant_initializer(bias_init)
-    else:
+    elif init == 'default':
         weights_init = tf.contrib.layers.variance_scaling_initializer()
-        bias_initializer    = tf.constant_initializer(bias_init)
+        bias_initializer = tf.constant_initializer(bias_init)
+    else:
+        weights_init = 'truncated_normal'
+        bias_initializer = 'zeros'
 
     return tflearn.fully_connected(incoming=incoming, n_units=n_out, activation=activation, weights_init=weights_init,
                                    bias_init=bias_initializer, weight_decay=0.0, name=name)
