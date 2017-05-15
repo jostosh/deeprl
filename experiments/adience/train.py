@@ -94,13 +94,13 @@ def network_spatial_interpolation(input):
     else:
         n_centroids = args.n_centroids
 
-    net = spatial_weight_sharing(net, n_centroids=n_centroids, n_filters=256, filter_size=5, strides=1, activation=tf.nn.elu,
+    net = spatial_weight_sharing(net, n_centroids=n_centroids, n_filters=192, filter_size=5, strides=1, activation=tf.nn.elu,
                                  per_feature=args.per_feature, centroids_trainable=args.trainable_centroids,
                                  similarity_fn=args.distance_fn)
     net = tflearn.layers.max_pool_2d(net, kernel_size=3, strides=2, padding='valid')
     net = tflearn.layers.local_response_normalization(net)
 
-    net = spatial_weight_sharing(net, n_centroids=n_centroids, n_filters=384, filter_size=3, strides=1, activation=tf.nn.elu,
+    net = spatial_weight_sharing(net, n_centroids=n_centroids, n_filters=256, filter_size=3, strides=1, activation=tf.nn.elu,
                                  per_feature=args.per_feature, centroids_trainable=args.trainable_centroids,
                                  similarity_fn=args.distance_fn)
     net = tflearn.layers.max_pool_2d(net, kernel_size=3, strides=2, padding='valid')
@@ -118,6 +118,7 @@ def network_spatial_interpolation(input):
 
 
 def train(idx):
+    tf.reset_default_graph()
 
     h5f = h5py.File('/home/jos/datasets/aligned/fold{}.hdf5'.format(idx), 'r')
     X_train = h5f['train/images']
@@ -166,4 +167,5 @@ if __name__ == "__main__":
 
     logdir = LogDir(args.model)
     for i in range(5):
+        print("Training for {} epochs".format(args.n_epochs))
         train(i)
