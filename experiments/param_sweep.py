@@ -363,7 +363,13 @@ presets = {
         'model': 'a3c_ff',
         'policy_quantization': True,
         'pq_cpa': True
-    }
+    },
+    '65': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_sim_fn': 'euc_sq',
+        'pq_soft_labels': True
+    },
 }
 
 

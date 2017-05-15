@@ -493,8 +493,11 @@ class ActorCriticNN(object):
                         # k_sim.shape == [batch, k], k_ind.shape == [batch, k]
                         k_sim, self.k_ind = tf.nn.top_k(similarity, n_winning_prototypes, sorted=False, name='KNN')
                         if self.hp.pq_soft_labels:
+                            prototype_init = np.random.rand(num_prototypes, self.num_actions).astype('float')
+                            prototype_init /= np.sqrt(np.sum(prototype_init ** 2, keepdims=True, axis=1))
                             prototype_labels = tf.Variable(
-                                tf.random_uniform((num_prototypes, self.num_actions), -d, maxval=d),
+                                prototype_init,
+                                dtype=tf.float32,
                                 name='PrototypeLabels'
                             )
                             additional_variables.append(prototype_labels)
