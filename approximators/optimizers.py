@@ -55,33 +55,6 @@ class RMSPropShared(object):
         self.global_theta = theta
         self._init_from_prototype(theta)
 
-    def build_hist_update(self, k_ind, advantage, actions, head, num_actions, ppa):
-        num_prototypes = ppa * num_actions
-        if not self.prototype_hist:
-            self.prototype_hist = tf.Variable(tf.zeros([num_prototypes]), name='PrototypeHist')
-
-        hist_update = tf.assign(
-            self.prototype_hist,
-            0.99 * self.prototype_hist + (1 - 0.99) * tf.reduce_sum(tf.one_hot(k_ind, num_prototypes, 1.0, 0.0), [0, 1])
-        )
-
-        max_adv_ind = tf.cast(tf.argmax(advantage, axis=0), tf.int32)
-        max_adv = tf.reduce_max(advantage, axis=0)
-
-        prob = tf.contrib.distributions.Uniform(0.0, 1.0).sample()
-        jump = tf.logical_and(tf.less(prob, 0.05), tf.greater(max_adv, 0.0))
-
-        winning_action = tf.cast(actions[max_adv_ind], tf.int64)
-        na = tf.convert_to_tensor(num_actions, dtype=tf.int64)
-
-        # 0 1 [2] 3 4 5 6 7 8 9
-        #
-
-        candidate_prototypes = tf.gather(hist_update, winning_action + na * tf.range(0, ppa, dtype=tf.int64))
-        hist_winner = tf.argmin(candidate_prototypes, axis=0) * na + winning_action
-
-        return tf.cond(jump, lambda: tf.scatter_update(self.prototypes, hist_winner, head[max_adv_ind]), lambda: hist_update)
-
 
 
     def build_update_from_vars(self, theta, loss):
@@ -124,6 +97,7 @@ class RMSPropShared(object):
 
     def build_update_from_grads(self, grads, other_updates, d_t):
 
+
         with tf.name_scope("MovingAverageGradientUpdate"):
             g_update = [tf.assign(ms, self.decay * ms + (1 - self.decay) * tf.square(grad), use_locking=False)
                         for ms, grad in zip(self.ms, grads)]
@@ -142,6 +116,7 @@ class RMSPropShared(object):
                                       use_locking=False)
                                    for t, grad, ms in zip(self.global_theta, grads, g_update)] + other_updates),
                                 name='minimize')
+
         return minimize
 
 

@@ -358,6 +358,11 @@ presets = {
         'model': 'a3c_ff',
         'policy_quantization': True,
         'value_quantization': True
+    }, # 15-05-2017
+    '64': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_cpa': True
     }
 }
 

@@ -68,7 +68,8 @@ config1 = {
     'pq_soft_labels': False,
     'zpi': False,
     'value_quantization': False,
-    'vp': 45
+    'vp': 45,
+    'pq_cpa': False
 }
 
 param_sweep = {
@@ -180,3 +181,4 @@ class HyperParameters(object):
         self.pq_soft_labels = params.pq_soft_labels
         self.value_quantization = params.value_quantization
         self.vp = params.vp
+        self.pq_cpa = params.pq_cpa

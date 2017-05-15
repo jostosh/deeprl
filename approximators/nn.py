@@ -463,6 +463,7 @@ class ActorCriticNN(object):
                     num_prototypes = self.hp.ppa * self.num_actions
                     n_winning_prototypes = np.ceil(self.hp.wpr * num_prototypes) if self.hp.wpr != 0.0 else self.hp.nwp
 
+
                     self.head = net
                     head_shape = net.get_shape().as_list()[-1]
                     d = 1.0 / np.sqrt(head_shape)
@@ -470,30 +471,48 @@ class ActorCriticNN(object):
                         tf.random_uniform((num_prototypes, head_shape), minval=0.0 if self.hp.zpi else -d, maxval=d),
                         name='Prototypes'
                     )
+                    self.k_ind = None
                     similarity, additional_variables = similarity_functions[self.hp.pq_sim_fn](net, prototypes)
-                    # k_sim.shape == [batch, k], k_ind.shape == [batch, k]
-                    k_sim, self.k_ind = tf.nn.top_k(similarity, n_winning_prototypes, sorted=False, name='KNN')
-                    if self.hp.pq_soft_labels:
-                        prototype_labels = tf.Variable(
-                            tf.random_uniform((num_prototypes, self.num_actions), -d, maxval=d),
-                            name='PrototypeLabels'
-                        )
-                        additional_variables.append(prototype_labels)
-                        # winning_labels.shape == [batch, k, num_actions]
-                        winning_labels = tf.gather(prototype_labels, self.k_ind)
-                        # score.shape == [batch, k, num_actions]
-                        score = tf.mul(winning_labels, tf.expand_dims(k_sim, 2))
-                        self.pi = tf.nn.softmax(tf.reduce_sum(score, axis=1))
-                    else:
-                        # k_one_hot.shape == [batch, 20, num_actions]
-                        k_one_hot = tf.one_hot(tf.mod(self.k_ind, self.num_actions), self.num_actions, 1.0, 0.0)
-                        # softmax.shape == [batch, 20], softmax_expand_dims.shape == [batch, 20, num_actions]
-                        # pi.shape == [batch, num_actions]
-                        self.pi = tf.reduce_sum(
-                            tf.expand_dims(tf.nn.softmax(k_sim), 2) * k_one_hot, axis=1
-                        )
+                    if self.hp.pq_cpa:
+                        n_winning_prototypes = min(n_winning_prototypes, self.hp.ppa)
 
-                    self.summaries.append(tf.summary.histogram("WinningPrototypes", self.k_ind))
+                        similarity = tf.reshape(similarity, [-1, self.num_actions, self.hp.ppa])
+                        if self.hp.nwp == 1:
+                            self.pi = tf.nn.softmax(tf.reduce_max(similarity, axis=2))
+                        else:
+                            k_sim, self.k_ind = tf.nn.top_k(similarity, n_winning_prototypes, sorted=False)
+                            self.pi = tf.reduce_sum(
+                                tf.reshape(
+                                    tf.nn.softmax(tf.reshape(k_sim, [-1, self.num_actions * n_winning_prototypes])),
+                                    [-1, self.num_actions, n_winning_prototypes]
+                                ),
+                                axis=2
+                            )
+                    else:
+
+                        # k_sim.shape == [batch, k], k_ind.shape == [batch, k]
+                        k_sim, self.k_ind = tf.nn.top_k(similarity, n_winning_prototypes, sorted=False, name='KNN')
+                        if self.hp.pq_soft_labels:
+                            prototype_labels = tf.Variable(
+                                tf.random_uniform((num_prototypes, self.num_actions), -d, maxval=d),
+                                name='PrototypeLabels'
+                            )
+                            additional_variables.append(prototype_labels)
+                            # winning_labels.shape == [batch, k, num_actions]
+                            winning_labels = tf.gather(prototype_labels, self.k_ind)
+                            # score.shape == [batch, k, num_actions]
+                            score = tf.mul(winning_labels, tf.expand_dims(k_sim, 2))
+                            self.pi = tf.nn.softmax(tf.reduce_sum(score, axis=1))
+                        else:
+                            # k_one_hot.shape == [batch, 20, num_actions]
+                            k_one_hot = tf.one_hot(tf.mod(self.k_ind, self.num_actions), self.num_actions, 1.0, 0.0)
+                            # softmax.shape == [batch, 20], softmax_expand_dims.shape == [batch, 20, num_actions]
+                            # pi.shape == [batch, num_actions]
+                            self.pi = tf.reduce_sum(
+                                tf.expand_dims(tf.nn.softmax(k_sim), 2) * k_one_hot, axis=1
+                            )
+                    if self.k_ind is not None:
+                        self.summaries.append(tf.summary.histogram("WinningPrototypes", self.k_ind))
 
                     self.theta += [prototypes] + additional_variables # , relevance_mat]
                     self.prototypes = prototypes
@@ -624,10 +643,6 @@ class ActorCriticNN(object):
     def build_param_update(self):
         with tf.name_scope("ParamUpdate"):
             self.minimize = self.optimizer.build_update_from_vars(self.theta, self.loss)
-            if self.hp.policy_quantization:
-                self.hist_update = self.optimizer.build_hist_update(self.k_ind, self.advantage_no_grad, self.actions,
-                                                                    self.head, num_actions=self.num_actions,
-                                                                    ppa=self.hp.ppa)
 
     def build_loss(self):
         """
