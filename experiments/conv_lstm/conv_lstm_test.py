@@ -5,7 +5,8 @@ import numpy as np
 import tensorflow as tf
 import cv2
 
-from deeprl.approximators.layers import conv_layer, convolutional_lstm, conv_transpose
+from deeprl.approximators.layers import conv_layer, conv_transpose
+from deeprl.approximators.recurrent import convolutional_lstm
 
 import deeprl.experiments.conv_lstm.bouncing_balls as b
 
