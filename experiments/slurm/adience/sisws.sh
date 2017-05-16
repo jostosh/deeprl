@@ -15,5 +15,4 @@ module load tensorflow/1.0.1-foss-2016a-Python-3.5.2
 srun python mproj/deeprl/experiments/adience/train.py \
     --model spatial \
     --n_epochs 200 \
-    --random_inits 3 \
-    --datadir
+    --random_inits 3
