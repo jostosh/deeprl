@@ -15,4 +15,5 @@ source envs/adience/bin/activate
 srun python mproj/deeprl/experiments/adience/train.py \
     --model spatial \
     --n_epochs 200 \
-    --random_inits 3
+    --random_inits 3 \
+    --distance_fn InvEuclidean

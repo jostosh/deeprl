@@ -6,7 +6,7 @@
 #SBATCH --job-name=ADIENCE_SISWS
 #SBATCH --mail-type ALL
 #SBATCH --mail-user jos.vandewolfshaar@gmail.com
-#SBATCH --output job-ADIENCE_SISWS-%j.log
+#SBATCH --output job-ADIENCE_SISWS_TC-%j.log
 #SBATCH --mem=8000
 #SBATCH --partition=gpu
 
@@ -15,4 +15,5 @@ source envs/adience/bin/activate
 srun python mproj/deeprl/experiments/adience/train.py \
     --model spatial \
     --n_epochs 200 \
-    --random_inits 3
+    --random_inits 3 \
+    --trainable_centroids
