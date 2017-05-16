@@ -9,6 +9,7 @@
 #SBATCH --output job-ADIENCE_SISWS-%j.log
 #SBATCH --mem=8000
 #SBATCH --partition=gpu
+#SBATCH --gres=gpu:1
 
 module load tensorflow/1.0.1-foss-2016a-Python-3.5.2
 source envs/adience/bin/activate
