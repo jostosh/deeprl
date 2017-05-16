@@ -120,7 +120,7 @@ def network_spatial_interpolation(input):
 def train(idx):
     tf.reset_default_graph()
 
-    h5f = h5py.File('/home/jos/datasets/aligned/fold{}.hdf5'.format(idx), 'r')
+    h5f = h5py.File('{}/fold{}.hdf5'.format(args.datadir, idx), 'r')
     X_train = h5f['train/images']
     y_train = h5f['train/labels']
 
@@ -163,6 +163,7 @@ if __name__ == "__main__":
     parser.add_argument("--random_inits", type=int, default=0)
     parser.add_argument("--distance_fn", type=str, default='Exp', choices=['Exp', 'InvEuclidean'])
     parser.add_argument("--n_centroids", type=int, nargs='+', default=[2, 2])
+    parser.add_argument("--datadir", default='/data/s2098407/adience')
     args = parser.parse_args()
 
     logdir = LogDir(args.model)
