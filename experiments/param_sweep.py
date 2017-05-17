@@ -387,6 +387,9 @@ presets = {
         'ppa': 15,
         'wpr': 0.25,
         'pq_sim_fn': 'euc_sq'
+    },
+    '69': {
+        'model': 'a3c_lstm'
     }
 }
 

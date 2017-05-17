@@ -2,9 +2,9 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops.rnn import dynamic_rnn
 try:
-    from tensorflow.python.ops.rnn_cell import RNNCell, LSTMStateTuple
+    from tensorflow.python.ops.rnn_cell import RNNCell, LSTMStateTuple, BasicLSTMCell
 except:
-    from tensorflow.contrib.rnn.python.ops.core_rnn_cell_impl import RNNCell, LSTMStateTuple
+    from tensorflow.contrib.rnn.python.ops.core_rnn_cell_impl import RNNCell, LSTMStateTuple, BasicLSTMCell
 from tensorflow.python.platform import tf_logging as logging
 from tensorflow.python.util import nest
 
@@ -167,9 +167,6 @@ def convolutional_gru(incoming, outer_filter_size, num_features, stride, inner_f
 def custom_lstm(incoming, n_units, activation=tf.nn.tanh, forget_bias=1.0, initial_state=None, scope=None,
                 name="LSTM", sequence_length=None):
 
-    _, _, in_dim = incoming.get_shape().as_list()
-    d = 1.0 / np.sqrt(in_dim)
-
     #with tf.name_scope(name) as scope:
     with tf.variable_scope(name) as vs:
         cell = BasicLSTMCell(n_units, forget_bias=forget_bias, activation=activation)#LSTMCell(n_units, forget_bias=forget_bias, activation=activation, name=name)
@@ -181,7 +178,7 @@ def custom_lstm(incoming, n_units, activation=tf.nn.tanh, forget_bias=1.0, initi
 
     return o, state
 
-
+'''
 class BasicLSTMCell(RNNCell):
   """Basic LSTM recurrent network cell.
 
@@ -306,3 +303,4 @@ def _linear(args, output_size, bias, bias_start=0.0, scope=None):
         dtype=dtype,
         initializer=tf.random_uniform_initializer(minval=-d, maxval=d))
   return res + bias_term
+'''
