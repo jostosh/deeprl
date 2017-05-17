@@ -64,7 +64,7 @@ config1 = {
     'ppa': 100,
     'debug': False,
     'wpr': 0.0,
-    'pq_sim_fn': 'euc',
+    'pq_sim_fn': 'euc_sq',
     'pq_soft_labels': False,
     'zpi': False,
     'value_quantization': False,
