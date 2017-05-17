@@ -465,7 +465,7 @@ class ActorCriticNN(object):
             with tf.name_scope("Policy"):
                 if self.hp.policy_quantization:
                     num_prototypes = self.hp.ppa * self.num_actions
-                    n_winning_prototypes = np.ceil(self.hp.wpr * num_prototypes) if self.hp.wpr != 0.0 else self.hp.nwp
+                    n_winning_prototypes = int(np.ceil(self.hp.wpr * num_prototypes) if self.hp.wpr != 0.0 else self.hp.nwp)
 
 
                     self.head = net

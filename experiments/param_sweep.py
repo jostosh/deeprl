@@ -373,7 +373,7 @@ presets = {
     '66': {
         'model': 'a3c_ff',
         'weights_init': 'tflearn'
-    },
+    }, # 17-05-17
     '67': {
         'model': 'a3c_ff',
         'policy_quantization': True,
@@ -385,7 +385,8 @@ presets = {
         'policy_quantization': True,
         'pq_cpa': True,
         'ppa': 15,
-        'wpr': 0.25
+        'wpr': 0.25,
+        'pq_sim_fn': 'euc_sq'
     }
 }
 
