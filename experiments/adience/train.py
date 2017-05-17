@@ -168,5 +168,4 @@ if __name__ == "__main__":
 
     logdir = LogDir(args.model)
     for i in range(5):
-        print("Training for {} epochs".format(args.n_epochs))
         train(i)

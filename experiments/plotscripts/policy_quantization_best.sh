@@ -2,7 +2,7 @@
 LOGBASE=~/tensorflowlogs/peregrine/v0.9.5/sweep
 
 python3 export_plots.py \
-    --input_dir $LOGBASE/preset13 $LOGBASE/preset57 $LOGBASE/preset61 $LOGBASE/preset62 \
+    --input_dir $LOGBASE/preset13 $LOGBASE/preset57 $LOGBASE/preset65 $LOGBASE/preset62 \
     --mode sweep \
     --trace_by learning_rate \
     --image_suffix policy_quantization_best \

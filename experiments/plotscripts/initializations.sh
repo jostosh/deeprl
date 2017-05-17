@@ -2,7 +2,7 @@
 LOGBASE=~/tensorflowlogs/peregrine/v0.9.5/sweep
 
 python3 export_plots.py \
-    --input_dir $LOGBASE/preset13 $LOGBASE/preset42 \
+    --input_dir $LOGBASE/preset13 $LOGBASE/preset42 $LOGBASE/preset66 \
     --mode sweep \
     --trace_by learning_rate \
     --image_suffix sweep_multiple_test \
@@ -12,6 +12,6 @@ python3 export_plots.py \
     --title "Parameter initializations" \
     --xlabel "$\log_{10}(\alpha)$" \
     --ylabel "Mean score" \
-    --labels "A3C FF torch" "A3C FF"
+    --labels "A3C FF torch" "A3C FF" "A3C FF tflearn"
     --legend_at "upper left" \
     $*
