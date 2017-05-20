@@ -390,6 +390,14 @@ presets = {
     },
     '69': {
         'model': 'a3c_lstm'
+    },
+    '70': {
+        'model': 'a3c_ff',
+        'value_loss_fac': 0.5
+    },
+    '71': {
+        'model': 'a3c_lstm',
+        'value_loss_fac': 0.5
     }
 }
 

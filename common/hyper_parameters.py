@@ -69,7 +69,8 @@ config1 = {
     'zpi': False,
     'value_quantization': False,
     'vp': 45,
-    'pq_cpa': False
+    'pq_cpa': False,
+    'value_loss_fac': 1.0
 }
 
 param_sweep = {
@@ -182,3 +183,4 @@ class HyperParameters(object):
         self.value_quantization = params.value_quantization
         self.vp = params.vp
         self.pq_cpa = params.pq_cpa
+        self.value_loss_fac = params.value_loss_fac

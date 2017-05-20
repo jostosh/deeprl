@@ -19,7 +19,7 @@ from deeprl.common.catch import CatchEnv
 from tensorflow.python import debug as tf_debug
 from sklearn.cluster import AffinityPropagation
 from sklearn.mixture import GaussianMixture
-
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS

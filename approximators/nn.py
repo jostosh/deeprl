@@ -671,13 +671,13 @@ class ActorCriticNN(object):
             # The entropy is added to encourage exploration
             entropy = -tf.reduce_sum(log_pi * self.pi, reduction_indices=1, name="Entropy")
             # Define the loss for the policy (minus is needed to perform *negative* gradient descent == gradient ascent)
-            pi_loss = -(tf.reduce_sum(tf.mul(action_mask, log_pi), reduction_indices=1) * self.advantage_no_grad
-                        + self.beta * entropy)
+            pi_loss = -tf.reduce_sum((tf.reduce_sum(tf.mul(action_mask, log_pi), reduction_indices=1) * self.advantage_no_grad
+                        + self.beta * entropy))
 
         with tf.name_scope("ValueLoss"):
             # A3C originally uses a factor 0.5 for the value loss. The l2_loss() method already does this
             advantage = self.n_step_returns - self.value
-            value_loss = tf.square(advantage)
+            value_loss = tf.nn.l2_loss(advantage)
             if self.optimality_tightening:
                 self.upper_limits = tf.placeholder(tf.float32, [None], name='UpperLimits')
                 self.lower_limits = tf.placeholder(tf.float32, [None], name='LowerLimits')
@@ -689,7 +689,7 @@ class ActorCriticNN(object):
         with tf.name_scope("CombinedLoss"):
 
             # Add losses and
-            self.loss = tf.reduce_sum(pi_loss + 0.5 * value_loss)
+            self.loss = pi_loss + self.hp.value_loss_fac * value_loss
 
             # Add TensorBoard summaries
             self.summaries.append(tf.summary.scalar('{}/Loss'.format(self.agent_name), self.loss))
