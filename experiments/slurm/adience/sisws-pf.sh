@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --time=48:00:00
+#SBATCH --time=72:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
@@ -17,4 +17,5 @@ srun python mproj/deeprl/experiments/adience/train.py \
     --model spatial \
     --n_epochs 200 \
     --random_inits 3 \
-    --per_feature
+    --per_feature \
+    --idx 2
