@@ -403,8 +403,8 @@ presets = {
 
 
 def convert_preset_to_params(preset):
-    ret = ["--{}={}".format(p, v) for p, v in preset.items() if not isinstance(v, bool)]
-    ret += ["--{}".format(p) for p, v in preset.items() if isinstance(v, bool) and v]
+    ret = ["--{0}={1}".format(p, v) for p, v in preset.items() if not isinstance(v, bool)]
+    ret += ["--{0}".format(p) for p, v in preset.items() if isinstance(v, bool) and v]
     return ret
 
 if __name__ == "__main__":
