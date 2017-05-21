@@ -432,4 +432,7 @@ if __name__ == "__main__":
                        for p in args.params]
         print('INITIATING COMMAND:\n{0}'.format(' '.join(command)))
 
-        subprocess.run(command)
+        try:
+            subprocess.run(command)
+        except:
+            subprocess.call(command)
