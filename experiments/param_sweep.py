@@ -423,13 +423,13 @@ if __name__ == "__main__":
             command = ["python3", "mproj/deeprl/rlmethods/a3c.py", '--env=Catch',
                        '--evaluation_interval=50000', '--T_max=1000000', '--n_threads=12',
                        '--logprefix=sweep/preset{}'.format(args.preset)] + preset_str + \
-                      ["--{}={}".format(p, func_by_param[p](lo_by_param[p], hi_by_param[p], np.random.rand()))
+                      ["--{0}={1}".format(p, func_by_param[p](lo_by_param[p], hi_by_param[p], np.random.rand()))
                        for p in args.params]
         else:
-            command = ["python3", "mproj/deeprl/rlmethods/a3c.py", '--env=Catch', '--model={}'.format(args.model),
+            command = ["python3", "mproj/deeprl/rlmethods/a3c.py", '--env=Catch', '--model={0}'.format(args.model),
                        '--evaluation_interval=50000', '--T_max=1000000',  '--n_threads=12'] + a3c_args + \
-                      ["--{}={}".format(p, func_by_param[p](lo_by_param[p], hi_by_param[p], np.random.rand()))
+                      ["--{0}={1}".format(p, func_by_param[p](lo_by_param[p], hi_by_param[p], np.random.rand()))
                        for p in args.params]
-        print('INITIATING COMMAND:\n{}'.format(' '.join(command)))
+        print('INITIATING COMMAND:\n{0}'.format(' '.join(command)))
 
         subprocess.run(command)
