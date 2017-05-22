@@ -294,7 +294,7 @@ def export_plots():
 
 
 def render_sweep2d_mpl(all_scores, all_xticks, all_yticks, env, xlab, ylab):
-    from mpl_toolkits.mplot3d import Axes3D
+    from mpl_toolkits.mplot3d import axes3d
     min_x, max_x = np.min(all_xticks), np.max(all_xticks)
     min_y, max_y = np.min(all_yticks), np.max(all_yticks)
     xi = np.linspace(min_x, max_x)
