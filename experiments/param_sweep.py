@@ -398,6 +398,12 @@ presets = {
     '71': {
         'model': 'a3c_lstm',
         'value_loss_fac': 0.5
+    },
+    '72': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 15,
+        'nwp': 1
     }
 }
 

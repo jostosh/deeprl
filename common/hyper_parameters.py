@@ -70,7 +70,7 @@ config1 = {
     'value_quantization': False,
     'vp': 45,
     'pq_cpa': False,
-    'value_loss_fac': 1.0
+    'value_loss_fac': 0.5
 }
 
 param_sweep = {

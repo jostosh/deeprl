@@ -39,7 +39,7 @@ def conv_layer(incoming, n_filters, filter_size, stride, activation, name, paddi
     d = 1.0 / np.sqrt(filter_size * filter_size * input_channels)
     if init == 'torch':
         weight_init = tf.random_uniform([filter_size, filter_size, input_channels, n_filters], minval=-d, maxval=d)
-        bias_init   = tf.constant_initializer(bias_init)
+        bias_init   = tf.random_uniform([n_filters], minval=-d, maxval=d)
     elif init == 'default':
         weight_init = tf.contrib.layers.variance_scaling_initializer()
         bias_init   = tf.constant_initializer(bias_init)
@@ -57,7 +57,7 @@ def fc_layer(incoming, n_out, activation, name, init='torch', bias_init=0.01):
     d = 1.0 / np.sqrt(n_in)
     if init == 'torch':
         weights_init = tf.random_uniform([n_in, n_out], minval=-d, maxval=d)
-        bias_initializer = tf.constant_initializer(bias_init)
+        bias_initializer = tf.random_uniform([n_out], minval=-d, maxval=d)
     elif init == 'default':
         weights_init = tf.contrib.layers.variance_scaling_initializer()
         bias_initializer = tf.constant_initializer(bias_init)
