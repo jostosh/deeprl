@@ -402,6 +402,7 @@ presets = {
     '72': {
         'model': 'a3c_ff',
         'policy_quantization': True,
+        'pq_cpa': True,
         'ppa': 15,
         'nwp': 1
     }
