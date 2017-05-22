@@ -69,7 +69,7 @@ config1 = {
     'zpi': False,
     'value_quantization': False,
     'vp': 45,
-    'pq_cpa': False,
+    'pq_cpa': True,
     'value_loss_fac': 0.5
 }
 
