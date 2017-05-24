@@ -23,7 +23,7 @@ func_by_param = {
     'ss_temp': log_uniform,
     'prototype_factor': log_uniform,
     'ppa': lambda l, h, r: int(log_uniform(l, h, r)),
-    'nwp': lambda l, h, r: int(log_uniform(l, h, r)),
+    'nwp': lambda l, h, r: int(uniform(l, h, r)),
     'wpr': uniform
 }
 
@@ -37,7 +37,7 @@ lo_by_param = {
     'ss_temp': 0.01,
     'prototype_factor': 1,
     'ppa': 10,
-    'nwp': 3,
+    'nwp': 1,
     'wpr': 0.01
 }
 
@@ -49,9 +49,9 @@ hi_by_param = {
     'fplc': 1.0,
     'fp_decay': 0.99999999,
     'ss_temp': 1.0,
-    'prototype_factor': 100,
+    'prototype_factor': 50,
     'ppa': 200,
-    'nwp': 25,
+    'nwp': 15,
     'wpr': 1.0
 }
 
@@ -414,8 +414,14 @@ presets = {
     '74': {
         'model': 'a3c_conv_lstm',
         'weights_init': 'tflearn'
+    },
+    '75': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_cpa': True,
+        'ppa': 15,
+        'pq_sim_fn': 'euc_sq'
     }
-
 }
 
 
