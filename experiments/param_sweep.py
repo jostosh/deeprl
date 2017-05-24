@@ -405,7 +405,17 @@ presets = {
         'pq_cpa': True,
         'ppa': 15,
         'nwp': 1
+    }, # 24-05-17
+    '73': {
+        'model': 'a3c_ff_ss',
+        'trainable_temp': True,
+        'activation': 'elu'
+    },
+    '74': {
+        'model': 'a3c_conv_lstm',
+        'weights_init': 'tflearn'
     }
+
 }
 
 
