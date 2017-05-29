@@ -11,7 +11,7 @@ except:
 from deeprl.approximators.convlstm import ConvLSTM2D
 from deeprl.approximators.layers import \
     spatialsoftmax, conv_layer, fc_layer
-from deeprl.approximators.recurrent import convolutional_lstm, convolutional_gru, custom_lstm
+from deeprl.approximators.recurrent import convolutional_lstm, convolutional_gru, custom_lstm, ConvLSTM
 from deeprl.approximators.similarity_functions import similarity_functions
 from deeprl.approximators.sisws import spatial_weight_sharing
 from deeprl.common.logger import logger
@@ -27,6 +27,7 @@ class ModelNames:
     A3C_CONV_LSTM = 'a3c_conv_lstm'
     A3C_CONV_LSTM_K = 'a3c_conv_lstm_k'
     A3C_SISWS   = 'a3c_sisws'
+    A3C_SISWS2  = 'a3c_sisws2'
     A3C_SISWS_S = 'a3c_sisws_s'
     A3C_CONV_GRU = 'a3c_conv_gru'
 
@@ -123,6 +124,30 @@ class ActorCriticNN(object):
             # Add second convolutional layer
             net = spatial_weight_sharing(net, 3, n_filters=32, filter_size=4, strides=2, activation=self.hp.activation,
                                          name='Conv2', centroids_trainable=True, per_feature=True)
+            self._add_trainable(net)
+
+            net = tflearn.flatten(net)
+            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
+            self._add_trainable(net)
+
+            self.embedding_layer = net
+
+        return net
+
+    def _a3c_sisws2(self):
+        with tf.name_scope(self.forward_input_scope):
+            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+
+        with tf.name_scope('HiddenLayers') as scope:
+            # Add first convolutional layer
+            net = conv_layer(net, 32, 8, 4, activation='linear', name='{}/Conv1'.format(self.agent_name),
+                             init=self.hp.weights_init)
+            self._add_trainable(net)
+            net = self.hp.activation(net)
+
+            # Add second convolutional layer
+            net = spatial_weight_sharing(net, 3, n_filters=32, filter_size=4, strides=2, activation=self.hp.activation,
+                                         name='Conv2', centroids_trainable=True)
             self._add_trainable(net)
 
             net = tflearn.flatten(net)
@@ -291,10 +316,16 @@ class ActorCriticNN(object):
             self._add_trainable(net)
             net = tf.reshape(net, [-1, 1] + net.get_shape().as_list()[1:])
 
-            net, new_state, self.initial_state = convolutional_lstm(net, outer_filter_size=4, num_features=64,
-                                                                    stride=2, inner_filter_size=5, inner_depthwise=False,
-                                                                    forget_bias=1.)
-            self.theta += net.W + [net.b]
+            convlstm = ConvLSTM(net, outer_filter_size=4, num_features=64,
+                                                          stride=2, inner_filter_size=5, inner_depthwise=False,
+                                                          forget_bias=1., name=self.agent_name + 'ConvLSTM')
+            net, new_state, self.initial_state = convlstm.get_outputs()
+
+
+            #net, new_state, self.initial_state = convolutional_lstm(net, outer_filter_size=4, num_features=64,
+            #                                                        stride=2, inner_filter_size=5, inner_depthwise=False,
+            #                                                        forget_bias=1., name=self.agent_name + 'ConvLSTM')
+            self.theta += convlstm.get_vars()
 
             net = tf.reshape(net, [-1, 9 * 9 * 64])
             self.lstm_state_variable = new_state
@@ -458,6 +489,8 @@ class ActorCriticNN(object):
             net = self._a3c_sisws_s()
         elif self.model_name == ModelNames.A3C_CONV_GRU:
             net = self._a3c_conv_gru()
+        elif self.model_name == ModelNames.A3C_SISWS2:
+            net = self._a3c_sisws2()
         else:
             raise ValueError("Unknown model name {}".format(self.model_name))
 

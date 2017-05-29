@@ -9,9 +9,122 @@ from tensorflow.python.platform import tf_logging as logging
 from tensorflow.python.util import nest
 
 
+def ln(tensor, scope = None, epsilon = 1e-5):
+    """ Layer normalizes a 2D tensor along its second axis """
+    assert(len(tensor.get_shape()) == 4)
+    m, v = tf.nn.moments(tensor, [1, 2, 3], keep_dims=True)
+    if not isinstance(scope, str):
+        scope = ''
+    with tf.variable_scope(scope + 'layer_norm'):
+        scale = tf.get_variable('scale',
+                                shape=tensor.get_shape()[1:],
+                                initializer=tf.constant_initializer(1))
+        shift = tf.get_variable('shift',
+                                shape=tensor.get_shape()[1:],
+                                initializer=tf.constant_initializer(0))
+    LN_initial = (tensor - m) / tf.sqrt(v + epsilon)
+
+    return LN_initial * scale + shift, scale, shift
+
+
+class ConvLSTM:
+
+    def __init__(self, incoming, outer_filter_size, num_features, stride, inner_filter_size = None, forget_bias = 1.0,
+                 activation = tf.nn.tanh, padding = 'VALID', inner_depthwise = False, outer_init = 'torch',
+                 inner_init = 'orthogonal', inner_act = tf.nn.sigmoid, name = 'ConvLSTM'):
+        n_input_features = incoming.get_shape().as_list()[-1]
+        self.vars = []
+
+        with tf.name_scope("ConvLSTM"):
+
+            with tf.name_scope("ConvLSTMWeights"):
+                def get_conv_W(filter_size, n_in_features, n_out_features, name, depthwise=False, init='torch'):
+                    if init == 'torch':
+                        d = 1.0 / np.sqrt(filter_size * filter_size * (n_in_features if not depthwise else 1))
+                        weights_init = tf.random_uniform([filter_size, filter_size, n_in_features, n_out_features],
+                                                         minval=-d, maxval=d)
+                    elif init == 'orthogonal':
+                        weights_all = []
+                        for i in range(4 if depthwise else 1):
+                            X = np.random.random((n_out_features // (4 if depthwise else 1),
+                                                  n_in_features * filter_size * filter_size))
+                            _, _, Vt = np.linalg.svd(X, full_matrices=False)
+                            assert np.allclose(np.dot(Vt, Vt.T), np.eye(Vt.shape[0]))
+                            weights_all.append(np.transpose(
+                                np.reshape(Vt, (n_out_features, n_in_features, filter_size, filter_size)),
+                                (2, 3, 1, 0)
+                            ))
+                        weights_init = np.concatenate(weights_all, axis=3).astype('float32')
+                    else:
+                        raise ValueError("Unknown initialization: {}".format(init))
+                    return tf.Variable(weights_init, name=name)
+
+                W_x_to_ijfo = get_conv_W(outer_filter_size, n_input_features, num_features * 4, name='Wh', init='torch')
+                if inner_depthwise:
+                    W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, 4, name='Wx', depthwise=True,
+                                             init=inner_init)
+                else:
+                    W_h_to_ijfo = get_conv_W(inner_filter_size, num_features, num_features * 4, name='Wx',
+                                             init=inner_init)
+
+                b = tf.Variable(tf.zeros(4 * num_features), dtype=tf.float32, name='Bias')
+
+            def lstm_step(lstm_state, x):
+                with tf.name_scope("ConvLSTMStep"):
+                    c, h = tf.split(3, 2, lstm_state)
+
+                    conv_x = tf.nn.conv2d(x, W_x_to_ijfo, strides=[1, stride, stride, 1], padding=padding)
+                    if inner_depthwise:
+                        conv_h = tf.nn.depthwise_conv2d(h, W_h_to_ijfo, strides=4 * [1], padding='SAME')
+                    else:
+                        conv_h = tf.nn.conv2d(h, W_h_to_ijfo, strides=4 * [1], padding='SAME')
+                    concat = tf.nn.bias_add(conv_x + conv_h, b)
+
+                    # i = input_gate, j = new_input, f = forget_gate, o = output_gate
+                    i, j, f, o = tf.split(3, 4, concat)
+
+                    i, iscale, ishift = ln(i, scope=name + 'i')
+                    j, jscale, jshift = ln(j, scope=name + 'j')
+                    f, fscale, fshift = ln(f, scope=name + 'f')
+                    o, oscale, oshift = ln(o, scope=name + 'o')
+                    self.vars += [iscale, ishift, jscale, jshift, fscale, fshift, oscale, oshift]
+
+                    new_c = (c * inner_act(f + forget_bias) + inner_act(i) * activation(j))
+                    new_h = activation(new_c) * inner_act(o)
+
+                    return tf.concat(3, [new_c, new_h])
+
+            with tf.name_scope("Reshaping"):
+                _, batch_size, h, w, _ = incoming.get_shape().as_list()
+                n_pad = 2 * (outer_filter_size // 2) if padding == 'SAME' else 0
+                state_shape = [batch_size,
+                               (h - outer_filter_size + n_pad) // stride + 1,
+                               (w - outer_filter_size + n_pad) // stride + 1,
+                               2 * num_features]
+                output_shape = [-1] + state_shape[1:]
+                # print(state_shape)
+
+                initial_state = tf.placeholder(tf.float32, state_shape, name='ConvLSTMState')
+                new_state = tf.reshape(tf.scan(lstm_step, incoming, initializer=initial_state), output_shape)
+
+                _, outputs = tf.split(3, 2, new_state)
+
+                outputs.W = [W_h_to_ijfo, W_x_to_ijfo]
+                outputs.b = b
+        self.outputs = outputs
+        self.new_state = new_state
+        self.initial_state = initial_state
+        self.vars += outputs.W + [outputs.b]
+
+    def get_outputs(self):
+        return self.outputs, self.new_state[-1:], self.initial_state
+
+    def get_vars(self):
+        return self.vars
+
 def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_filter_size=None, forget_bias=1.0,
                        activation=tf.nn.tanh, padding='VALID', inner_depthwise=False, outer_init='torch',
-                       inner_init='orthogonal', inner_act=tf.nn.sigmoid):
+                       inner_init='orthogonal', inner_act=tf.nn.sigmoid, name='ConvLSTM'):
     n_input_features = incoming.get_shape().as_list()[-1]
 
     with tf.name_scope("ConvLSTM"):
@@ -62,6 +175,11 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_
                 # i = input_gate, j = new_input, f = forget_gate, o = output_gate
                 i, j, f, o = tf.split(3, 4, concat)
 
+                i, iscale, ishift = ln(i, scope=name + 'i')
+                j, jscale, jshift = ln(j, scope=name + 'j')
+                f, fscale, fshift = ln(f, scope=name + 'f')
+                o, oscale, oshift = ln(o, scope=name + 'o')
+
                 new_c = (c * inner_act(f + forget_bias) + inner_act(i) * activation(j))
                 new_h = activation(new_c) * inner_act(o)
 
@@ -84,6 +202,8 @@ def convolutional_lstm(incoming, outer_filter_size, num_features, stride, inner_
 
             outputs.W = [W_h_to_ijfo, W_x_to_ijfo]
             outputs.b = b
+            ln_vars = [tf.get_variable]
+            outputs.ln = [iscale, ishift, jscale, jshift]
 
     return outputs, new_state[-1:], initial_state
 
