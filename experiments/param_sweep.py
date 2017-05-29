@@ -35,7 +35,7 @@ lo_by_param = {
     'fplc': 1e-5,
     'fp_decay': 0.999,
     'ss_temp': 0.01,
-    'prototype_factor': 1,
+    'prototype_factor': 0.5,
     'ppa': 10,
     'nwp': 1,
     'wpr': 0.01
