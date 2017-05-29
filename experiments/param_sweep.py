@@ -421,6 +421,13 @@ presets = {
         'pq_cpa': True,
         'ppa': 15,
         'pq_sim_fn': 'euc_sq'
+    },
+    '76': {
+        'model': 'a3c_sisws2'
+    },
+    '77': {
+        'model': 'a3c_conv_lstm',
+        'weights_init': 'tflearn'
     }
 }
 
