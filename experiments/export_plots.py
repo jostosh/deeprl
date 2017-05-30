@@ -101,7 +101,7 @@ def event_arrays_to_mean_and_errors(event_array):
 def obtain_name(hp):
     function_by_name = {
         'idx': lambda p: 'Fold ' + hp['idx'],
-        'model': lambda p: {'default': 'Default CNN', 'spatial': 'SIWS CNN'}[hp[p]],
+        'model': lambda p: {'default': 'Default CNN', 'spatial': 'SIWS CNN', 'per_feature': "SISWS PF"}[hp[p]],
         'per_feature': lambda p: '/F' if (p in hp and hp[p] == True) else ''
     }
 
@@ -309,8 +309,8 @@ def render_sweep2d_mpl(all_scores, all_xticks, all_yticks, env, xlab, ylab):
         ax.set_xlim(args.xrange)
     if args.yrange:
         ax.set_ylim(args.yrange)
-    CS = ax.contour(xi, yi, zi, 20, linewidths=0.5, colors='k')
-    CS = ax.contourf(xi, yi, zi, 20, cmap=cm.viridis)
+    CS = ax.contour(xi, yi, zi, args.levels, linewidths=0.5, colors='k')
+    CS = ax.contourf(xi, yi, zi, args.levels, cmap=cm.viridis)
     sc = ax.scatter(all_xticks, all_yticks, c='k')
     cb = fig.colorbar(CS)
     cb.ax.set_title("Score")
@@ -432,6 +432,7 @@ def add_to_mpl_plot(errors, handles, hp_idx, hyper_parameters, steps, values):
 def get_events_by_scalar(event_files):
     events_by_scalar = {}
     for event_file in event_files:
+        print(event_file)
         ea = event_accumulator.EventAccumulator(event_file)
         ea.Reload()
         for scalar in ea.Tags()['scalars']:
@@ -484,6 +485,23 @@ def get_event_files_by_hp_by_env(input_dir):
                 event_files_by_hp_by_env[hyper_parameters['env']][hyper_parameters_str] = event_files
             else:
                 event_files_by_hp_by_env[hyper_parameters['env']][hyper_parameters_str] += event_files
+        elif 'hyper_parameters.pkl' in files and all('fold{}'.format(i) in dir for i in range(5)):
+            try:
+                with open(os.path.join(root, 'hyper_parameters.pkl'), 'rb') as f:
+                    hyper_parameters = pickle.load(f)
+            except Exception as e:
+                continue
+
+            for r, _, fs in os.walk(root):
+                event_files = [os.path.join(root, r, f) for f in fs if IsTensorFlowEventsFile(f)]
+                hyper_parameters_str = json.dumps(hyper_parameters, sort_keys=True)
+
+                if 'adience' not in event_files_by_hp_by_env:
+                    event_files_by_hp_by_env['adience'] = {hyper_parameters_str: event_files}
+                elif hyper_parameters_str not in event_files_by_hp_by_env['adience']:
+                    event_files_by_hp_by_env['adience'][hyper_parameters_str] = event_files
+                else:
+                    event_files_by_hp_by_env['adience'][hyper_parameters_str] += event_files
     return event_files_by_hp_by_env
 
 
@@ -507,6 +525,7 @@ if __name__ == "__main__":
     parser.add_argument("--trace_by", nargs='+', default=[])
     parser.add_argument("--mode", default='mean', choices=['mean', 'sweep'])
     parser.add_argument("--legend_at", default='upper right')
+    parser.add_argument("--levels", default=20, type=int)
     args = parser.parse_args()
 
     print(args.input_dir)
