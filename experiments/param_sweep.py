@@ -428,6 +428,20 @@ presets = {
     '77': {
         'model': 'a3c_conv_lstm',
         'weights_init': 'tflearn'
+    },
+    '78': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_cpa': True,
+        'ppa': 15,
+        'nwp': 10
+    },
+    '79': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_cpa': True,
+        'ppa': 15,
+        'nwp': 15
     }
 }
 

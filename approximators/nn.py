@@ -514,8 +514,16 @@ class ActorCriticNN(object):
                         n_winning_prototypes = min(n_winning_prototypes, self.hp.ppa)
 
                         similarity = tf.reshape(similarity, [-1, self.num_actions, self.hp.ppa])
-                        if self.hp.nwp == 1:
+                        if n_winning_prototypes == 1:
                             self.pi = tf.nn.softmax(tf.reduce_max(similarity, axis=2))
+                        elif n_winning_prototypes == self.hp.ppa:
+                            self.pi = tf.reduce_sum(
+                                tf.reshape(
+                                    tf.nn.softmax(tf.reshape(similarity, [-1, self.num_actions * n_winning_prototypes])),
+                                    [-1, self.num_actions, n_winning_prototypes]
+                                ),
+                                axis=2
+                            )
                         else:
                             k_sim, self.k_ind = tf.nn.top_k(similarity, n_winning_prototypes, sorted=False)
                             self.pi = tf.reduce_sum(
