@@ -60,7 +60,7 @@ config1 = {
     'ignore_annealing': False,
     'prototype_factor': 1.0,
     'weights_init': 'torch',
-    'nwp': 3,
+    'nwp': 10,
     'ppa': 15,
     'debug': False,
     'wpr': 0.0,
