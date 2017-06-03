@@ -70,7 +70,10 @@ config1 = {
     'value_quantization': False,
     'vp': 45,
     'pq_cpa': True,
-    'value_loss_fac': 0.5
+    'value_loss_fac': 0.5,
+    'pq_init_noise': 0.01,
+    'pt_samples': 1000,
+    'pt_sample_init': False
 }
 
 param_sweep = {
@@ -184,3 +187,6 @@ class HyperParameters(object):
         self.vp = params.vp
         self.pq_cpa = params.pq_cpa
         self.value_loss_fac = params.value_loss_fac
+        self.pq_init_noise = params.pq_init_noise
+        self.pt_samples = params.pt_samples
+        self.pt_sample_init = params.pt_sample_init

@@ -265,14 +265,15 @@ class A3CAgent(object):
 
         return np.mean(returns)
 
-
     def sample_head_space(self):
         self.synchronize_thread_parameters()
         self.last_state = self.env.reset_random()
         self.local_network.reset()
 
         heads = []
-        for t in range(1000):
+
+        print("Sampling head space!\n\n\n")
+        for t in range(self.hp.pt_samples):
 
             heads.append(self.local_network.get_embedding(self.last_state, session)[0])
 
@@ -285,22 +286,13 @@ class A3CAgent(object):
                 self.local_network.reset()
 
         heads_stacked = np.stack(heads)
-
-        print("Fitting GMM for prototype initialization")
-        af = AffinityPropagation().fit(heads_stacked)
-        n_components = len(af.cluster_centers_indices_)
-        print("Found {} clusters".format(n_components))
-
-        gmm = GaussianMixture(n_components=n_components, covariance_type='full')
-        gmm.fit(heads_stacked)
-        prototype_inits = gmm.sample(n_samples=self.num_actions * self.hp.ppa)[0]
-
-        print(prototype_inits.shape)
-
-        mask = heads_stacked.max(axis=0) > 0
-        prototype_inits *= np.reshape(mask, (1, mask.shape[0]))
-
         prototypes = self.global_network.prototypes
+
+        candidate_indices = np.random.permutation(
+            np.arange(0, len(heads_stacked)))[:prototypes.get_shape().as_list()[0]]
+
+        prototype_inits = heads_stacked[candidate_indices] + \
+                          self.hp.pq_init_noise * np.random.standard_normal(prototypes.get_shape().as_list())
 
         prototype_ph = tf.placeholder(tf.float32, prototypes.get_shape().as_list())
         assign_prototypes = tf.assign(prototypes, prototype_ph)
@@ -413,6 +405,9 @@ if __name__ == "__main__":
 
     init = tf.global_variables_initializer()
     session.run(init)
+
+    if hyperparameters.pt_sample_init:
+        agents[0].sample_head_space()
 
     for agent in agents:
         agent.train()

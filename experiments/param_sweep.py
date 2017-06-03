@@ -458,6 +458,14 @@ presets = {
         'ppa': 16,
         'nwp': 4,
         'prototype_factor': 2.5
+    },
+    '82': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'pq_cpa': True,
+        'ppa': 15,
+        'nwp': 10,
+        'pt_sample_init': True
     }
 }
 
