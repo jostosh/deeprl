@@ -466,6 +466,9 @@ presets = {
         'ppa': 15,
         'nwp': 10,
         'pt_sample_init': True
+    },
+    '83': {
+        'model': 'a3c_ntc'
     }
 }
 

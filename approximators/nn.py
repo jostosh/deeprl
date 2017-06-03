@@ -10,7 +10,7 @@ except:
 
 from deeprl.approximators.convlstm import ConvLSTM2D
 from deeprl.approximators.layers import \
-    spatialsoftmax, conv_layer, fc_layer
+    spatialsoftmax, conv_layer, fc_layer, neural_tile_coding
 from deeprl.approximators.recurrent import convolutional_lstm, convolutional_gru, custom_lstm, ConvLSTM
 from deeprl.approximators.similarity_functions import similarity_functions
 from deeprl.approximators.sisws import spatial_weight_sharing
@@ -30,6 +30,7 @@ class ModelNames:
     A3C_SISWS2  = 'a3c_sisws2'
     A3C_SISWS_S = 'a3c_sisws_s'
     A3C_CONV_GRU = 'a3c_conv_gru'
+    A3C_NTC = 'a3c_ntc'
 
 
 
@@ -233,6 +234,38 @@ class ActorCriticNN(object):
                 self.theta += net.b
             net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
             self._add_trainable(net)
+            self.embedding_layer = net
+
+        return net
+
+    def _a3c_ntc(self):
+        """
+        This is the feedforward model taken from "Asynchronous Methods for Reinforcement Learning" together with a
+        spatial softmax layer.
+        :param network_name:    Name of the network
+        :return:                The feedforward model (last hidden layer) as a graph node
+        """
+        with tf.name_scope('Inputs'):
+            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+
+        with tf.name_scope('HiddenLayers'):
+            # Add first convolutional layer
+            net = conv_layer(net, 32, 8, 4, activation='linear', name='{}/Conv1'.format(self.agent_name),
+                             init=self.hp.weights_init)
+
+            self._add_trainable(net)
+            net = self.hp.activation(net)
+
+            # Add second convolutional layer
+            net = conv_layer(net, 64, 4, 2, activation='linear', name='{}/Conv2'.format(self.agent_name),
+                             init=self.hp.weights_init)
+            self._add_trainable(net)
+            net = self.hp.activation(net)
+
+            net = tflearn.flatten(net)
+            net, ntc_vars = neural_tile_coding(net, [16] * 16, [512] * 16, name='{}/NTC'.format(self.agent_name))
+
+            self.theta += ntc_vars
             self.embedding_layer = net
 
         return net
@@ -491,6 +524,8 @@ class ActorCriticNN(object):
             net = self._a3c_conv_gru()
         elif self.model_name == ModelNames.A3C_SISWS2:
             net = self._a3c_sisws2()
+        elif self.model_name == ModelNames.A3C_NTC:
+            net = self._a3c_ntc()
         else:
             raise ValueError("Unknown model name {}".format(self.model_name))
 

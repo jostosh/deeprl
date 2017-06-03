@@ -52,6 +52,35 @@ def conv_layer(incoming, n_filters, filter_size, stride, activation, name, paddi
                            weight_decay=0.0, name=name)
 
 
+def neural_tile_coding(incoming, n_units, sizes, name, init='torch', bias_init=0.01):
+
+    _, n_in = incoming.get_shape().as_list()
+
+    out = []
+    vars = []
+    for i, (n_u, sz) in enumerate(zip(n_units, sizes)):
+        indices = np.random.permutation(np.arange(n_in))[:sz]
+
+        in_ = tf.transpose(tf.gather(tf.transpose(incoming), indices))
+
+        d = 1.0 / np.sqrt(sz)
+        if init == 'torch':
+            weights_init = tf.random_uniform_initializer(minval=-d, maxval=d)
+        elif init == 'default':
+            weights_init = tf.contrib.layers.variance_scaling_initializer()
+        else:
+            raise ValueError("Unknown initialization {}".format(init))
+        W = tf.get_variable(name + str(i) + 'W', [sz, n_u], initializer=weights_init)
+        vars.append(W)
+
+        norm2 = -tf.reduce_sum(tf.square(tf.expand_dims(in_, 2) - tf.expand_dims(W, 0)), axis=1)
+        out.append(tf.nn.softmax(norm2))
+
+        tf.add_to_collection(tf.GraphKeys.LAYER_VARIABLES + '/' + name, W)
+
+    return tf.concat(1, out), vars
+
+
 def fc_layer(incoming, n_out, activation, name, init='torch', bias_init=0.01):
     _, n_in = incoming.get_shape().as_list()
     d = 1.0 / np.sqrt(n_in)
