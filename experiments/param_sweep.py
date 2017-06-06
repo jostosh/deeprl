@@ -469,6 +469,9 @@ presets = {
     },
     '83': {
         'model': 'a3c_ntc'
+    },
+    '84': {
+        'model': 'a3c_ff_ss'
     }
 }
 
@@ -484,21 +487,23 @@ if __name__ == "__main__":
     parser.add_argument("--params", nargs='+', default=['learning_rate', 'otc', 'fplc', 'fp_decay'])
     parser.add_argument("--a3c_args", nargs='+', default=[])
     parser.add_argument("--preset", default=None)
+    parser.add_argument("--t_max", default=1000000, type=int)
+    parser.add_argument("--sweeps", default=100, type=int)
     args = parser.parse_args()
 
     a3c_args = ['--' + a for a in args.a3c_args]
 
-    for i in range(100):
+    for i in range(args.sweeps):
         if args.preset:
             preset_str = convert_preset_to_params(presets[args.preset])
             command = ["python3", "mproj/deeprl/rlmethods/a3c.py", '--env=Catch',
-                       '--evaluation_interval=50000', '--T_max=1000000', '--n_threads=12',
+                       '--evaluation_interval=50000', '--T_max={0}'.format(args.t_max), '--n_threads=12',
                        '--logprefix=sweep/preset{0}'.format(args.preset)] + preset_str + \
                       ["--{0}={1}".format(p, func_by_param[p](lo_by_param[p], hi_by_param[p], np.random.rand()))
                        for p in args.params]
         else:
             command = ["python3", "mproj/deeprl/rlmethods/a3c.py", '--env=Catch', '--model={0}'.format(args.model),
-                       '--evaluation_interval=50000', '--T_max=1000000',  '--n_threads=12'] + a3c_args + \
+                       '--evaluation_interval=50000', '--T_max={0}'.format(args.t_max),  '--n_threads=12'] + a3c_args + \
                       ["--{0}={1}".format(p, func_by_param[p](lo_by_param[p], hi_by_param[p], np.random.rand()))
                        for p in args.params]
         print('INITIATING COMMAND:\n{0}'.format(' '.join(command)))
