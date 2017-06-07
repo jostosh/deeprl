@@ -479,6 +479,23 @@ presets = {
         'ppa': 128,
         'nwp': 48,
         'pq_cpa': True
+    },
+    '86': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 15,
+        'nwp': 10,
+        'pq_cpa': True,
+        'glvq': True
+    },
+    '87': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 15,
+        'nwp': 10,
+        'pq_cpa': True,
+        'glvq': True,
+        'ppao': True
     }
 }
 

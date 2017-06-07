@@ -12,7 +12,7 @@ from deeprl.approximators.convlstm import ConvLSTM2D
 from deeprl.approximators.layers import \
     spatialsoftmax, conv_layer, fc_layer, neural_tile_coding
 from deeprl.approximators.recurrent import convolutional_lstm, convolutional_gru, custom_lstm, ConvLSTM
-from deeprl.approximators.similarity_functions import similarity_functions
+from deeprl.approximators.similarity_functions import similarity_functions, glvq_score
 from deeprl.approximators.sisws import spatial_weight_sharing
 from deeprl.common.logger import logger
 
@@ -545,10 +545,15 @@ class ActorCriticNN(object):
                     )
                     self.k_ind = None
                     similarity, additional_variables = similarity_functions[self.hp.pq_sim_fn](net, prototypes)
+
+
                     if self.hp.pq_cpa:
                         n_winning_prototypes = min(n_winning_prototypes, self.hp.ppa)
 
                         similarity = tf.reshape(similarity, [-1, self.num_actions, self.hp.ppa])
+                        if self.hp.glvq:
+                            similarity = -glvq_score(-similarity, self.num_actions)
+
                         if n_winning_prototypes == 1:
                             self.pi = tf.nn.softmax(tf.reduce_max(similarity, axis=2))
                         elif n_winning_prototypes == self.hp.ppa:
@@ -740,6 +745,8 @@ class ActorCriticNN(object):
             self.n_step_returns = tf.placeholder(tf.float32, [None], name='NStepReturns')
 
         with tf.name_scope("PolicyLoss"):
+            adv_no_grad = self.advantage_no_grad if not self.hp.ppao else tf.nn.relu(self.advantage_no_grad)
+
             # action matrix is n x a where each row corresponds to a time step and each column to an action
             action_mask = tf.one_hot(self.actions, self.num_actions, 1.0, 0.0, name="ActionMask")
             # self.pi and log_pi are n x a matrices
@@ -747,7 +754,7 @@ class ActorCriticNN(object):
             # The entropy is added to encourage exploration
             entropy = -tf.reduce_sum(log_pi * self.pi, reduction_indices=1, name="Entropy")
             # Define the loss for the policy (minus is needed to perform *negative* gradient descent == gradient ascent)
-            pi_loss = -tf.reduce_sum((tf.reduce_sum(tf.mul(action_mask, log_pi), reduction_indices=1) * self.advantage_no_grad
+            pi_loss = -tf.reduce_sum((tf.reduce_sum(tf.mul(action_mask, log_pi), reduction_indices=1) * adv_no_grad
                         + self.beta * entropy))
 
         with tf.name_scope("ValueLoss"):

@@ -25,6 +25,25 @@ def inv_euclidean(net, prototypes):
     diff = tf.expand_dims(net, 1) - tf.expand_dims(prototypes, 0)
     return tf.div(1.0, 1.0 + tf.sqrt(tf.reduce_sum(tf.square(diff), axis=2))), []
 
+def glvq_score(distances, num_classes):
+    scores = []
+    for i in range(num_classes):
+        jnoti = [j for j in range(num_classes) if j != i]
+
+        distance_wrong = tf.reshape(tf.reduce_min(
+            tf.transpose(tf.gather(tf.transpose(distances, (1, 0, 2)), jnoti), (1, 0, 2)),
+            axis=[1, 2]),
+            shape=(-1, 1)
+        )
+
+        distance_right = distances[:, i, :]
+
+        scores.append(distance_right - distance_wrong / (distance_right + distance_wrong))
+
+    return tf.stack(scores, axis=1)
+
+
+
 similarity_functions = {
     'euc': euclidean_neg,
     'cor': correlation,
