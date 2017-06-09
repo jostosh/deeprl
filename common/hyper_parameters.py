@@ -78,7 +78,8 @@ config1 = {
     'ppao': False,
     'ng_anneal': False,
     'tau0': 0,
-    'tauN': 2.5
+    'tauN': 2.5,
+    'lpq_temp': 1.0
 }
 
 param_sweep = {
@@ -200,3 +201,4 @@ class HyperParameters(object):
         self.ng_anneal = params.ng_anneal
         self.tau0 = params.tau0
         self.tauN = params.tauN
+        self.lpq_temp = params.lpq_temp

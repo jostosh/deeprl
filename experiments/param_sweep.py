@@ -24,7 +24,8 @@ func_by_param = {
     'prototype_factor': log_uniform,
     'ppa': lambda l, h, r: int(log_uniform(l, h, r)),
     'nwp': lambda l, h, r: int(uniform(l, h, r)),
-    'wpr': uniform
+    'wpr': uniform,
+    'lpq_temp': log_uniform
 }
 
 lo_by_param = {
@@ -38,7 +39,8 @@ lo_by_param = {
     'prototype_factor': 0.5,
     'ppa': 10,
     'nwp': 1,
-    'wpr': 0.01
+    'wpr': 0.01,
+    'lpq_temp': 0.01
 }
 
 hi_by_param = {
@@ -52,7 +54,8 @@ hi_by_param = {
     'prototype_factor': 50,
     'ppa': 200,
     'nwp': 15,
-    'wpr': 1.0
+    'wpr': 1.0,
+    'lpq_temp': 100
 }
 
 presets = {
