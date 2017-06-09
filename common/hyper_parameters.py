@@ -75,7 +75,10 @@ config1 = {
     'pt_samples': 1000,
     'pt_sample_init': False,
     'glvq': False,
-    'ppao': False
+    'ppao': False,
+    'ng_anneal': False,
+    'tau0': 0,
+    'tauN': 2.5
 }
 
 param_sweep = {
@@ -194,3 +197,6 @@ class HyperParameters(object):
         self.pt_sample_init = params.pt_sample_init
         self.glvq = params.glvq
         self.ppao = params.ppao
+        self.ng_anneal = params.ng_anneal
+        self.tau0 = params.tau0
+        self.tauN = params.tauN

@@ -552,7 +552,9 @@ class ActorCriticNN(object):
 
                         similarity = tf.reshape(similarity, [-1, self.num_actions, self.hp.ppa])
                         if self.hp.glvq:
-                            similarity = -glvq_score(-similarity, self.num_actions)
+
+                            similarity = -glvq_score(-similarity, self.num_actions, neural_gas=self.hp.ng_anneal,
+                                                     tau0=self.hp.tau0, tauN=self.hp.tauN, N=self.hp.T_max)
 
                         if n_winning_prototypes == 1:
                             self.pi = tf.nn.softmax(tf.reduce_max(similarity, axis=2))
