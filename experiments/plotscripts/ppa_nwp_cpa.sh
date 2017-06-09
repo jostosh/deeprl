@@ -7,4 +7,5 @@ python3 export_plots.py \
     --title "Policy Quantization Closest Per Action" \
     --xlabel "$\log_{10}(|\mathcal P|/|\mathcal A|)$" \
     --ylabel "$|\mathcal P^*|/|\mathcal A|$" \
-    --display
+    --display \
+    --levels 30

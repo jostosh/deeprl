@@ -4,7 +4,8 @@ python3 export_plots.py \
     --mode sweep \
     --trace_by ppa wpr \
     --image_suffix sweep_preset67 \
-    --title "Policy Quantization Closest Per Action" \
-    --xlabel "$\log_{10}(|\mathcal P|/|\mathcal A|)$" \
-    --ylabel "$|\mathcal P^*|/|\mathcal P|$" \
-    --display
+    --title "Neighborhood size and prototypes per action" \
+    --xlabel "$\log_{10}(|\tilde{\mathcal A}^k|/|\mathcal A|)$" \
+    --ylabel "$|\tilde{\mathcal A}^k|/|\tilde{\mathcal A}|$" \
+    --display \
+    --levels 30

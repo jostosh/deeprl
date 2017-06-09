@@ -9,9 +9,10 @@ python3 export_plots.py \
     --log_scale \
     --xrange -6 -2 \
     --yrange 0 1 \
-    --title "ELU vs. ReLU, default A3C" \
+    --title "ELU vs. ReLU with A3C FF" \
     --xlabel "$\log_{10}(\alpha)$" \
     --ylabel "Mean score" \
-    --labels "A3C default ReLU" "A3C default ELU" \
+    --labels "ReLU" "ELU" \
     --legend_at "upper left" \
+    --fontsize 20 \
     $*

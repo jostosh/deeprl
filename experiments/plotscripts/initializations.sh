@@ -12,6 +12,7 @@ python3 export_plots.py \
     --title "Parameter initializations" \
     --xlabel "$\log_{10}(\alpha)$" \
     --ylabel "Mean score" \
-    --labels "A3C FF torch" "A3C FF" "A3C FF tflearn"
+    --labels "Torch" "TensorFlow" "TFLearn" \
     --legend_at "upper left" \
+    --fontsize 20 \
     $*

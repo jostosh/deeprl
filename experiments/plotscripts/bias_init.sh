@@ -14,4 +14,5 @@ python3 export_plots.py \
     --ylabel "Mean score" \
     --labels "Torch" "$\xi = 0.01$" \
     --legend_at "upper left" \
+    --fontsize 20 \
     $*

@@ -12,6 +12,7 @@ python3 export_plots.py \
     --title "SISWS models vs. default A3C" \
     --xlabel "$\log_{10}(\alpha)$" \
     --ylabel "Mean score" \
-    --labels "A3C default" "A3C SISWS trainable" "A3C SISWS static" \
+    --labels "Default" "SISWS T" "SISWS S" \
     --legend_at "upper left" \
+    --fontsize 20 \
     $*
