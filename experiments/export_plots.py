@@ -15,15 +15,12 @@ import pprint
 from matplotlib.mlab import griddata
 import plotly.plotly as py
 import plotly.graph_objs as go
-
+from copy import deepcopy
 from matplotlib import cm
 
-mpl.rc('text', usetex=True)
-mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman'], 'size': 14})
-mpl.rc('xtick', labelsize=14)
-mpl.rc('ytick', labelsize=14)
 import colorlover as cl
 from scipy.interpolate import spline
+import re
 from scipy.signal import savgol_filter
 
 
@@ -41,12 +38,13 @@ def event_arrays_to_mean_and_errors(event_array):
     np_arrays_x = []
     np_arrays_y = []
     for event in event_array:
-        for scalar_event in event:
-            if scalar_event.step not in value_by_step:
-                value_by_step[scalar_event.step] = [scalar_event.value]
+        for i, scalar_event in enumerate(event):
+            step = i+1 if args.step_to_epoch else scalar_event.step
+            if step not in value_by_step:
+                value_by_step[step] = [scalar_event.value]
             else:
-                value_by_step[scalar_event.step].append(scalar_event.value)
-        np_arrays_x.append(np.asarray([se.step for se in event]))
+                value_by_step[step].append(scalar_event.value)
+        np_arrays_x.append(np.asarray([i+1 if args.step_to_epoch else se.step for i, se in enumerate(event)]))
         np_arrays_y.append(np.asarray([se.value for se in event]))
 
     continuous_arrays_x = []
@@ -101,8 +99,18 @@ def event_arrays_to_mean_and_errors(event_array):
 def obtain_name(hp):
     function_by_name = {
         'idx': lambda p: 'Fold ' + hp['idx'],
-        'model': lambda p: {'default': 'Default CNN', 'spatial': 'SIWS CNN', 'per_feature': "SISWS PF"}[hp[p]],
-        'per_feature': lambda p: '/F' if (p in hp and hp[p] == True) else ''
+        'model': lambda p: {
+            'default': 'Default CNN',
+            'spatial': 'SISWS default',
+            'per_feature': "SISWS PF",
+            'centroids_trainable': 'SISWS TC',
+            'inv_euclidean': 'SISWS IE',
+            'a3c_ff': 'A3C FF',
+            'a3c_ff_ss': 'A3C FF SS',
+            'a3c_sisws': 'A3C SISWS'
+        }[hp[p]],
+        'per_feature': lambda p: '/F' if (p in hp and hp[p] == True) else '',
+        'policy_quantization': lambda p: "PQ" if (hp[p] == True) else ""
     }
 
     if args.trace_by:
@@ -143,7 +151,7 @@ def export_plots():
     if args.xrange:
         layout.xaxis.range = args.xrange
     if args.yrange:
-        layout.xaxis.range = args.yrange
+        layout.yaxis.range = args.yrange
 
     if len(args.input_dir) > 1:
         handles = []
@@ -186,14 +194,14 @@ def export_plots():
         ax.set_ylim(args.yrange)
 
         for label, (scores, surfaces, xticks, yticks) in data_by_label.items():
-            xi = np.linspace(args.xrange[0], args.xrange[1])
+            xi = np.linspace(min(xticks), max(xticks))
 
-            indices = np.argsort(xticks)
+            indices = np.argsort(xticks).astype('int64')
             yi = spline([xticks[i] for i in indices], [surfaces[i] for i in indices], xi, order=1)
 
             ysmoothed = savgol_filter(yi, window_length=5, polyorder=3)
 
-            handles.append(plt.plot(xi, ysmoothed, linewidth=4.0, label=label)[0])
+            handles.append(plt.plot(xi, np.nan_to_num(ysmoothed), linewidth=4.0, label=label)[0])
             #handles.append(plt.scatter(xticks, scores, label=args.labels[label_idx] + " Data"))
 
         plt.legend(handles=handles, loc=args.legend_at, framealpha=0.)
@@ -211,7 +219,7 @@ def export_plots():
         ax.set_ylim(args.yrange)
 
         for label, (scores, surfaces, xticks, yticks) in data_by_label.items():
-            xi = np.linspace(args.xrange[0], args.xrange[1])
+            xi = np.linspace(min(xticks), max(xticks))
 
             indices = np.argsort(xticks)
             yi = spline([xticks[i] for i in indices], [scores[i] for i in indices], xi, order=1)
@@ -254,6 +262,13 @@ def export_plots():
             for scalar, event_arrays in events_by_scalar.items():
                 steps, values, errors, np_arrays_x, np_arrays_y = event_arrays_to_mean_and_errors(event_arrays)
 
+                if args.export_best:
+                    best_index = np.argmax(values)
+                    with open(os.path.join(args.output_dir, 'best_{}.txt'
+                            .format(hyper_parameters[args.trace_by[0]])), 'w') as f:
+                        [f.write(str(arr[best_index]) + '\n') for arr in np_arrays_y]
+
+
                 if args.mode == 'mean':
                     steps, values, errors = zip(*sorted(zip(steps, values, errors)))
                     steps = np.asarray(steps)
@@ -279,7 +294,7 @@ def export_plots():
         }
 
         if args.mode == 'mean':
-            render_mean_score_plotly(data_objs, env, layout)
+            #render_mean_score_plotly(data_objs, env, layout)
             render_mean_score_mpl(env, handles, position_by_env)
         else:
             xlab = args.trace_by[0].split('_').title() if not args.xlabel else args.xlabel
@@ -333,7 +348,9 @@ def render_sweep1d_mpl(all_scores, all_surfaces, all_xticks, title, xlab, ylab):
     cax = ax.scatter(all_xticks, all_scores, s=80, c=all_surfaces, cmap=cm.winter)
     cb = fig.colorbar(cax)
     cb.ax.set_title("$\sum_i s_i$")
-    plt.savefig(os.path.join(args.output_dir, title.lower().replace(' ', '_') + '.pdf'))
+    #plt.tight_layout()
+    #ax.tight_layout()
+    plt.savefig(os.path.join(args.output_dir, title.lower().replace(' ', '_').replace('.', '').replace(',', '') + '.pdf'))
     plt.show()
     plt.clf()
 
@@ -385,7 +402,9 @@ def get_sweep_data(all_scores, all_surfaces, all_xticks, all_yticks, hyper_param
         all_scores += [np.mean(y_arr[-5:]) for y_arr in np_arrays_y]
         all_surfaces += [np.mean(y_arr) for y_arr in np_arrays_y]
 
-        all_xticks += [np.log10(hyper_parameters[args.trace_by[0]]) for _ in range(len(np_arrays_y))]
+        transform = np.log10 if not args.no_log_scale else lambda x: x
+
+        all_xticks += [transform(hyper_parameters[args.trace_by[0]]) for _ in range(len(np_arrays_y))]
     elif len(args.trace_by) == 2:
 
         if ((hyper_parameters[args.trace_by[0]], hyper_parameters[args.trace_by[1]]) not in all_tick_combinations):
@@ -477,6 +496,12 @@ def get_event_files_by_hp_by_env(input_dir):
                 print(hyper_parameters['activation'].__dict__)
                 hyper_parameters['activation'] = 'elu' if hyper_parameters['activation'] == tf.nn.elu else 'relu'
 
+            if args.subset_params:
+                hyper_parameters = {p: hyper_parameters[p] for p in args.subset_params}
+
+            if hyper_parameters['model'] in args.exclude:
+                continue
+
             hyper_parameters_str = json.dumps(hyper_parameters, sort_keys=True)
 
             if hyper_parameters['env'] not in event_files_by_hp_by_env:
@@ -485,7 +510,7 @@ def get_event_files_by_hp_by_env(input_dir):
                 event_files_by_hp_by_env[hyper_parameters['env']][hyper_parameters_str] = event_files
             else:
                 event_files_by_hp_by_env[hyper_parameters['env']][hyper_parameters_str] += event_files
-        elif 'hyper_parameters.pkl' in files and all('fold{}'.format(i) in dir for i in range(5)):
+        elif 'hyper_parameters.pkl' in files and all('fold{}'.format(i) in dir for i in range(args.folds)):
             try:
                 with open(os.path.join(root, 'hyper_parameters.pkl'), 'rb') as f:
                     hyper_parameters = pickle.load(f)
@@ -493,8 +518,18 @@ def get_event_files_by_hp_by_env(input_dir):
                 continue
 
             for r, _, fs in os.walk(root):
-                event_files = [os.path.join(root, r, f) for f in fs if IsTensorFlowEventsFile(f)]
-                hyper_parameters_str = json.dumps(hyper_parameters, sort_keys=True)
+                event_files = [os.path.join(root, r, f) for f in fs if IsTensorFlowEventsFile(f) and
+                               any('fold{}'.format(i) in r for i in range(args.folds))]
+                hp = deepcopy(hyper_parameters)
+
+                searched = re.search('adience\/([A-Za-z_]*)\/', r)
+                if not searched:
+                    continue
+                hp['model'] = searched.group(1)
+
+                if hp['model'] in args.exclude:
+                    continue
+                hyper_parameters_str = json.dumps(hp, sort_keys=True)
 
                 if 'adience' not in event_files_by_hp_by_env:
                     event_files_by_hp_by_env['adience'] = {hyper_parameters_str: event_files}
@@ -511,9 +546,11 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", default='/home/jos/Dropbox/RUG/6e Jaar/mproj/thesis/im')
     parser.add_argument("--scalar_subset", nargs='+', default=['Evaluation/Score'])
     parser.add_argument("--ignore_params", nargs='+', default=['git_description'])
+    parser.add_argument("--subset_params", nargs='+', default=[])
     parser.add_argument("--labels", nargs='+', default=[])
     parser.add_argument("--interpolate", dest='interpolate', action='store_true')
     parser.add_argument("--log_scale", dest='log_scale', action='store_true')
+    parser.add_argument("--no_log_scale", dest='no_log_scale', action='store_true')
     parser.add_argument("--display", dest='display', action='store_true')
     parser.add_argument("--image_suffix", default="")
     parser.add_argument("--xlabel", default="Train episode")
@@ -526,7 +563,18 @@ if __name__ == "__main__":
     parser.add_argument("--mode", default='mean', choices=['mean', 'sweep'])
     parser.add_argument("--legend_at", default='upper right')
     parser.add_argument("--levels", default=20, type=int)
+    parser.add_argument("--folds", default=5, type=int)
+    parser.add_argument("--exclude", default=[], nargs='+')
+    parser.add_argument("--step_to_epoch", dest='step_to_epoch', action='store_true')
+    parser.add_argument("--export_best", dest='export_best', action='store_true')
+    parser.add_argument("--fontsize", type=int, default=14)
     args = parser.parse_args()
+
+    mpl.rc('text', usetex=True)
+    mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman'], 'size': args.fontsize})
+    mpl.rc('xtick', labelsize=args.fontsize)
+    mpl.rc('ytick', labelsize=args.fontsize)
+    mpl.rc('figure', autolayout=True)
 
     print(args.input_dir)
     export_plots()
