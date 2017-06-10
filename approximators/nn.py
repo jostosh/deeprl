@@ -15,6 +15,7 @@ from deeprl.approximators.recurrent import convolutional_lstm, convolutional_gru
 from deeprl.approximators.similarity_functions import similarity_functions, glvq_score
 from deeprl.approximators.sisws import spatial_weight_sharing
 from deeprl.common.logger import logger
+from deeprl.common.tf_py_functions import val_to_rank
 
 
 class ModelNames:
@@ -560,6 +561,16 @@ class ActorCriticNN(object):
                         if n_winning_prototypes == 1:
                             self.pi = tf.nn.softmax(tf.reduce_max(similarity, axis=2))
                         elif n_winning_prototypes == self.hp.ppa:
+                            if self.hp.lpq_anneal_nbh:
+                                #similarity_flat = tf.reshape(similarity, [-1, self.num_actions, n_winning_prototypes])
+                                ranks = val_to_rank(-similarity)
+
+                                T = [v for v in tf.global_variables() if v.name == "T:0"][0]
+
+                                tau = tf.cast(T, tf.float32) * (self.hp.tauN - self.hp.tau0) / self.hp.T_max + self.hp.tau0
+
+                                similarity *= tf.nn.softmax(tau * ranks)
+
                             self.pi = tf.reduce_sum(
                                 tf.reshape(
                                     tf.nn.softmax(tf.reshape(similarity, [-1, self.num_actions * n_winning_prototypes])),

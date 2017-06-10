@@ -1,5 +1,5 @@
 import tensorflow as tf
-
+from deeprl.common.tf_py_functions import val_to_rank
 
 def euclidean_squared_neg(net, prototypes):
     diff = tf.expand_dims(net, 1) - tf.expand_dims(prototypes, 0)
@@ -32,6 +32,12 @@ def inv_euclidean(net, prototypes):
     return tf.div(1.0, 1.0 + tf.sqrt(tf.reduce_sum(tf.square(diff), axis=2))), []
 
 
+def pearson(net, prototypes):
+    normalized_feature = net / tf.expand_dims(tf.sqrt(tf.reduce_sum(tf.square(net), axis=1)), 1)
+    normalized_prototypes = prototypes / tf.expand_dims(tf.sqrt(tf.reduce_sum(tf.square(prototypes), axis=1)), 1)
+    return tf.matmul(normalized_feature, tf.transpose(normalized_prototypes)), []
+
+
 def glvq_score(distances, num_classes, neural_gas=False, tau0=None, tauN=None, N=None):
     scores = []
     _, na, num_p = distances.get_shape().as_list()
@@ -45,8 +51,7 @@ def glvq_score(distances, num_classes, neural_gas=False, tau0=None, tauN=None, N
 
             wrong_prototypes = tf.transpose(tf.gather(tf.transpose(distances, (1, 0, 2)), jnoti), (1, 0, 2))
 
-            _, ranks = tf.nn.top_k(tf.reshape(-wrong_prototypes, (-1, (na-1) * num_p)), k=(na-1) * num_p)
-            ranks = tf.cast(ranks, tf.float32)
+            ranks = val_to_rank(tf.reshape(wrong_prototypes, (-1, (na - 1) * num_p)), name='WrongRanks')
             distance_wrong = tf.reshape(tf.reduce_sum(
                 tf.reshape(tf.nn.softmax(-tau*ranks), (-1, na-1, num_p)) *
                 wrong_prototypes,
@@ -68,11 +73,13 @@ def glvq_score(distances, num_classes, neural_gas=False, tau0=None, tauN=None, N
 
 
 
+
 similarity_functions = {
     'euc': euclidean_neg,
     'cor': correlation,
     'man': manhattan_neg,
     'euc_sq': euclidean_squared_neg,
     'inv_euc': inv_euclidean,
-    'inv_euc_sq': inv_euclidean_squared
+    'inv_euc_sq': inv_euclidean_squared,
+    'pearson': pearson
 }

@@ -518,7 +518,28 @@ presets = {
         'pq_cpa': True,
         'glvq': True,
         'ppao': True
-    }
+    },
+    '90': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'ppao': True,
+        'pq_sim_fn': 'pearson'
+    },
+    '91': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 15,
+        'nwp': 10,
+        'pq_cpa': True,
+        'glvq': True,
+        'ppao': True,
+        'ng_anneal': True,
+        'lpq_anneal_nbh': True
+    },
 }
 
 
