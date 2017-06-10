@@ -257,13 +257,14 @@ def export_plots():
             print("Currently looking at {} event files".format(len(event_files)))
             pprint.pprint(hyper_parameters)
 
-            events_by_scalar = get_events_by_scalar(event_files)
+            events_by_scalar = get_events_by_scalar(sorted(event_files))
 
             for scalar, event_arrays in events_by_scalar.items():
                 steps, values, errors, np_arrays_x, np_arrays_y = event_arrays_to_mean_and_errors(event_arrays)
 
                 if args.export_best:
                     best_index = np.argmax(values)
+
                     with open(os.path.join(args.output_dir, 'best_{}.txt'
                             .format(hyper_parameters[args.trace_by[0]])), 'w') as f:
                         [f.write(str(arr[best_index]) + '\n') for arr in np_arrays_y]
