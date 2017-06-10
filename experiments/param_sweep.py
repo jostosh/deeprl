@@ -509,6 +509,15 @@ presets = {
         'glvq': True,
         'ppao': True,
         'ng_anneal': True
+    },
+    '89': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'ppao': True
     }
 }
 
