@@ -174,9 +174,11 @@ def export_plots():
 
                     events_by_scalar = get_events_by_scalar(event_files)
 
+
                     for scalar, event_arrays in events_by_scalar.items():
                         steps, values, errors, np_arrays_x, np_arrays_y = event_arrays_to_mean_and_errors(event_arrays)
 
+                        #print(hyper_parameters_str, len(steps))
 
                         all_scores, all_surfaces, all_xticks, all_yticks = get_sweep_data(all_scores, all_surfaces,
                                                                                           all_xticks, all_yticks,
@@ -494,7 +496,7 @@ def get_event_files_by_hp_by_env(input_dir):
             event_files = [os.path.join(root, f) for f in files if IsTensorFlowEventsFile(f)]
 
             if 'activation' in hyper_parameters:
-                print(hyper_parameters['activation'].__dict__)
+                #print(hyper_parameters['activation'].__dict__)
                 hyper_parameters['activation'] = 'elu' if hyper_parameters['activation'] == tf.nn.elu else 'relu'
 
             if args.subset_params:

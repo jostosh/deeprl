@@ -6,7 +6,8 @@ python3 export_plots.py \
     --scalar_subset "Accuracy/Validation" \
     --trace_by "model" \
     --title "SISWS on Adience" \
-    --folds 3 \
+    --folds 5 \
     --xrange 0 200 \
     --export_best \
+    --step_to_epoch \
     $*
