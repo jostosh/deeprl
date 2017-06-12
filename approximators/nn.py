@@ -230,7 +230,7 @@ class ActorCriticNN(object):
             self._add_trainable(net)
             net = spatialsoftmax(net, epsilon=self.hp.ss_epsilon, trainable_temperature=self.hp.trainable_temp,
                                  use_softmax_only=self.hp.softmax_only, temp_init=self.hp.ss_temp,
-                                 hierarchical=self.hp.ss_hierarchical)
+                                 hierarchical=self.hp.ss_hierarchical, temp_pf=self.hp.ss_temp_global)
             if self.hp.trainable_temp:
                 self.theta += net.b
             net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')

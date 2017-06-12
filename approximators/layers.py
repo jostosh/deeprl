@@ -117,7 +117,7 @@ def conv_transpose(incoming, nb_filter, size, stride, activation=tf.nn.elu):
 
 
 def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='SpatialSoftmax', hierarchical=False,
-                   safe_softmax=True, use_softmax_only=False, temp_init=0.05):
+                   safe_softmax=True, use_softmax_only=False, temp_init=0.05, temp_pf=True):
     # Get the incoming dimensions (should be a 4D tensor)
     _, h, w, c = incoming.get_shape().as_list()
 
@@ -130,15 +130,17 @@ def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='Spa
         # Note that each '1' in the reshape is to enforce broadcasting along that dimension
         cartesian_y = tf.reshape(tf.linspace(-edge + epsilon*edge, edge - epsilon*edge, h), (1, h, 1, 1), name="CartesianY")
         cartesian_x = tf.reshape(tf.linspace(-edge + epsilon*edge, edge - epsilon*edge, w), (1, 1, w, 1), name="CartesianX")
-        temperature = tf.Variable(initial_value=tf.ones(c) * temp_init, dtype=tf.float32,
+        temperature = tf.Variable(initial_value=tf.ones(c) * temp_init if temp_pf else temp_init, dtype=tf.float32,
                                   trainable=trainable_temperature, name='SoftmaxTemperature')
+
+        temp_r = tf.reshape(temperature, (1, 1, 1, c)) if temp_pf else temperature
 
         # Compute the softmax numerator
         if safe_softmax:
             incoming_ = incoming - tf.stop_gradient(tf.reduce_max(incoming, reduction_indices=[1, 2], keep_dims=True))
-            numerator_softmax = tf.exp(incoming_ / tf.reshape(temperature, (1, 1, 1, c)), name='Numerator')
+            numerator_softmax = tf.exp(incoming_ / temp_r, name='Numerator')
         else:
-            numerator_softmax = tf.exp(incoming / tf.reshape(temperature, (1, 1, 1, c)), name='Numerator')
+            numerator_softmax = tf.exp(incoming / temp_r, name='Numerator')
         # The denominator is computed by computing the sum per channel
         # Again, the '1's in the reshaping are to ensure broadcasting along those dimensions
         denominator_softmax = tf.reshape(tf.reduce_sum(numerator_softmax, reduction_indices=[1, 2]), (-1, 1, 1, c),

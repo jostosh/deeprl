@@ -553,6 +553,23 @@ presets = {
         'lpq_p0': 0.9,
         'lpq_pN': 0.99,
         'beta': 0.0
+    },
+    '94': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_p0': 0.9,
+        'lpq_pN': 0.99,
+        'beta': 0.0
+    },
+    '95': {
+        'model': 'a3c_ff_ss',
+        'ss_temp': 1.0,
+        'trainable_temp': True,
+        'ss_temp_global': True
     }
 }
 
@@ -560,6 +577,7 @@ presets = {
 def convert_preset_to_params(preset):
     ret = ["--{0}={1}".format(p, v) for p, v in preset.items() if not isinstance(v, bool)]
     ret += ["--{0}".format(p) for p, v in preset.items() if isinstance(v, bool) and v]
+    ret += ["--not_{0}".format(p) for p, v in preset.items() if isinstance(v, bool) and not v]
     return ret
 
 if __name__ == "__main__":
