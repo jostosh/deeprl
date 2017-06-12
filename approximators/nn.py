@@ -555,14 +555,20 @@ class ActorCriticNN(object):
                         if self.hp.glvq:
 
                             similarity = -glvq_score(-similarity, self.num_actions, neural_gas=self.hp.ng_anneal,
-                                                     tau0=self.hp.tau0, tauN=self.hp.tauN, N=self.hp.T_max) 
+                                                     tau0=self.hp.tau0, tauN=self.hp.tauN, N=self.hp.T_max)
 
-                        similarity *= self.hp.lpq_temp
+                        T = [v for v in tf.global_variables() if v.name == "T:0"][0]
+                        p = tf.cast(T, tf.float32) * (self.hp.lpq_pN - self.hp.lpq_p0) \
+                              / self.hp.T_max + self.hp.lpq_p0
+                        temperature = tf.log(-p*(self.num_actions - 1)/(p - 1)) / 2
+
+                        self.summaries.append(tf.summary.scalar('LPQTemperature', temperature))
+                        similarity *= temperature
                         if n_winning_prototypes == 1:
                             self.pi = tf.nn.softmax(tf.reduce_max(similarity, axis=2))
                         elif n_winning_prototypes == self.hp.ppa:
                             if self.hp.lpq_anneal_nbh:
-                                #similarity_flat = tf.reshape(similarity, [-1, self.num_actions, n_winning_prototypes])
+
                                 ranks = val_to_rank(-similarity)
 
                                 T = [v for v in tf.global_variables() if v.name == "T:0"][0]
@@ -759,7 +765,6 @@ class ActorCriticNN(object):
             self.n_step_returns = tf.placeholder(tf.float32, [None], name='NStepReturns')
 
         with tf.name_scope("PolicyLoss"):
-            adv_no_grad = self.advantage_no_grad if not self.hp.ppao else tf.nn.relu(self.advantage_no_grad)
 
             # action matrix is n x a where each row corresponds to a time step and each column to an action
             action_mask = tf.one_hot(self.actions, self.num_actions, 1.0, 0.0, name="ActionMask")
@@ -768,7 +773,7 @@ class ActorCriticNN(object):
             # The entropy is added to encourage exploration
             entropy = -tf.reduce_sum(log_pi * self.pi, reduction_indices=1, name="Entropy")
             # Define the loss for the policy (minus is needed to perform *negative* gradient descent == gradient ascent)
-            pi_loss = -tf.reduce_sum((tf.reduce_sum(tf.mul(action_mask, log_pi), reduction_indices=1) * adv_no_grad
+            pi_loss = -tf.reduce_sum((tf.reduce_sum(tf.mul(action_mask, log_pi), reduction_indices=1) * self.advantage_no_grad
                         + self.beta * entropy))
 
         with tf.name_scope("ValueLoss"):

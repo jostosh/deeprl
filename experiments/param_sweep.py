@@ -507,7 +507,6 @@ presets = {
         'nwp': 10,
         'pq_cpa': True,
         'glvq': True,
-        'ppao': True,
         'ng_anneal': True
     },
     '89': {
@@ -516,8 +515,7 @@ presets = {
         'ppa': 16,
         'nwp': 16,
         'pq_cpa': True,
-        'glvq': True,
-        'ppao': True
+        'glvq': True
     },
     '90': {
         'model': 'a3c_ff',
@@ -526,7 +524,6 @@ presets = {
         'nwp': 16,
         'pq_cpa': True,
         'glvq': True,
-        'ppao': True,
         'pq_sim_fn': 'pearson'
     },
     '91': {
@@ -536,10 +533,27 @@ presets = {
         'nwp': 10,
         'pq_cpa': True,
         'glvq': True,
-        'ppao': True,
         'ng_anneal': True,
         'lpq_anneal_nbh': True
     },
+    '92': { # Vary nwp and lpq_temp
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'pq_cpa': True,
+        'glvq': True,
+    },
+    '93': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_p0': 0.9,
+        'lpq_pN': 0.99,
+        'beta': 0.0
+    }
 }
 
 
