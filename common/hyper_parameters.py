@@ -83,7 +83,8 @@ config1 = {
     'lpq_anneal_nbh': False,
     'lpq_p0': 0.9,
     'lpq_pN': 0.99,
-    'ss_temp_global': False
+    'ss_temp_global': False,
+    'pi_loss_correct': False
 }
 
 param_sweep = {
@@ -210,3 +211,4 @@ class HyperParameters(object):
         self.lpq_p0 = params.lpq_p0
         self.lpq_pN = params.lpq_pN
         self.ss_temp_global = params.ss_temp_global
+        self.pi_loss_correct = params.pi_loss_correct

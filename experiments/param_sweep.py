@@ -563,7 +563,8 @@ presets = {
         'glvq': True,
         'lpq_p0': 0.9,
         'lpq_pN': 0.99,
-        'beta': 0.0
+        'beta': 0.01,
+        'pi_loss_correct': True
     },
     '95': {
         'model': 'a3c_ff_ss',

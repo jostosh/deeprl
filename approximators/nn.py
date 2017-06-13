@@ -787,6 +787,15 @@ class ActorCriticNN(object):
                                              tf.nn.relu(self.value - self.upper_limits) ** 2)
                 value_loss /= (self.hp.otc + 1)
 
+        if self.hp.pi_loss_correct:
+            T = [v for v in tf.global_variables() if v.name == "T:0"][0]
+            p = tf.cast(T, tf.float32) * (self.hp.lpq_pN - self.hp.lpq_p0) \
+                / self.hp.T_max + self.hp.lpq_p0
+            temperature = tf.log(-p * (self.num_actions - 1) / (p - 1)) / 2
+
+            print("AOSDNODNGOAINSDONASND\n\n\n")
+            pi_loss *= 1.0 / temperature
+
         # We can combine the policy loss and the value loss in a single expression
         with tf.name_scope("CombinedLoss"):
 
