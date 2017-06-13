@@ -571,7 +571,57 @@ presets = {
         'ss_temp': 1.0,
         'trainable_temp': True,
         'ss_temp_global': True
-    }
+    },
+    '96': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'pq_sim_fn': 'pearson',
+        'lpq_p0': 0.787,
+        'lpq_pN': 0.787
+    },
+    '97': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'pq_sim_fn': 'cosine',
+        'lpq_p0': 0.787,
+        'lpq_pN': 0.787
+    },
+    '98': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'pq_sim_fn': 'man',
+        'lpq_p0': 0.787,
+        'lpq_pN': 0.787
+    },
+    '99': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'pq_sim_fn': 'euc',
+        'lpq_p0': 0.787,
+        'lpq_pN': 0.787
+    },
+    '100': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'pq_sim_fn': 'euc_sq',
+        'lpq_p0': 0.787,
+        'lpq_pN': 0.787
+    },
 }
 
 

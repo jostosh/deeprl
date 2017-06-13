@@ -33,9 +33,18 @@ def inv_euclidean(net, prototypes):
 
 
 def pearson(net, prototypes):
+    net = net - tf.reduce_mean(net, axis=1, keep_dims=True)
+    prototypes = prototypes - tf.reduce_mean(prototypes, axis=1, keep_dims=True)
+
     normalized_feature = net / tf.expand_dims(tf.sqrt(tf.reduce_sum(tf.square(net), axis=1)), 1)
     normalized_prototypes = prototypes / tf.expand_dims(tf.sqrt(tf.reduce_sum(tf.square(prototypes), axis=1)), 1)
-    return tf.matmul(normalized_feature, tf.transpose(normalized_prototypes)), []
+    return - (1 - tf.matmul(normalized_feature, tf.transpose(normalized_prototypes))), []
+
+
+def cosine(net, prototypes):
+    normalized_feature = net / tf.expand_dims(tf.sqrt(tf.reduce_sum(tf.square(net), axis=1)), 1)
+    normalized_prototypes = prototypes / tf.expand_dims(tf.sqrt(tf.reduce_sum(tf.square(prototypes), axis=1)), 1)
+    return - (1 - tf.matmul(normalized_feature, tf.transpose(normalized_prototypes))), []
 
 
 def glvq_score(distances, num_classes, neural_gas=False, tau0=None, tauN=None, N=None):
@@ -72,8 +81,6 @@ def glvq_score(distances, num_classes, neural_gas=False, tau0=None, tauN=None, N
     return tf.stack(scores, axis=1)
 
 
-
-
 similarity_functions = {
     'euc': euclidean_neg,
     'cor': correlation,
@@ -81,5 +88,6 @@ similarity_functions = {
     'euc_sq': euclidean_squared_neg,
     'inv_euc': inv_euclidean,
     'inv_euc_sq': inv_euclidean_squared,
-    'pearson': pearson
+    'pearson': pearson,
+    'cosine': cosine
 }
