@@ -793,7 +793,6 @@ class ActorCriticNN(object):
                 / self.hp.T_max + self.hp.lpq_p0
             temperature = tf.log(-p * (self.num_actions - 1) / (p - 1)) / 2
 
-            print("AOSDNODNGOAINSDONASND\n\n\n")
             pi_loss *= 1.0 / temperature
 
         # We can combine the policy loss and the value loss in a single expression
