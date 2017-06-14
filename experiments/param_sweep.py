@@ -629,7 +629,33 @@ presets = {
     '102': {
         'model': 'a3c_sisws',
         'sisws_init': 'torch'
-    }
+    },
+    '103': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_p0': 0.9,
+        'lpq_pN': 0.99,
+        'beta': 0.01,
+        'pi_loss_correct': True,
+        'ng_anneal': True,
+    },
+    '104': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_p0': 0.9,
+        'lpq_pN': 0.99,
+        'beta': 0.01,
+        'pi_loss_correct': True,
+        'lpq_anneal_nbh': True
+    },
 }
 
 
