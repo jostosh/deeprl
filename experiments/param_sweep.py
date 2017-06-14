@@ -625,6 +625,10 @@ presets = {
     '101': {
         'model': 'a3c_ff_ww',
         'ss_temp': 1.0
+    },
+    '102': {
+        'model': 'a3c_sisws',
+        'sisws_init': 'torch'
     }
 }
 

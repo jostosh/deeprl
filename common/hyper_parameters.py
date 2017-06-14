@@ -84,7 +84,8 @@ config1 = {
     'lpq_p0': 0.9,
     'lpq_pN': 0.99,
     'ss_temp_global': False,
-    'pi_loss_correct': False
+    'pi_loss_correct': False,
+    'sisws_init': 'tflearn'
 }
 
 param_sweep = {
@@ -212,3 +213,4 @@ class HyperParameters(object):
         self.lpq_pN = params.lpq_pN
         self.ss_temp_global = params.ss_temp_global
         self.pi_loss_correct = params.pi_loss_correct
+        self.sisws_init = params.sisws_init

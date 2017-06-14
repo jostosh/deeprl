@@ -7,7 +7,7 @@ import numpy as np
 def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, strides, activation, name='SoftWeightConv',
                            scope=None, reuse=False, local_normalization=True, centroids_trainable=False, scaling=1.0,
                            padding='same', sigma_trainable=None, per_feature=False, color_coding=False,
-                           similarity_fn='Exp'):
+                           similarity_fn='Exp', weight_init='torch'):
     """
     Defines a soft weight sharing layer. The soft weight sharing is accomplished by performing multiple convolutions
     which are then combined by a local weighting locally depends on the distance to the 'centroid' of each convolution.
@@ -66,12 +66,30 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
     with vscope as scope:
         name = scope.name
         with tf.name_scope("SubConvolutions"):
+            if weight_init == 'torch':
+                print("USING TORCH INIT!!!\n\n\n")
+                input_channels = incoming.get_shape().as_list()[-1]
+                d = 1.0 / np.sqrt(filter_size * filter_size * input_channels)
+                W = tf.random_uniform(
+                    [filter_size, filter_size, input_channels, n_filters],
+                    minval=-d, maxval=d
+                )
+                b   = tf.random_uniform([n_filters], minval=-d, maxval=d)
+
+                w_init = tf.tile(W, [1, 1, 1, np.prod(n_centroids)])
+                b_init = tf.tile(b, [np.prod(n_centroids)])
+            else:
+                w_init = 'uniform_scaling'
+                b_init = 'zeros'
+
             convs = tflearn.conv_2d(incoming, nb_filter=n_filters * np.prod(n_centroids), filter_size=filter_size,
-                                    strides=strides, padding=padding, weight_decay=0., name='Conv', activation='linear')
+                                    strides=strides, padding=padding, weight_decay=0., name='Conv', activation='linear',
+                                    weights_init=w_init, bias_init=b_init)
             stacked_convs = tf.reshape(convs, [-1] + convs.get_shape().as_list()[1:-1] +
                                        [n_filters, np.prod(n_centroids)], name='StackedConvs')
 
-        _, m, n, k, _ = stacked_convs.get_shape().as_list()
+            _, m, n, k, _ = stacked_convs.get_shape().as_list()
+
 
         with tf.name_scope("DistanceWeighting"):
             # First define the x-coordinates per cell. We exploit TensorFlow's broadcast mechanisms by using
@@ -176,7 +194,7 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
                 out.W_list = tf.split(3, n_centroids, convs.W)
             except:
                 out.W_list = tf.split(convs.W, n_centroids * [n_filters], axis=3)
-    # Add to collection for tflearn functionality
+                # Add to collection for tflearn functionality
     tf.add_to_collection(tf.GraphKeys.LAYER_TENSOR + '/' + name, out)
     return out
 
