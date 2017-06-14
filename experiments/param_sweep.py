@@ -623,7 +623,8 @@ presets = {
         'lpq_pN': 0.787
     },
     '101': {
-        'model': 'a3c_ff_ww'
+        'model': 'a3c_ff_ww',
+        'ss_temp': 1.0
     }
 }
 
