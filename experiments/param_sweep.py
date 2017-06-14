@@ -622,6 +622,9 @@ presets = {
         'lpq_p0': 0.787,
         'lpq_pN': 0.787
     },
+    '101': {
+        'model': 'a3c_ff_ww'
+    }
 }
 
 

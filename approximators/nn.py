@@ -32,6 +32,7 @@ class ModelNames:
     A3C_SISWS_S = 'a3c_sisws_s'
     A3C_CONV_GRU = 'a3c_conv_gru'
     A3C_NTC = 'a3c_ntc'
+    A3C_FF_WW = 'a3c_ff_ww'
 
 
 
@@ -233,6 +234,37 @@ class ActorCriticNN(object):
                                  hierarchical=self.hp.ss_hierarchical, temp_pf=self.hp.ss_temp_global)
             if self.hp.trainable_temp:
                 self.theta += net.b
+            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
+            self._add_trainable(net)
+            self.embedding_layer = net
+
+        return net
+
+    def _a3c_ff_ww(self):
+        """
+        This is the feedforward model taken from "Asynchronous Methods for Reinforcement Learning" together with a
+        spatial softmax layer.
+        :param network_name:    Name of the network
+        :return:                The feedforward model (last hidden layer) as a graph node
+        """
+        with tf.name_scope('Inputs'):
+            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+
+        with tf.name_scope('HiddenLayers'):
+            net = conv_layer(net, 32, 5, 3, activation=self.hp.activation, name='Conv1')
+            self._add_trainable(net)
+            net = conv_layer(net, 64, 3, 2, activation=tf.identity, name='Conv2')
+            self._add_trainable(net)
+
+            what, where = tf.split(3, 2, net)
+            where = spatialsoftmax(where, epsilon=self.hp.ss_epsilon, trainable_temperature=self.hp.trainable_temp,
+                                 use_softmax_only=self.hp.softmax_only, temp_init=self.hp.ss_temp,
+                                 hierarchical=self.hp.ss_hierarchical, temp_pf=self.hp.ss_temp_global)
+            what = self.hp.activation(what)
+            net = tf.concat(1, (tf.contrib.layers.flatten(what), where))
+
+            if self.hp.trainable_temp:
+                self.theta += where.b
             net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
             self._add_trainable(net)
             self.embedding_layer = net
@@ -527,6 +559,8 @@ class ActorCriticNN(object):
             net = self._a3c_sisws2()
         elif self.model_name == ModelNames.A3C_NTC:
             net = self._a3c_ntc()
+        elif self.model_name == ModelNames.A3C_FF_WW:
+            net = self._a3c_ff_ww()
         else:
             raise ValueError("Unknown model name {}".format(self.model_name))
 
