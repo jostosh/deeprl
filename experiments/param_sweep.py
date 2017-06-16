@@ -656,6 +656,11 @@ presets = {
         'pi_loss_correct': True,
         'lpq_anneal_nbh': True
     },
+    '105': {
+        'model': 'a3c_ff_ww',
+        'ss_temp': 1.0,
+        'ss_temp_global': True
+    }
 }
 
 
