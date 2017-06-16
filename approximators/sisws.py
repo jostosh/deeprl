@@ -67,7 +67,6 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
         name = scope.name
         with tf.name_scope("SubConvolutions"):
             if weight_init == 'torch':
-                print("USING TORCH INIT!!!\n\n\n")
                 input_channels = incoming.get_shape().as_list()[-1]
                 d = 1.0 / np.sqrt(filter_size * filter_size * input_channels)
                 W = tf.random_uniform(

@@ -609,9 +609,10 @@ class ActorCriticNN(object):
 
                                 T = [v for v in tf.global_variables() if v.name == "T:0"][0]
 
-                                tau = tf.cast(T, tf.float32) * (self.hp.tauN - self.hp.tau0) / self.hp.T_max + self.hp.tau0
+                                tau = tf.cast(T, tf.float32) * (self.hp.tauN - self.hp.tau0) \
+                                      / self.hp.T_max + self.hp.tau0
 
-                                similarity *= tf.nn.softmax(tau * ranks)
+                                similarity *= tf.nn.softmax(-tau * ranks)
 
                             self.pi = tf.reduce_sum(
                                 tf.reshape(
