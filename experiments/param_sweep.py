@@ -660,7 +660,44 @@ presets = {
         'model': 'a3c_ff_ww',
         'ss_temp': 1.0,
         'ss_temp_global': True
-    }
+    },
+    '106': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_p0': 0.9,
+        'lpq_pN': 0.99,
+        'beta': 0.01,
+        'pi_loss_correct': True,
+        'lpq_trainable_temp': True
+    },
+    '107': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 8,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_p0': 0.9,
+        'lpq_pN': 0.99,
+        'beta': 0.01,
+        'pi_loss_correct': True,
+    },
+    '108': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 4,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_p0': 0.9,
+        'lpq_pN': 0.99,
+        'beta': 0.01,
+        'pi_loss_correct': True,
+    },
 }
 
 

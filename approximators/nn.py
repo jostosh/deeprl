@@ -598,14 +598,23 @@ class ActorCriticNN(object):
                               / self.hp.T_max + self.hp.lpq_p0
                         temperature = tf.log(-p*(self.num_actions - 1)/(p - 1)) / 2
 
+                        if self.hp.lpq_trainable_temp:
+                            temperature = tf.Variable(tf.log(-self.hp.lpq_p0 * (self.num_actions - 1) / (self.hp.lpq_p0 - 1)) / 2)
+                            self.theta.append(temperature)
                         self.summaries.append(tf.summary.scalar('LPQTemperature', temperature))
+
                         similarity *= temperature
+
+                        self.lpq_temp = temperature
                         if n_winning_prototypes == 1:
                             self.pi = tf.nn.softmax(tf.reduce_max(similarity, axis=2))
                         elif n_winning_prototypes == self.hp.ppa:
                             if self.hp.lpq_anneal_nbh:
 
-                                ranks = val_to_rank(-similarity)
+                                ranks = tf.reshape(
+                                    val_to_rank(tf.reshape(-similarity, [-1, self.num_actions * n_winning_prototypes])),
+                                    [-1, self.num_actions, n_winning_prototypes]
+                                ),
 
                                 T = [v for v in tf.global_variables() if v.name == "T:0"][0]
 
@@ -825,12 +834,7 @@ class ActorCriticNN(object):
                 value_loss /= (self.hp.otc + 1)
 
         if self.hp.pi_loss_correct:
-            T = [v for v in tf.global_variables() if v.name == "T:0"][0]
-            p = tf.cast(T, tf.float32) * (self.hp.lpq_pN - self.hp.lpq_p0) \
-                / self.hp.T_max + self.hp.lpq_p0
-            temperature = tf.log(-p * (self.num_actions - 1) / (p - 1)) / 2
-
-            pi_loss *= 1.0 / temperature
+            pi_loss *= 1.0 / tf.stop_gradient(self.lpq_temp)
 
         # We can combine the policy loss and the value loss in a single expression
         with tf.name_scope("CombinedLoss"):
