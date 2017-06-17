@@ -713,6 +713,17 @@ presets = {
         'pi_loss_correct': True,
         'lpq_trainable_temp': True
     },
+    '110': {  # vary lpq_p0
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_pN': 0.99,
+        'beta': 0.01,
+        'pi_loss_correct': True
+    },
 }
 
 
