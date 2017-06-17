@@ -25,7 +25,8 @@ func_by_param = {
     'ppa': lambda l, h, r: int(log_uniform(l, h, r)),
     'nwp': lambda l, h, r: int(uniform(l, h, r)),
     'wpr': uniform,
-    'lpq_temp': log_uniform
+    'lpq_temp': log_uniform,
+    'lpq_p0': uniform
 }
 
 lo_by_param = {
@@ -40,7 +41,8 @@ lo_by_param = {
     'ppa': 10,
     'nwp': 1,
     'wpr': 0.01,
-    'lpq_temp': 0.01
+    'lpq_temp': 0.01,
+    'lpq_p0': 0.8
 }
 
 hi_by_param = {
@@ -55,7 +57,8 @@ hi_by_param = {
     'ppa': 200,
     'nwp': 15,
     'wpr': 1.0,
-    'lpq_temp': 100
+    'lpq_temp': 100,
+    'lpq_p0': 0.95
 }
 
 presets = {
@@ -697,6 +700,18 @@ presets = {
         'lpq_pN': 0.99,
         'beta': 0.01,
         'pi_loss_correct': True,
+    },
+    '109': { # vary lpq_p0
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_pN': 0.99,
+        'beta': 0.01,
+        'pi_loss_correct': True,
+        'lpq_trainable_temp': True
     },
 }
 
