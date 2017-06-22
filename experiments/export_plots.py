@@ -106,8 +106,9 @@ def obtain_name(hp):
             'centroids_trainable': 'SISWS TC',
             'inv_euclidean': 'SISWS IE',
             'a3c_ff': 'A3C FF',
-            'a3c_ff_ss': 'A3C FF SS',
-            'a3c_sisws': 'A3C SISWS'
+            'a3c_ff_ss': 'A3C SS',
+            'a3c_sisws': 'A3C SISWS',
+            'a3c_ff_ww': 'A3C WW'
         }[hp[p]],
         'per_feature': lambda p: '/F' if (p in hp and hp[p] == True) else '',
         'policy_quantization': lambda p: "PQ" if (hp[p] == True) else ""
@@ -560,8 +561,8 @@ if __name__ == "__main__":
     parser.add_argument("--ylabel", default="Score")
     parser.add_argument("--zlabel", default="Score")
     parser.add_argument("--title", default=None)
-    parser.add_argument("--xrange", nargs='+', default=[], type=int)
-    parser.add_argument("--yrange", nargs='+', default=[], type=int)
+    parser.add_argument("--xrange", nargs='+', default=[], type=float)
+    parser.add_argument("--yrange", nargs='+', default=[], type=float)
     parser.add_argument("--trace_by", nargs='+', default=[])
     parser.add_argument("--mode", default='mean', choices=['mean', 'sweep'])
     parser.add_argument("--legend_at", default='upper right')
