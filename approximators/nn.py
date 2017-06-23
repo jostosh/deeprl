@@ -121,13 +121,13 @@ class ActorCriticNN(object):
         with tf.name_scope('HiddenLayers') as scope:
             # Add first convolutional layer
             net = spatial_weight_sharing(net, 3, n_filters=32, filter_size=8, strides=4, activation=self.hp.activation,
-                                         name='Conv1', centroids_trainable=True, per_feature=True,
+                                         name='Conv1', centroids_trainable=True, per_feature=not self.hp.lws_npf,
                                          weight_init=self.hp.sisws_init)
             self._add_trainable(net)
 
             # Add second convolutional layer
             net = spatial_weight_sharing(net, 3, n_filters=32, filter_size=4, strides=2, activation=self.hp.activation,
-                                         name='Conv2', centroids_trainable=True, per_feature=True,
+                                         name='Conv2', centroids_trainable=True, per_feature=not self.hp.lws_npf,
                                          weight_init=self.hp.sisws_init)
             self._add_trainable(net)
 

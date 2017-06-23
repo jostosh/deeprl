@@ -762,6 +762,10 @@ presets = {
     },
     '114': {
         'model': 'a3c_lstm'
+    },
+    '115': {
+        'model': 'a3c_sisws',
+        'lws_npf': True
     }
 }
 

@@ -86,7 +86,8 @@ config1 = {
     'ss_temp_global': False,
     'pi_loss_correct': False,
     'sisws_init': 'tflearn',
-    'lpq_trainable_temp': False
+    'lpq_trainable_temp': False,
+    'lws_npf': False
 }
 
 param_sweep = {
@@ -216,3 +217,4 @@ class HyperParameters(object):
         self.pi_loss_correct = params.pi_loss_correct
         self.sisws_init = params.sisws_init
         self.lpq_trainable_temp = params.lpq_trainable_temp
+        self.lws_npf = params.lws_npf
