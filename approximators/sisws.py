@@ -39,6 +39,7 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
     Return values:
         :return: A 4D Tensor with similar dimensionality as a normal conv_2d's output
     """
+
     valid_fns = ['Exp', 'InvEuclidean']
     if similarity_fn not in valid_fns:
         raise ValueError("Invalid similarity function {}, must be either {}"
