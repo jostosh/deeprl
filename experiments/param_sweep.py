@@ -771,6 +771,12 @@ presets = {
         'model': 'a3c_sisws',
         'lws_npf': True,
         'lws_of': 64
+    },
+    '117': {
+        'model': 'a3c_sisws',
+        'lws_of': 64,
+        'lws_npf': True,
+        'mahalanobis': True
     }
 }
 

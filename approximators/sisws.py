@@ -7,7 +7,7 @@ import numpy as np
 def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, strides, activation, name='SoftWeightConv',
                            scope=None, reuse=False, local_normalization=True, centroids_trainable=False, scaling=1.0,
                            padding='same', sigma_trainable=None, per_feature=False, color_coding=False,
-                           similarity_fn='Exp', weight_init='torch'):
+                           similarity_fn='Exp', weight_init='torch', mahalanobis=False):
     """
     Defines a soft weight sharing layer. The soft weight sharing is accomplished by performing multiple convolutions
     which are then combined by a local weighting locally depends on the distance to the 'centroid' of each convolution.
@@ -90,7 +90,6 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
 
             _, m, n, k, _ = stacked_convs.get_shape().as_list()
 
-
         with tf.name_scope("DistanceWeighting"):
             # First define the x-coordinates per cell. We exploit TensorFlow's broadcast mechanisms by using
             # single-sized dimensions
@@ -150,10 +149,16 @@ def spatial_weight_sharing(incoming, n_centroids, n_filters, filter_size, stride
             x_diff = tf.reshape(centroids_x, centroid_broadcasting_shape) - x_coordinates
             y_diff = tf.reshape(centroids_y, centroid_broadcasting_shape) - y_coordinates
 
-            x_diff2 = tf.square(x_diff * tf.reshape(cov11, centroid_broadcasting_shape) +
-                                y_diff * tf.reshape(cov12, centroid_broadcasting_shape))
-            y_diff2 = tf.square(x_diff * tf.reshape(cov21, centroid_broadcasting_shape) +
-                                y_diff * tf.reshape(cov22, centroid_broadcasting_shape))
+            if mahalanobis:
+                x_diff2 = x_diff * x_diff * tf.reshape(cov11, centroid_broadcasting_shape) + \
+                          y_diff * y_diff * tf.reshape(cov12, centroid_broadcasting_shape)
+                y_diff2 = x_diff * x_diff * tf.reshape(cov21, centroid_broadcasting_shape) + \
+                          y_diff * y_diff * tf.reshape(cov22, centroid_broadcasting_shape)
+            else:
+                x_diff2 = tf.square(x_diff * tf.reshape(cov11, centroid_broadcasting_shape) +
+                                    y_diff * tf.reshape(cov12, centroid_broadcasting_shape))
+                y_diff2 = tf.square(x_diff * tf.reshape(cov21, centroid_broadcasting_shape) +
+                                    y_diff * tf.reshape(cov22, centroid_broadcasting_shape))
 
             # Again, we use broadcasting. The result is of shape [1, m, n, 1, c]
             similarities = tf.exp(-(x_diff2 + y_diff2), 'similarities') if similarity_fn == 'Exp' \
