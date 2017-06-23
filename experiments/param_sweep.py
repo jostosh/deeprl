@@ -760,6 +760,9 @@ presets = {
         'beta': 0.01,
         'pi_loss_correct': True
     },
+    '114': {
+        'model': 'a3c_lstm'
+    }
 }
 
 
