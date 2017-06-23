@@ -6,7 +6,7 @@
 #SBATCH --job-name=A3C_GLPQ
 #SBATCH --mail-type ALL
 #SBATCH --mail-user jos.vandewolfshaar@gmail.com
-#SBATCH --output job-PQ-%j.log
+#SBATCH --output job-GLPQ-%j.log
 #SBATCH --mem=2000
 
 module load python/3.5.0
