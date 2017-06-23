@@ -15,7 +15,8 @@ module load tensorflow/1.0.1-foss-2016a-Python-3.5.2
 source envs/adience/bin/activate
 srun python mproj/deeprl/experiments/adience/train.py \
     --model spatial \
-    --n_epochs 200 \
+    --n_epochs 150 \
     --random_inits 3 \
     --trainable_centroids \
-    --idx 2
+    --idx 0 \
+    --logsub trainable_centroids
