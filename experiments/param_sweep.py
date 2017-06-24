@@ -782,7 +782,7 @@ presets = {
         'model': 'a3c_ff_ss'
     },
     '119': {
-        'model': 'a3c_ww_ss'
+        'model': 'a3c_ff_ww'
     }
 }
 
