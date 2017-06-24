@@ -26,7 +26,8 @@ func_by_param = {
     'nwp': lambda l, h, r: int(uniform(l, h, r)),
     'wpr': uniform,
     'lpq_temp': log_uniform,
-    'lpq_p0': uniform
+    'lpq_p0': uniform,
+    'noiselevel': uniform
 }
 
 lo_by_param = {
@@ -42,7 +43,8 @@ lo_by_param = {
     'nwp': 1,
     'wpr': 0.01,
     'lpq_temp': 0.01,
-    'lpq_p0': 0.8
+    'lpq_p0': 0.8,
+    'noiselevel': 0.0
 }
 
 hi_by_param = {
@@ -58,7 +60,8 @@ hi_by_param = {
     'nwp': 15,
     'wpr': 1.0,
     'lpq_temp': 100,
-    'lpq_p0': 0.95
+    'lpq_p0': 0.95,
+    'noiselevel': 0.5
 }
 
 presets = {
@@ -792,6 +795,9 @@ presets = {
         'model': 'a3c_ff_ss',
         'ss_temp_global': True,
     },
+    '122': { # Vary noiselevel
+        'model': 'a3c_ff'
+    }
 }
 
 

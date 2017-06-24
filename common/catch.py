@@ -2,13 +2,14 @@ import numpy as np
 from scipy.misc import imresize
 
 
-class CatchEnv():
+class CatchEnv:
 
-    def __init__(self, frames_per_state):
+    def __init__(self, frames_per_state, noiselevel=0.0):
         self.image = np.zeros((24, 24))
         self.state = []
         self.fps = frames_per_state
         self.output_shape = (84, 84)
+        self.noiselevel = noiselevel
 
     def reset_random(self):
         self.image.fill(0)
@@ -54,7 +55,8 @@ class CatchEnv():
         [self.state.append(imresize(self.image, (84, 84))) for _ in range(self.fps - len(self.state) + 1)]
         self.state = self.state[-self.fps:]
 
-        return np.copy(self.state), reward, terminal, None
+        out = np.copy(self.state)
+        return out + self.noiselevel * out.std() * np.random.random(out.shape), reward, terminal, None
 
     def num_actions(self):
         return 3

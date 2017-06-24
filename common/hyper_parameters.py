@@ -89,7 +89,8 @@ config1 = {
     'lpq_trainable_temp': False,
     'lws_npf': False,
     'lws_of': 32,
-    'mahalanobis': False
+    'mahalanobis': False,
+    'noiselevel': 0.0
 }
 
 param_sweep = {
@@ -222,3 +223,4 @@ class HyperParameters(object):
         self.lws_npf = params.lws_npf
         self.lws_of = params.lws_of
         self.mahalanobis = params.mahalanobis
+        self.noiselevel = params.noiselevel

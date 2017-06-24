@@ -6,12 +6,12 @@ import tensorflow as tf
 from deeprl.common.catch import CatchEnv
 
 
-def get_env(env, frames_per_state=4, output_shape=None, session=None, remove_artifacts=True):
+def get_env(env, frames_per_state=4, output_shape=None, session=None, remove_artifacts=True, noiselevel=0.0):
     if env in ['Breakout-v0', 'Pong-v0', 'BeamRider-v0', 'Qbert-v0', 'SpaceInvaders-v0']:
         return AtariEnvironment(env.replace('-', 'Deterministic-'), frames_per_state, output_shape=output_shape,
                                 session=session, remove_artifacts=remove_artifacts)
     elif env == 'Catch':
-        return CatchEnv(frames_per_state)
+        return CatchEnv(frames_per_state, noiselevel=noiselevel)
     return ClassicControl(env)
 
 
@@ -42,6 +42,7 @@ class ClassicControl(object):
 
     def reset_random(self):
         return self.reset()
+
 
 class AtariEnvironment(object):
 

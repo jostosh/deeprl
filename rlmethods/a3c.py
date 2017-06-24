@@ -39,7 +39,8 @@ class A3CAgent(object):
         """
         self.env = get_env(env_name,
                            frames_per_state=hp.frames_per_state,
-                           output_shape=hp.input_shape[1:])
+                           output_shape=hp.input_shape[1:],
+                           noiselevel=hp.noiselevel)
         self.num_actions = self.env.num_actions()
 
         self.local_network = ActorCriticNN(num_actions=self.num_actions,
@@ -344,7 +345,7 @@ if __name__ == "__main__":
         session = tf_debug.LocalCLIDebugWrapperSession(session)
         session.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
 
-    global_env = get_env(env_name)
+    global_env = get_env(env_name, noiselevel=hyperparameters.noiselevel)
     num_actions = global_env.num_actions()
 
     learning_rate_ph = tf.placeholder(tf.float32)
