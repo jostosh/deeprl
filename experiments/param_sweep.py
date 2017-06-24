@@ -783,7 +783,11 @@ presets = {
     },
     '119': {
         'model': 'a3c_ff_ww'
-    }
+    },
+    '120': {
+        'model': 'a3c_ff_ss',
+        'trainable_temp': False
+    },
 }
 
 
