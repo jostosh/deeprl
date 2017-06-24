@@ -788,6 +788,10 @@ presets = {
         'model': 'a3c_ff_ss',
         'trainable_temp': False
     },
+    '121': {
+        'model': 'a3c_ff_ss',
+        'ss_temp_global': True,
+    },
 }
 
 
