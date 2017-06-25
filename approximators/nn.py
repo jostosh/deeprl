@@ -609,27 +609,16 @@ class ActorCriticNN(object):
                         if n_winning_prototypes == 1:
                             self.pi = tf.nn.softmax(tf.reduce_max(similarity, axis=2))
                         elif n_winning_prototypes == self.hp.ppa:
-                            if self.hp.lpq_anneal_nbh:
-
-                                ranks = tf.reshape(
-                                    val_to_rank(tf.reshape(-similarity, [-1, self.num_actions * n_winning_prototypes])),
-                                    [-1, self.num_actions, n_winning_prototypes]
-                                ),
-
-                                T = [v for v in tf.global_variables() if v.name == "T:0"][0]
-
-                                tau = tf.cast(T, tf.float32) * (self.hp.tauN - self.hp.tau0) \
-                                      / self.hp.T_max + self.hp.tau0
-
-                                similarity *= tf.nn.softmax(-tau * ranks)
-
-                            self.pi = tf.reduce_sum(
-                                tf.reshape(
-                                    tf.nn.softmax(tf.reshape(similarity, [-1, self.num_actions * n_winning_prototypes])),
-                                    [-1, self.num_actions, n_winning_prototypes]
-                                ),
-                                axis=2
-                            )
+                            if self.hp.lpq_single_winner:
+                                self.pi = tf.nn.softmax(tf.reshape(similarity, [-1, self.num_actions * n_winning_prototypes]))
+                            else:
+                                self.pi = tf.reduce_sum(
+                                    tf.reshape(
+                                        tf.nn.softmax(tf.reshape(similarity, [-1, self.num_actions * n_winning_prototypes])),
+                                        [-1, self.num_actions, n_winning_prototypes]
+                                    ),
+                                    axis=2
+                                )
                         else:
                             k_sim, self.k_ind = tf.nn.top_k(similarity, n_winning_prototypes, sorted=False)
                             self.pi = tf.reduce_sum(
@@ -813,7 +802,8 @@ class ActorCriticNN(object):
         with tf.name_scope("PolicyLoss"):
 
             # action matrix is n x a where each row corresponds to a time step and each column to an action
-            action_mask = tf.one_hot(self.actions, self.num_actions, 1.0, 0.0, name="ActionMask")
+            action_mask = tf.one_hot(self.actions, self.num_actions if not self.hp.lpq_single_winner else \
+                self.num_actions * self.hp.ppa, 1.0, 0.0, name="ActionMask")
             # self.pi and log_pi are n x a matrices
             log_pi = tf.log(tf.clip_by_value(self.pi, 1e-20, 1.0), name="LogPi")
             # The entropy is added to encourage exploration
@@ -869,7 +859,8 @@ class ActorCriticNN(object):
         else:
             pi = session.run(self.pi, feed_dict={self.inputs: [state]})
 
-        action = np.random.choice(self.num_actions, p=pi[0])
+        action = np.random.choice(self.num_actions if not self.hp.lpq_single_winner \
+                                      else self.num_actions * self.hp.ppa, p=pi[0])
         return action
 
     def get_value(self, state, session):
@@ -908,7 +899,8 @@ class ActorCriticNN(object):
                 [self.value, self.pi],
                 feed_dict={self.inputs: [state]})
 
-        action = np.random.choice(self.num_actions, p=pi[0])
+        action = np.random.choice(self.num_actions if not self.hp.lpq_single_winner \
+                                      else self.num_actions * self.hp.ppa, p=pi[0])
         return value[0], action
 
     def get_value_and_action_and_visualize(self, state, session):

@@ -9,10 +9,10 @@ python3 export_plots.py \
     --log_scale \
     --xrange -6 -2 \
     --yrange 0 1 \
-    --title "Adam and RMSprop" \
+    --title "Gradient descent optimizers" \
     --xlabel "$\log_{10}(\eta)$" \
     --ylabel "Mean score" \
-    --labels "A3C RMSProp" "A3C Adam" \
+    --labels "RMSProp" "Adam" \
     --legend_at "upper left" \
     --fontsize 20 \
     $*

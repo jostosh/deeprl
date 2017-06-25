@@ -21,7 +21,7 @@ func_by_param = {
     'fplc': log_uniform,
     'fp_decay': log_uniform,
     'ss_temp': log_uniform,
-    'prototype_factor': log_uniform,
+    'prototype_factor': uniform,
     'ppa': lambda l, h, r: int(log_uniform(l, h, r)),
     'nwp': lambda l, h, r: int(uniform(l, h, r)),
     'wpr': uniform,
@@ -55,7 +55,7 @@ hi_by_param = {
     'fplc': 1.0,
     'fp_decay': 0.99999999,
     'ss_temp': 2.0,
-    'prototype_factor': 50,
+    'prototype_factor': 10,
     'ppa': 200,
     'nwp': 15,
     'wpr': 1.0,
@@ -797,7 +797,32 @@ presets = {
     },
     '122': { # Vary noiselevel
         'model': 'a3c_ff'
-    }
+    },
+    '123': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_p0': 0.9,
+        'lpq_pN': 0.99,
+        'beta': 0.01,
+        'pi_loss_correct': True,
+        'lpq_single_winner': True
+    },
+    '124': { # Vary prototype factor
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_p0': 0.9,
+        'lpq_pN': 0.99,
+        'beta': 0.01,
+        'pi_loss_correct': True,
+    },
 }
 
 

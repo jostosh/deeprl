@@ -114,6 +114,10 @@ def obtain_name(hp):
         'policy_quantization': lambda p: "PQ" if (hp[p] == True) else ""
     }
 
+    if hp['policy_quantization'] and 'glvq' in hp and hp['glvq']:
+        return 'A3C GLPQ'
+
+
     if args.trace_by:
         return ' '.join(function_by_name[n](n) for n in args.trace_by)
 
@@ -501,7 +505,7 @@ def get_event_files_by_hp_by_env(input_dir):
                 hyper_parameters['activation'] = 'elu' if hyper_parameters['activation'] == tf.nn.elu else 'relu'
 
             if args.subset_params:
-                hyper_parameters = {p: hyper_parameters[p] for p in args.subset_params}
+                hyper_parameters = {p: hyper_parameters[p] for p in args.subset_params if p in hyper_parameters}
 
             if hyper_parameters['model'] in args.exclude:
                 continue

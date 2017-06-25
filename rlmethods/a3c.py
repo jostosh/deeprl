@@ -120,7 +120,8 @@ class A3CAgent(object):
                 # has to perform a single forward pass.
                 values[i], actions[i] = self.local_network.get_value_and_action(self.last_state, session)
                 # Perform step in environment and obtain rewards and observations
-                self.last_state, rewards[i], terminal_state, info = self.env.step(actions[i])
+                a = actions[i] if not self.hp.lpq_single_winner else actions[i] // self.hp.ppa
+                self.last_state, rewards[i], terminal_state, info = self.env.step(a)
                 # Increment time counters
                 self.t += 1
                 T = session.run(global_step)
@@ -236,7 +237,9 @@ class A3CAgent(object):
         while episode_idx < num_episodes:
             # Get action
             action = self.local_network.get_action(self.last_state, session)
-            self.last_state, reward, terminal, info = self.env.step(action)
+            a = action if not self.hp.lpq_single_winner else action // self.hp.ppa
+
+            self.last_state, reward, terminal, info = self.env.step(a)
             returns[episode_idx] += reward
 
             if terminal:
