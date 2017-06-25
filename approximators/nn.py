@@ -596,7 +596,10 @@ class ActorCriticNN(object):
                         T = [v for v in tf.global_variables() if v.name == "T:0"][0]
                         p = tf.cast(T, tf.float32) * (self.hp.lpq_pN - self.hp.lpq_p0) \
                               / self.hp.T_max + self.hp.lpq_p0
-                        temperature = tf.log(-p*(self.num_actions - 1)/(p - 1)) / 2
+                        if self.hp.lpq_hot:
+                            temperature = tf.log(-p*(n_winning_prototypes * self.num_actions - 1)/(p - 1)) / 2
+                        else:
+                            temperature = tf.log(-p*(self.num_actions - 1)/(p - 1)) / 2
 
                         if self.hp.lpq_trainable_temp:
                             temperature = tf.Variable(tf.log(-self.hp.lpq_p0 * (self.num_actions - 1) / (self.hp.lpq_p0 - 1)) / 2)
