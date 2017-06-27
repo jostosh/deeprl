@@ -577,9 +577,14 @@ class ActorCriticNN(object):
                     head_shape = net.get_shape().as_list()[-1]
                     d = 1.0 / np.sqrt(head_shape)
                     prototypes = tf.Variable(
-                        tf.random_uniform((num_prototypes, head_shape), minval=0.0 if self.hp.zpi else -d, maxval=d),
-                        name='Prototypes'
+                        np.random.exponential(self.hp.exp_beta, (num_prototypes, head_shape)) if self.hp.lpq_exp else \
+                        np.clip(np.random.normal(size=(num_prototypes, head_shape), scale=0.25), 0.0, 2.5), #.random_normal((num_prototypes, head_shape), minval=0.0 if self.hp.zpi else -d, maxval=d),
+                        name='Prototypes',
+                        dtype=tf.float32
                     )
+
+                    self.summaries.append(tf.summary.histogram('Prototypes', prototypes))
+                    self.summaries.append(tf.summary.histogram('Head', self.head))
                     self.k_ind = None
                     similarity, additional_variables = similarity_functions[self.hp.pq_sim_fn](net, prototypes)
 

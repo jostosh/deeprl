@@ -92,7 +92,9 @@ config1 = {
     'mahalanobis': False,
     'noiselevel': 0.0,
     'lpq_single_winner': False,
-    'lpq_hot': False
+    'lpq_hot': False,
+    'exp_beta': 0.5,
+    'lpq_exp': False,
 }
 
 param_sweep = {
@@ -228,3 +230,5 @@ class HyperParameters(object):
         self.noiselevel = params.noiselevel
         self.lpq_single_winner = params.lpq_single_winner
         self.lpq_hot = params.lpq_hot
+        self.exp_beta = params.exp_beta
+        self.lpq_exp = params.lpq_exp
