@@ -7,10 +7,10 @@ python3 export_plots.py \
     --trace_by lpq_temp \
     --image_suffix policy_quantization_best \
     --log_scale \
-    --xrange -2 2 \
+    --xrange -1 2 \
     --yrange 0 1 \
-    --title "Policy quantization" \
-    --xlabel "$\log_{10}(\alpha)$" \
+    --title "Temperature Sweep LPQ" \
+    --xlabel "$\log_{10}(\gamma)$" \
     --ylabel "Mean score" \
     --labels "A3C LPQ" \
     --legend_at "upper left" \

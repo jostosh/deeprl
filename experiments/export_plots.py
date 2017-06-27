@@ -200,7 +200,7 @@ def export_plots():
         ax.set_xlim(args.xrange)
         ax.set_ylim(args.yrange)
 
-        for label, (scores, surfaces, xticks, yticks) in data_by_label.items():
+        for label, (scores, surfaces, xticks, yticks) in sorted(data_by_label.items()):
             xi = np.linspace(min(xticks), max(xticks))
 
             indices = np.argsort(xticks).astype('int64')
@@ -214,7 +214,8 @@ def export_plots():
         plt.legend(handles=handles, loc=args.legend_at, framealpha=0.)
 
         plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '.pdf'))
-        plt.show()
+        if args.display:
+            plt.show()
 
         plt.clf()
         handles.clear()
@@ -225,7 +226,7 @@ def export_plots():
         ax.set_xlim(args.xrange)
         ax.set_ylim(args.yrange)
 
-        for label, (scores, surfaces, xticks, yticks) in data_by_label.items():
+        for label, (scores, surfaces, xticks, yticks) in sorted(data_by_label.items()):
             xi = np.linspace(min(xticks), max(xticks))
 
             indices = np.argsort(xticks)
@@ -239,7 +240,8 @@ def export_plots():
         plt.legend(handles=handles, loc=args.legend_at, framealpha=0.)
 
         plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '_scores.pdf'))
-        plt.show()
+        if args.display:
+            plt.show()
 
         return
 

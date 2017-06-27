@@ -10,11 +10,12 @@ python3 export_plots.py \
     --log_scale \
     --xrange -6 -2 \
     --yrange 0 1 \
-    --title "GLPQ Prototypes Per Class" \
-    --xlabel "$\log_{10}(\alpha)$" \
+    --title "Prototypes Per Action" \
+    --xlabel "$\log_{10}(\eta)$" \
     --ylabel "Mean score" \
-    --labels "A3C FF" "A3C GLPQ $ \mathcal P / \mathcal A=32$" \
-    "A3C GLPQ $ \mathcal P / \mathcal A=64$" \
-    "A3C GLPQ $ \mathcal P / \mathcal A = 16$" \
+    --labels "A3C FF" "$ |\mathcal W| / |\mathcal A|=32$" \
+    "$ |\mathcal W| / |\mathcal A|=64$" \
+    "$ |\mathcal W| / |\mathcal A| = 16$" \
     --legend_at "upper left" \
+    --fontsize 18 \
     $*

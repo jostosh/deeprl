@@ -15,4 +15,5 @@ python3 export_plots.py \
     --ylabel "Mean score" \
     --labels "A3C GLPQ" " " \
     --legend_at "upper left" \
+    --fontsize 20 \
     $*
