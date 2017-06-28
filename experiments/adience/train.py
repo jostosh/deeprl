@@ -26,7 +26,8 @@ class LogDir(object):
             'random_inits': args.random_inits,
             'n_centroids': ' x '.join([str(a) for a in args.n_centroids])
         }
-        path = os.path.join(args.logbase, *['{}={}'.format(param, val) for param, val in hyperparameters.items()])
+        path = os.path.join(args.logbase, args.logsub) if args.logsub else \
+            os.path.join(args.logbase, *['{}={}'.format(param, val) for param, val in hyperparameters.items()])
         os.makedirs(path, exist_ok=True)
         current_dirs = sorted([o for o in os.listdir(path) if os.path.isdir(os.path.join(path, o))])
         # We're assuming at this point that we do not exceed 1M runs per version
@@ -169,8 +170,9 @@ if __name__ == "__main__":
     parser.add_argument("--n_centroids", type=int, nargs='+', default=[2, 2])
     parser.add_argument("--datadir", default='/data/s2098407/adience')
     parser.add_argument("--logbase",
-                        default=os.path.join('/data', 's2098407', 'tensorflowlogs', 'v0.9.7', 'adience'))
+                        default=os.path.join('/data', 's2098407', 'tensorflowlogs', 'v0.9.8', 'adience'))
     parser.add_argument("--first_normal", dest='first_normal', action='store_true')
+    parser.add_argument("--logsub", default="")
     args = parser.parse_args()
 
     logdir = LogDir(args.model)
