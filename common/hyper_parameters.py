@@ -92,7 +92,7 @@ config1 = {
     'mahalanobis': False,
     'noiselevel': 0.0,
     'lpq_single_winner': False,
-    'lpq_hot': False,
+    'lpq_hot': True,
     'exp_beta': 0.5,
     'lpq_exp': False,
 }

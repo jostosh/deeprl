@@ -151,7 +151,7 @@ def spatialsoftmax(incoming, epsilon=0.01, trainable_temperature=True, name='Spa
         if use_softmax_only:
             return tf.reshape(softmax_per_channel, (-1, h * w * c))
 
-        # Compute the x coordinates by element-wise multiplicatoin of the cartesion coordinates with the softmax
+        # Compute the x coordinates by element-wise multiplication of the cartesian coordinates with the softmax
         # activations and summing the result
         x_coordinates = tf.reduce_sum(tf.mul(cartesian_x, softmax_per_channel), reduction_indices=[1, 2], name='xOut')
         y_coordinates = tf.reduce_sum(tf.mul(cartesian_y, softmax_per_channel), reduction_indices=[1, 2], name='yOut')

@@ -227,9 +227,9 @@ class ActorCriticNN(object):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers'):
-            net = conv_layer(net, 32, 8, 4, activation=self.hp.activation, name='Conv1')
+            net = conv_layer(net, 32, 5, 3, activation=self.hp.activation, name='Conv1')
             self._add_trainable(net)
-            net = conv_layer(net, 64, 4, 2, activation=tf.identity, name='Conv2')
+            net = conv_layer(net, 64, 3, 2, activation=tf.identity, name='Conv2')
             self._add_trainable(net)
             net = spatialsoftmax(net, epsilon=self.hp.ss_epsilon, trainable_temperature=self.hp.trainable_temp,
                                  use_softmax_only=self.hp.softmax_only, temp_init=self.hp.ss_temp,
@@ -253,9 +253,9 @@ class ActorCriticNN(object):
             net = tf.transpose(self.inputs, [0, 2, 3, 1])
 
         with tf.name_scope('HiddenLayers'):
-            net = conv_layer(net, 32, 8, 4, activation=self.hp.activation, name='Conv1')
+            net = conv_layer(net, 32, 5, 3, activation=self.hp.activation, name='Conv1')
             self._add_trainable(net)
-            net = conv_layer(net, 64, 4, 2, activation=tf.identity, name='Conv2')
+            net = conv_layer(net, 64, 3, 2, activation=tf.identity, name='Conv2')
             self._add_trainable(net)
 
             what, where = tf.split(3, 2, net)
@@ -578,7 +578,7 @@ class ActorCriticNN(object):
                     d = 1.0 / np.sqrt(head_shape)
                     prototypes = tf.Variable(
                         np.random.exponential(self.hp.exp_beta, (num_prototypes, head_shape)) if self.hp.lpq_exp else \
-                        np.clip(np.random.normal(size=(num_prototypes, head_shape), scale=0.25), 0.0, 2.5), #.random_normal((num_prototypes, head_shape), minval=0.0 if self.hp.zpi else -d, maxval=d),
+                        tf.random_uniform((num_prototypes, head_shape), minval=0.0 if self.hp.zpi else -d, maxval=d),
                         name='Prototypes',
                         dtype=tf.float32
                     )
@@ -668,7 +668,7 @@ class ActorCriticNN(object):
                     self.theta += [prototypes] + additional_variables # , relevance_mat]
                     self.prototypes = prototypes
                 else:
-                    self.pi = fc_layer(net, num_actions, activation='softmax', name='{}/pi_sa'.format(self.agent_name),
+                    self.pi = fc_layer(net, num_actions, activation='softmax', name='pi_sa',
                                        init=self.hp.weights_init, bias_init=0.0)
                     self._add_trainable(self.pi)
             with tf.name_scope("Value"):
@@ -701,7 +701,7 @@ class ActorCriticNN(object):
 
                         self.theta += [prototypes, prototype_values]
                     else:
-                        self.value = fc_layer(net, 1, activation='linear', name='{}/v_s'.format(self.agent_name),
+                        self.value = fc_layer(net, 1, activation='linear', name='v_s'.format(self.agent_name),
                                               init=self.hp.weights_init, bias_init=0.0)
                         self._add_trainable(self.value)
                 self.value = tflearn.reshape(self.value, [-1], 'FlattenedValue')
@@ -911,34 +911,37 @@ class ActorCriticNN(object):
                                       else self.num_actions * self.hp.ppa, p=pi[0])
         return value[0], action
 
-    def get_value_and_action_and_visualize(self, state, session):
+    def get_value_and_action_and_visualize(self, state, session, tensors):
         """
         Returns the action and the value
         """
         activation_str = 'Relu' if self.hp.activation == tf.nn.relu else 'Elu'
 
-        conv1 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/{}:0".format(activation_str))
-        conv2 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/{}_1:0".format(activation_str))
-        fc1 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/FC3/{}:0".format(activation_str))
+        #conv1 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/Conv1/{}:0".format(activation_str))
+        #conv2 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/{}_1:0".format(activation_str))
+        #fc1 = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/FC3/{}:0".format(activation_str))
         lstm_out = None
         if self.recurrent:
-            lstm = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/ReshapedLSTMOutput/Reshape:0")
-            value, pi, self.lstm_state_numeric, conv1_out, conv2_out, fc1_out, lstm_out = session.run(
+            #lstm = session.graph.get_tensor_by_name(self.agent_name + "/HiddenLayers/ReshapedLSTMOutput/Reshape:0")
+            returns = session.run(
                 [
-                    self.value, self.pi, self.lstm_state_variable, conv1, conv2, fc1, lstm
-                ],
+                    self.value, self.pi, self.lstm_state_variable
+                ] + tensors,
                 feed_dict={
                     self.inputs: [state],
                     self.initial_state: self.lstm_state_numeric,
                     self.n_steps: [1]
                 }
             )
+            value, pi, lstm_out = returns[:3]
+            tensors_out = returns[3:]
         else:
-            value, pi, conv1_out, conv2_out, fc1 = session.run([self.value, self.pi, conv1, conv2, fc1],
-                                                          feed_dict={self.inputs: [state]})
+            returns = session.run([self.value, self.pi] + tensors, feed_dict={self.inputs: [state]})
+            value, pi = returns[:2]
+            tensors_out = returns[2:]
 
         action = np.random.choice(self.num_actions, p=pi[0])
-        return value[0], action, conv1_out, conv2_out, pi[0], fc1_out, lstm_out
+        return value[0], action, pi[0], tensors_out
 
     def get_embedding(self, state, session):
         assert self.embedding_layer is not None, "No embedding layer was configured for TensorBoard embeddings"
