@@ -937,6 +937,16 @@ presets = {
         'pi_loss_correct': True,
         'lpq_init': 'exp',
         'lpq_trainable_temp': True
+    },
+    '134': {  # Clipped Gaussian
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'beta': 0.01,
+        'pi_loss_correct': True,
+        'lpq_trainable_temp': True
     }
 }
 
