@@ -1,7 +1,7 @@
 LOGBASE=~/tensorflowlogs/peregrine/v0.9.5/sweep
 
 python3 export_plots.py \
-    --input_dir $LOGBASE/preset94 $LOGBASE/preset100 \
+    --input_dir $LOGBASE/preset126 $LOGBASE/preset100 \
     --mode sweep \
     --trace_by learning_rate \
     --image_suffix rslpq_distances \

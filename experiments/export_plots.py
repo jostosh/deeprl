@@ -81,13 +81,13 @@ def event_arrays_to_mean_and_errors(event_array):
 
     if args.interpolate:
         values = np.mean(np.stack(c_arrays_y), axis=0)
-        errors = np.std(np.stack(c_arrays_y), axis=0)
+        errors = np.std(np.stack(c_arrays_y), axis=0) / np.sqrt(len(c_arrays_y))
         steps = np.arange(min_x, max_x)
         return steps, values, errors, np_arrays_x, np_arrays_y
 
     error_by_step = {}
     for step, val in value_by_step.items():
-        error_by_step[step] = np.std(val)
+        error_by_step[step] = np.std(val) / np.sqrt(len(val))
         value_by_step[step] = np.mean(val)
 
     steps = np.asarray([k for k in value_by_step.keys()])
@@ -107,15 +107,20 @@ def obtain_name(hp):
             'inv_euclidean': 'SISWS IE',
             'a3c_ff': 'A3C FF',
             'a3c_ff_ss': 'A3C SS',
-            'a3c_sisws': 'A3C SISWS',
+            'a3c_sisws': 'A3C LWS',
             'a3c_ff_ww': 'A3C WW'
         }[hp[p]],
         'per_feature': lambda p: '/F' if (p in hp and hp[p] == True) else '',
         'policy_quantization': lambda p: "PQ" if (hp[p] == True) else ""
     }
 
-    if hp['policy_quantization'] and 'glvq' in hp and hp['glvq']:
+    if 'policy_quantization' in hp and hp['policy_quantization'] and 'glvq' in hp and hp['glvq'] and 'lpq_hot' in hp and hp['lpq_hot']:
+        return 'A3C GLPQ hot'
+    if 'policy_quantization' in hp and hp['policy_quantization'] and 'glvq' in hp and hp['glvq']:
         return 'A3C GLPQ'
+    elif 'policy_quantization' in hp and hp['policy_quantization']:
+        return 'A3C LPQ'
+
 
 
     if args.trace_by:
@@ -214,6 +219,8 @@ def export_plots():
         plt.legend(handles=handles, loc=args.legend_at, framealpha=0.)
 
         plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '.pdf'))
+        plt.gcf().patch.set_alpha(0.0)
+        plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '.png'), rasterized=True, dpi=600)
         if args.display:
             plt.show()
 
@@ -240,6 +247,8 @@ def export_plots():
         plt.legend(handles=handles, loc=args.legend_at, framealpha=0.)
 
         plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '_scores.pdf'))
+        plt.gcf().patch.set_alpha(0.0)
+        plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '_scores.png'), rasterized=True, dpi=600)
         if args.display:
             plt.show()
 
@@ -341,6 +350,8 @@ def render_sweep2d_mpl(all_scores, all_xticks, all_yticks, env, xlab, ylab):
     cb.ax.set_title("Score")
     plt.tight_layout()
     plt.savefig(os.path.join(args.output_dir, title.lower().replace(' ', '_') + '.pdf'))
+    plt.gcf().patch.set_alpha(0.0)
+    plt.savefig(os.path.join(args.output_dir, title.lower().replace(' ', '_') + '.png'), rasterized=True, dpi=600)
     if args.display:
         plt.show()
     plt.clf()
@@ -361,6 +372,8 @@ def render_sweep1d_mpl(all_scores, all_surfaces, all_xticks, title, xlab, ylab):
     #plt.tight_layout()
     #ax.tight_layout()
     plt.savefig(os.path.join(args.output_dir, title.lower().replace(' ', '_').replace('.', '').replace(',', '') + '.pdf'))
+    plt.gcf().patch.set_alpha(0.0)
+    plt.savefig(os.path.join(args.output_dir, title.lower().replace(' ', '_').replace('.', '').replace(',', '') + '.png'))
     plt.show()
     plt.clf()
 
@@ -396,6 +409,8 @@ def render_mean_score_mpl(env, handles, position_by_env):
         plt.ylim(args.yrange)
     plt.legend(handles=handles, loc=position_by_env[env], framealpha=0.)
     plt.savefig(os.path.join(args.output_dir, env.replace('-v0', '') + args.image_suffix + '.pdf'))
+    plt.gcf().patch.set_alpha(0.0)
+    plt.savefig(os.path.join(args.output_dir, env.replace('-v0', '') + args.image_suffix + '.png'), dpi=600)
     plt.clf()
 
 
@@ -509,7 +524,7 @@ def get_event_files_by_hp_by_env(input_dir):
             if args.subset_params:
                 hyper_parameters = {p: hyper_parameters[p] for p in args.subset_params if p in hyper_parameters}
 
-            if hyper_parameters['model'] in args.exclude:
+            if hyper_parameters['model'] in args.exclude or any(a in hyper_parameters and hyper_parameters[a] == True for a in args.exclude):
                 continue
 
             hyper_parameters_str = json.dumps(hyper_parameters, sort_keys=True)

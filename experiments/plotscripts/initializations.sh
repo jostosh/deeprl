@@ -9,10 +9,10 @@ python3 export_plots.py \
     --log_scale \
     --xrange -6 -2 \
     --yrange 0 1 \
-    --title "Parameter initializations" \
-    --xlabel "$\log_{10}(\alpha)$" \
+    --title "Weight Initializations" \
+    --xlabel "$\log_{10}(\eta)$" \
     --ylabel "Mean score" \
-    --labels "Torch" "TensorFlow" "TFLearn" \
+    --labels "Glorot \& Bengio" "He et al." "Sussillo \& Abbott" \
     --legend_at "upper left" \
     --fontsize 20 \
     $*

@@ -9,7 +9,7 @@ python3 export_plots.py \
     --log_scale \
     --xrange -6 -2 \
     --yrange 0 1 \
-    --title "Hot and cold GLPQ" \
+    --title "Temperature Schedule Range" \
     --xlabel "$\log_{10}(\eta)$" \
     --ylabel "Mean score" \
     --labels "A3C FF" "GLPQ hot" "GLPQ cold" \

@@ -9,8 +9,8 @@ python3 export_plots.py \
     --log_scale \
     --xrange -6 -2 \
     --yrange 0 1 \
-    --title "ELU vs. ReLU with A3C FF" \
-    --xlabel "$\log_{10}(\alpha)$" \
+    --title "Activation Functions" \
+    --xlabel "$\log_{10}(\eta)$" \
     --ylabel "Mean score" \
     --labels "ReLU" "ELU" \
     --legend_at "upper left" \

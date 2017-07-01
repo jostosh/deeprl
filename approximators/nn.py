@@ -576,9 +576,15 @@ class ActorCriticNN(object):
                     self.head = net
                     head_shape = net.get_shape().as_list()[-1]
                     d = 1.0 / np.sqrt(head_shape)
+                    if self.hp.lpq_init == 'torch':
+                        prototype_init = tf.random_uniform((num_prototypes, head_shape), minval=0.0 if self.hp.zpi else -d, maxval=d)
+                    elif self.hp.lpq_init == 'trunc_normal':
+                        prototype_init = tf.abs(tf.truncated_normal((num_prototypes, head_shape)))
+                    elif self.hp.lpq_init == 'exp':
+                        prototype_init = np.random.exponential(self.hp.exp_beta, (num_prototypes, head_shape))
+
                     prototypes = tf.Variable(
-                        np.random.exponential(self.hp.exp_beta, (num_prototypes, head_shape)) if self.hp.lpq_exp else \
-                        tf.random_uniform((num_prototypes, head_shape), minval=0.0 if self.hp.zpi else -d, maxval=d),
+                        prototype_init,
                         name='Prototypes',
                         dtype=tf.float32
                     )
@@ -668,7 +674,7 @@ class ActorCriticNN(object):
                     self.theta += [prototypes] + additional_variables # , relevance_mat]
                     self.prototypes = prototypes
                 else:
-                    self.pi = fc_layer(net, num_actions, activation='softmax', name='pi_sa',
+                    self.pi = fc_layer(net, num_actions, activation='softmax', name='{}/pi_sa'.format(self.agent_name),
                                        init=self.hp.weights_init, bias_init=0.0)
                     self._add_trainable(self.pi)
             with tf.name_scope("Value"):
@@ -701,7 +707,7 @@ class ActorCriticNN(object):
 
                         self.theta += [prototypes, prototype_values]
                     else:
-                        self.value = fc_layer(net, 1, activation='linear', name='v_s'.format(self.agent_name),
+                        self.value = fc_layer(net, 1, activation='linear', name='{}/v_s'.format(self.agent_name),
                                               init=self.hp.weights_init, bias_init=0.0)
                         self._add_trainable(self.value)
                 self.value = tflearn.reshape(self.value, [-1], 'FlattenedValue')

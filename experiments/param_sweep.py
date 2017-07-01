@@ -890,6 +890,54 @@ presets = {
         'beta': 0.01,
         'pi_loss_correct': True
     },
+    '130': {  # Clipped Gaussian
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_p0': 0.5,
+        'lpq_pN': 0.9,
+        'beta': 0.01,
+        'pi_loss_correct': True
+    },
+    '131': {  # Clipped Gaussian
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_p0': 0.95,
+        'lpq_pN': 0.999,
+        'beta': 0.01,
+        'pi_loss_correct': True
+    },
+    '132': {  # Clipped Gaussian
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'beta': 0.01,
+        'pi_loss_correct': True,
+        'lpq_init': 'trunc_normal',
+        'lpq_trainable_temp': True
+    },
+    '133': {  # Clipped Gaussian
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'beta': 0.01,
+        'pi_loss_correct': True,
+        'lpq_init': 'exp',
+        'lpq_trainable_temp': True
+    }
 }
 
 

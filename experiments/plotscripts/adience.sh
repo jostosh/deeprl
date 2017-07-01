@@ -10,4 +10,5 @@ python3 export_plots.py \
     --xrange 0 200 \
     --export_best \
     --step_to_epoch \
+    --exclude per_feature \
     $*

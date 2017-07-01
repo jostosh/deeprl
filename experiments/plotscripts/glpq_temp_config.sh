@@ -9,7 +9,7 @@ python3 export_plots.py \
     --log_scale \
     --xrange -6 -2 \
     --yrange 0 1 \
-    --title "GLPQ temperature configurations" \
+    --title "Temperature Configurations" \
     --xlabel "$\log_{10}(\eta)$" \
     --ylabel "Mean score" \
     --labels "$\gamma=1$" "$\gamma(t)$" \
