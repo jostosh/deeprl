@@ -44,7 +44,7 @@ lo_by_param = {
     'nwp': 1,
     'wpr': 0.01,
     'lpq_temp': 0.01,
-    'lpq_p0': 0.8,
+    'lpq_p0': 0.5,
     'noiselevel': 0.0,
     'exp_beta': 0.1
 }
