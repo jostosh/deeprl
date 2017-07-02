@@ -579,7 +579,7 @@ class ActorCriticNN(object):
                     if self.hp.lpq_init == 'torch':
                         prototype_init = tf.random_uniform((num_prototypes, head_shape), minval=0.0 if self.hp.zpi else -d, maxval=d)
                     elif self.hp.lpq_init == 'trunc_normal':
-                        prototype_init = tf.abs(tf.truncated_normal((num_prototypes, head_shape)))
+                        prototype_init = tf.nn.relu(tf.truncated_normal((num_prototypes, head_shape)))
                     elif self.hp.lpq_init == 'exp':
                         prototype_init = np.random.exponential(self.hp.exp_beta, (num_prototypes, head_shape))
 
