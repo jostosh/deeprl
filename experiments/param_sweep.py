@@ -959,6 +959,34 @@ presets = {
         'lpq_pN': 0.999,
         'lpq_init': 'trunc_normal',
         'pi_loss_correct': True,
+    },
+    '136': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'beta': 0.01,
+        'glvq': True,
+        'lpq_p0': 0.5,
+        'lpq_pN': 0.9999,
+        'lpq_init': 'trunc_normal',
+        'pi_loss_correct': True,
+        'lpq_temp_exp': True
+    },
+    '137': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'beta': 0.0,
+        'glvq': True,
+        'lpq_p0': 0.2,
+        'lpq_pN': 0.99,
+        'lpq_init': 'trunc_normal',
+        'pi_loss_correct': True,
+        'lpq_temp_exp': True
     }
 }
 

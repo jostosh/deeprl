@@ -605,8 +605,18 @@ class ActorCriticNN(object):
                                                      tau0=self.hp.tau0, tauN=self.hp.tauN, N=self.hp.T_max)
 
                         T = [v for v in tf.global_variables() if v.name == "T:0"][0]
-                        p = tf.cast(T, tf.float32) * (self.hp.lpq_pN - self.hp.lpq_p0) \
-                              / self.hp.T_max + self.hp.lpq_p0
+
+                        p0 = max(self.hp.lpq_p0, 1 / self.num_actions)
+                        if self.hp.lpq_temp_exp:
+                            p = self.hp.lpq_pN - \
+                                (self.hp.lpq_pN - p0) * \
+                                tf.exp(-tf.cast(T, tf.float32) / (self.hp.T_max / 10))
+                        else:
+                            p = tf.cast(T, tf.float32) * (self.hp.lpq_pN - p0) \
+                                  / self.hp.T_max + p0
+
+
+
                         if self.hp.lpq_hot:
                             temperature = tf.log(-p*(n_winning_prototypes * self.num_actions - 1)/(p - 1)) / 2
                         else:

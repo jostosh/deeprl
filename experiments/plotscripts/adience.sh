@@ -5,10 +5,11 @@ python3 export_plots.py \
     --ylabel "Accuracy" \
     --scalar_subset "Accuracy/Validation" \
     --trace_by "model" \
-    --title "SISWS on Adience" \
+    --title "LWS on Adience" \
     --folds 5 \
-    --xrange 0 200 \
+    --xrange 0 150 \
     --export_best \
     --step_to_epoch \
     --exclude per_feature \
+    --fontsize 20 \
     $*

@@ -103,7 +103,8 @@ def obtain_name(hp):
             'default': 'Default CNN',
             'spatial': 'SISWS default',
             'per_feature': "SISWS PF",
-            'centroids_trainable': 'SISWS TC',
+            'centroids_trainable': 'LWS small',
+            'large': 'LWS',
             'inv_euclidean': 'SISWS IE',
             'a3c_ff': 'A3C FF',
             'a3c_ff_ss': 'A3C SS',
@@ -205,11 +206,13 @@ def export_plots():
         ax.set_xlim(args.xrange)
         ax.set_ylim(args.yrange)
 
+        totals = []
         for label, (scores, surfaces, xticks, yticks) in sorted(data_by_label.items()):
             xi = np.linspace(min(xticks), max(xticks))
 
             indices = np.argsort(xticks).astype('int64')
             yi = spline([xticks[i] for i in indices], [surfaces[i] for i in indices], xi, order=1)
+            totals.append((label, np.mean(yi[12:])))
 
             ysmoothed = savgol_filter(yi, window_length=5, polyorder=3)
 
@@ -224,6 +227,9 @@ def export_plots():
         if args.display:
             plt.show()
 
+        #plot_hbar(totals)
+
+
         plt.clf()
         handles.clear()
         fig, ax = plt.subplots()
@@ -233,16 +239,19 @@ def export_plots():
         ax.set_xlim(args.xrange)
         ax.set_ylim(args.yrange)
 
+        totals = []
         for label, (scores, surfaces, xticks, yticks) in sorted(data_by_label.items()):
             xi = np.linspace(min(xticks), max(xticks))
 
             indices = np.argsort(xticks)
             yi = spline([xticks[i] for i in indices], [scores[i] for i in indices], xi, order=1)
+            totals.append((label, np.mean(yi[12:])))
 
             ysmoothed = savgol_filter(yi, window_length=5, polyorder=3)
 
             handles.append(plt.plot(xi, ysmoothed, linewidth=4.0, label=label)[0])
             #handles.append(plt.scatter(xticks, scores, label=args.labels[label_idx] + " Data"))
+
 
         plt.legend(handles=handles, loc=args.legend_at, framealpha=0.)
 
@@ -251,6 +260,8 @@ def export_plots():
         plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '_scores.png'), rasterized=True, dpi=600)
         if args.display:
             plt.show()
+
+        plot_hbar(totals)
 
         return
 
@@ -325,6 +336,35 @@ def export_plots():
                 render_sweep1d_plotly(all_scores, all_surfaces, all_xticks, env, layout, title, xlab, ylab)
             else:
                 render_sweep2d_mpl(all_scores, all_xticks, all_yticks, env, xlab, ylab)
+
+
+def plot_hbar(totals):
+    newsize = (args.fontsize * 2) // 3
+    mpl.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman'], 'size': newsize})
+    mpl.rc('xtick', labelsize=newsize)
+    mpl.rc('ytick', labelsize=newsize)
+
+    fig, ax = plt.subplots(figsize=(6, len(totals) + 1))
+    width = 0.75
+    ind = np.arange(len(totals))
+
+    ax.barh(ind, [t[1] for t in totals], width, color='blue')
+    ax.set_yticks(ind + width / 2)
+    ax.set_yticklabels([t[0] for t in totals], minor=False)
+    for i, (_, v) in enumerate(totals):
+        ax.text(v + 0.01, i + 0.3, "%.2f" % v, color='blue')
+
+    ax.set_xlim([0.2, 0.9])
+    plt.title(args.title)
+    plt.xlabel('Mean score final 5 evals')
+    plt.ylabel('Method')
+
+    plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '_bars.pdf'))
+    plt.gcf().patch.set_alpha(0.0)
+    plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '_bars.png'), rasterized=True, dpi=600)
+
+    if args.display:
+        plt.show()
 
 
 def render_sweep2d_mpl(all_scores, all_xticks, all_yticks, env, xlab, ylab):

@@ -2,7 +2,7 @@
 LOGBASE=~/tensorflowlogs/peregrine/v0.9.5/sweep
 
 python3 export_plots.py \
-    --input_dir ~/tensorflowlogs/cartesius/v0.9.7/Breakout-v0/ \
+    --input_dir ~/tensorflowlogs/cartesius/v0.9.7/Pong-v0/ \
     --mode mean \
     --image_suffix ff_vs_ww \
     --xrange 0 60 \
@@ -12,6 +12,6 @@ python3 export_plots.py \
     --subset_params model policy_quantization env glvq \
     --trace_by model policy_quantization \
     --fontsize 20 \
-    --exclude a3c_ff_ss policy_quantization a3c_sisws \
+    --exclude policy_quantization a3c_lstm \
     $*
 
