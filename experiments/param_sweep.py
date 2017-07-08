@@ -28,7 +28,8 @@ func_by_param = {
     'lpq_temp': log_uniform,
     'lpq_p0': uniform,
     'noiselevel': uniform,
-    'exp_beta': uniform
+    'exp_beta': uniform,
+    'lpq_gamma': uniform
 }
 
 lo_by_param = {
@@ -46,7 +47,8 @@ lo_by_param = {
     'lpq_temp': 0.01,
     'lpq_p0': 0.5,
     'noiselevel': 0.0,
-    'exp_beta': 0.1
+    'exp_beta': 0.1,
+    'lpq_gamma': 1.0
 }
 
 hi_by_param = {
@@ -64,7 +66,8 @@ hi_by_param = {
     'lpq_temp': 100,
     'lpq_p0': 0.95,
     'noiselevel': 0.5,
-    'exp_beta': 1.0
+    'exp_beta': 1.0,
+    'lpq_gamma': 256
 }
 
 presets = {
@@ -987,6 +990,17 @@ presets = {
         'lpq_init': 'trunc_normal',
         'pi_loss_correct': True,
         'lpq_temp_exp': True
+    },
+    '138': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'beta': 0.0,
+        'glvq': True,
+        'lpq_init': 'trunc_normal',
+        'pi_loss_correct': True,
     }
 }
 
