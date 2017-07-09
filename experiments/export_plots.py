@@ -112,7 +112,8 @@ def obtain_name(hp):
             'a3c_ff_ww': 'A3C WW'
         }[hp[p]],
         'per_feature': lambda p: '/F' if (p in hp and hp[p] == True) else '',
-        'policy_quantization': lambda p: "PQ" if (hp[p] == True) else ""
+        'policy_quantization': lambda p: "PQ" if (hp[p] == True) else "",
+        'value_loss_fac': lambda p: ' $\lambda_V = {}$'.format(hp[p])
     }
 
     if 'policy_quantization' in hp and hp['policy_quantization'] and 'glvq' in hp and hp['glvq'] and 'lpq_hot' in hp and hp['lpq_hot']:
@@ -121,7 +122,6 @@ def obtain_name(hp):
         return 'A3C GLPQ'
     elif 'policy_quantization' in hp and hp['policy_quantization']:
         return 'A3C LPQ'
-
 
 
     if args.trace_by:
@@ -447,7 +447,7 @@ def render_mean_score_mpl(env, handles, position_by_env):
         plt.xlim(args.xrange)
     if args.yrange:
         plt.ylim(args.yrange)
-    plt.legend(handles=handles, loc=position_by_env[env], framealpha=0.)
+    plt.legend(handles=handles, loc=args.legend_at, framealpha=0.)
     plt.savefig(os.path.join(args.output_dir, env.replace('-v0', '') + args.image_suffix + '.pdf'))
     plt.gcf().patch.set_alpha(0.0)
     plt.savefig(os.path.join(args.output_dir, env.replace('-v0', '') + args.image_suffix + '.png'), dpi=600)
@@ -550,6 +550,8 @@ def get_event_files_by_hp_by_env(input_dir):
 
             # if any(t not in hyper_parameters for t in args.trace_by):
             #    continue
+            if 'value_loss_fac' not in hyper_parameters:
+                hyper_parameters['value_loss_fac'] = 1.0
 
             for param in args.ignore_params:
                 if param in hyper_parameters:

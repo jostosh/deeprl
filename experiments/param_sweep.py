@@ -1001,7 +1001,20 @@ presets = {
         'glvq': True,
         'lpq_init': 'trunc_normal',
         'pi_loss_correct': True,
-    }
+    },
+    '139': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_p0': 0.95,
+        'lpq_pN': 0.999,
+        'beta': 0.01,
+        'pi_loss_correct': True,
+        'zpi': True
+    },
 }
 
 
