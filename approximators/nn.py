@@ -620,8 +620,6 @@ class ActorCriticNN(object):
                         else:
                             temperature = tf.log(-p*(self.num_actions - 1)/(p - 1)) / 2
 
-                        if self.hp.lpq_gamma:
-                            temperature = self.hp.lpq_gamma
 
                         if self.hp.lpq_trainable_temp:
                             temperature = tf.Variable(tf.log(-self.hp.lpq_p0 * (self.num_actions - 1) / (self.hp.lpq_p0 - 1)) / 2)
