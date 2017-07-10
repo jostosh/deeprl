@@ -1015,6 +1015,16 @@ presets = {
         'pi_loss_correct': True,
         'zpi': True
     },
+    '140': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'pq_sim_fn': 'inv_euc_sq',
+        'lpq_p0': 0.787,
+        'lpq_pN': 0.787
+    },
 }
 
 
