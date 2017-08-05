@@ -2,8 +2,7 @@
 LOGBASE=~/tensorflowlogs/peregrine/v0.9.5/sweep
 
 python3 export_plots.py \
-    --input_dir $LOGBASE/preset13 $LOGBASE/preset107 \
-                $LOGBASE/preset108 $LOGBASE/preset94 \
+    --input_dir $LOGBASE/preset107 $LOGBASE/preset108 $LOGBASE/preset94 \
     --mode sweep \
     --trace_by learning_rate \
     --image_suffix glpq_neighborhood_size \
@@ -13,8 +12,7 @@ python3 export_plots.py \
     --title "Competition Size" \
     --xlabel "$\log_{10}(\eta)$" \
     --ylabel "Mean score" \
-    --labels "A3C FF" "$ k=8$" "$ k=4$" \
-    "$ k=16$" \
+    --labels  "$ k=8$" "$ k=4$" "$ k=16$" \
     --legend_at "upper left" \
-    --fontsize 18 \
+    --fontsize 22 \
     $*

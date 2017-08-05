@@ -109,13 +109,18 @@ def obtain_name(hp):
             'a3c_ff': 'A3C FF',
             'a3c_ff_ss': 'A3C SS',
             'a3c_sisws': 'A3C LWS',
-            'a3c_ff_ww': 'A3C WW'
+            'a3c_ff_ww': 'A3C WW',
         }[hp[p]],
         'per_feature': lambda p: '/F' if (p in hp and hp[p] == True) else '',
         'policy_quantization': lambda p: "PQ" if (hp[p] == True) else "",
-        'value_loss_fac': lambda p: ' $\lambda_V = {}$'.format(hp[p])
+        'value_loss_fac': lambda p: ' $\lambda_V = {}$'.format(hp[p]),
+        'zpi': lambda p: ''
     }
 
+    print(hp)
+    if 'policy_quantization' in hp and hp['policy_quantization'] and 'glvq' in hp and hp['glvq'] and 'zpi' in hp and \
+            hp['zpi']:
+        return 'A3C GLPQ zpi'
     if 'policy_quantization' in hp and hp['policy_quantization'] and 'glvq' in hp and hp['glvq'] and 'lpq_hot' in hp and hp['lpq_hot']:
         return 'A3C GLPQ hot'
     if 'policy_quantization' in hp and hp['policy_quantization'] and 'glvq' in hp and hp['glvq']:
@@ -356,7 +361,7 @@ def plot_hbar(totals):
 
     ax.set_xlim([0.2, 0.9])
     plt.title(args.title)
-    plt.xlabel('Mean score final 5 evals')
+    plt.xlabel('Mean score final 5 evals over all runs')
     plt.ylabel('Method')
 
     plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '_bars.pdf'))

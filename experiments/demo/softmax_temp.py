@@ -35,6 +35,16 @@ plt.ylabel("Maximum $\pi(s,a;\\theta)$", size=16)
 #plt.show()
 '''
 
+t = np.linspace(0, 1e6)
+p0 = 3
+pN = 5
+
+gamma = pN - (pN - p0) * np.exp(-t/1e5)
+
+plt.plot(gamma)
+plt.show()
+
+
 p = np.linspace(0.01, 0.999, 100)
 
 pp, ww = np.meshgrid(p, W)
@@ -89,3 +99,4 @@ plt.ylabel("$\gamma$", size=16)
 plt.legend(handles=handles, loc='lower right', fontsize=16)
 plt.show()
 '''
+

@@ -14,5 +14,5 @@ python3 export_plots.py \
     --ylabel "Mean score" \
     --labels "A3C FF" "A3C SS" "A3C SS TT" "A3C SS GT TT" "A3C WW" \
     --legend_at "upper left" \
-    --fontsize 20 \
+    --fontsize 22 \
     $*

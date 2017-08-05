@@ -10,8 +10,9 @@ python3 export_plots.py \
     --xrange -6 -2 \
     --yrange 0 1 \
     --title "Spatial Softmax on Catch" \
-    --xlabel "$\log_{10}(\alpha)$" \
+    --xlabel "$\log_{10}(\eta)$" \
     --ylabel "Mean score" \
     --labels "A3C FF" "A3C SS" "A3C FF SS elu" "A3C SS global temp"  \
     --legend_at "upper left" \
+    --fontsize 22 \
     $*

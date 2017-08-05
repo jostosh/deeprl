@@ -10,8 +10,8 @@ python3 export_plots.py \
     --log_scale \
     --xrange -6 -2 \
     --yrange 0 1 \
-    --title "Policy quantization" \
-    --xlabel "$\log_{10}(\alpha)$" \
+    --title "Policy quantization experimental" \
+    --xlabel "$\log_{10}(\eta)$" \
     --ylabel "Mean score" \
     --labels "A3C FF" "A3C PQ" "A3C PQ soft labels" "A3C PQ ZPI" "A3C PQ CPA" "A3C PQ large" \
     --legend_at "upper left" \

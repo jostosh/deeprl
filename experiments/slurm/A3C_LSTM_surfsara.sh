@@ -6,7 +6,7 @@
 #SBATCH --job-name=A3C_LSTM_v09
 #SBATCH --mail-type ALL
 #SBATCH --mail-user jos.vandewolfshaar@gmail.com
-#SBATCH --output job-A3C_LSTM_v09-%j.log
+#SBATCH --output job-A3C_SISWS_v09-%j.log
 #SBATCH --mem=2000
 #SBATCH --partition=gpu
 

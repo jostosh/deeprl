@@ -2,7 +2,7 @@
 LOGBASE=~/tensorflowlogs/peregrine/v0.9.5/sweep
 
 python3 export_plots.py \
-    --input_dir $LOGBASE/preset13 $LOGBASE/preset112 \
+    --input_dir $LOGBASE/preset112 \
                 $LOGBASE/preset113 $LOGBASE/preset94 \
     --mode sweep \
     --trace_by learning_rate \
@@ -13,9 +13,9 @@ python3 export_plots.py \
     --title "Prototypes Per Action" \
     --xlabel "$\log_{10}(\eta)$" \
     --ylabel "Mean score" \
-    --labels "A3C FF" "$ |\mathcal W| / |\mathcal A|=32$" \
+    --labels "$ |\mathcal W| / |\mathcal A|=32$" \
     "$ |\mathcal W| / |\mathcal A|=64$" \
     "$ |\mathcal W| / |\mathcal A| = 16$" \
     --legend_at "upper left" \
-    --fontsize 18 \
+    --fontsize 22 \
     $*

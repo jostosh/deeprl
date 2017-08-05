@@ -15,5 +15,5 @@ python3 export_plots.py \
     --labels "$\gamma=1$" "$\gamma(t)$" \
     "$\gamma(t), ~ \mathcal L_{\pi}(\gamma)$" "$\gamma$ trainable" \
     --legend_at "upper left" \
-    --fontsize 20 \
+    --fontsize 22 \
     $*

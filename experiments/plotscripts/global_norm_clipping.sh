@@ -14,5 +14,5 @@ python3 export_plots.py \
     --ylabel "Mean score" \
     --labels "Clip by value" "Global norm clipping"  \
     --legend_at "upper left" \
-    --fontsize 20 \
+    --fontsize 22 \
     $*
