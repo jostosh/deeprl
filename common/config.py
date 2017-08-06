@@ -5,7 +5,7 @@ import os
 class Config:
     lr = 7e-4
     stacked_frames = 4
-    env = dict(default='Pong', type=str, choices=['Pong', 'Breakout', 'BeamRider', 'Qbert', 'SpaceInvaders'])
+    env = dict(default='Pong', type=str, choices=['Pong', 'Breakout', 'BeamRider', 'Qbert', 'SpaceInvaders', 'Catch'])
     model = 'a3cff'
     T_max = int(1e8)
     t_max = 20
@@ -17,7 +17,8 @@ class Config:
     render = False
     log_prefix = ''
     eval_interval = int(1e6)
-    stat_interval = 50
+    stat_interval = 100
+    score_interval = 50
     weight_init = 'glorot'
 
     ppa = 16
@@ -32,7 +33,7 @@ class Config:
 
     version = 'v1.0'
 
-    log_base = os.path.join(os.path.realpath(__file__), '../logs')
+    log_base = os.path.join(os.path.dirname(__file__), '../logs')
     log_dir = None
 
 

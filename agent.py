@@ -84,7 +84,7 @@ class Agent(abc.ABC):
         total_duration = time.time() - self.clock0
         steps_per_second = self.T / total_duration
 
-        if self.n_batches % Config.stat_interval == 0:
+        if self.n_batches % Config.stat_interval == 0 and self.name == 'Agent1':
             logger.info("Steps per second: {}, steps per hour: {}".format(steps_per_second, 3600 * steps_per_second))
 
     def toggle_stats(self):
@@ -202,7 +202,7 @@ class A3CAgent(Agent):
             n_step_target = self.r_t[i] + Config.gamma * n_step_target
             self.G_t[i] = n_step_target
 
-        if terminal_state:
+        if terminal_state and self.name == 'Agent1' and self.episode % Config.score_interval == 0:
             logger.info(
                 'Terminal state reached (episode {}, reward {}, T {}): resetting state'.
                     format(self.episode, self.episode_score, self.session.run(self.global_time))

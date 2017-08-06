@@ -94,7 +94,7 @@ class CatchEnv:
             if self.pos > 3:
                 self.pos -= 2
         def right():
-            if self.pos < 20:
+            if self.pos < 17:
                 self.pos += 2
         def noop():
             pass
@@ -120,9 +120,9 @@ class CatchEnv:
         [self.state.append(imresize(self.image, (84, 84))) for _ in range(self.fps - len(self.state) + 1)]
         self.state = self.state[-self.fps:]
 
-        return np.copy(self.state), reward, terminal, None
+        return np.transpose(self.state, [1, 2, 0]), reward, terminal
 
-    def num_actions(self):
+    def get_num_actions(self):
         return 3
 
     def reset(self):
