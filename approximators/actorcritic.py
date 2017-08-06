@@ -45,7 +45,7 @@ class ActorCriticApproximator(Approximator, abc.ABC):
         """
         return self.session.run(self.embedding_layer, feed_dict={self.states: [state]})
 
-    def update_params(self, actions, states, values, lr, n_step_returns, include_summaries, **kwargs):
+    def update_params(self, actions, states, values, n_step_returns, lr, include_summaries, **kwargs):
         """
         Updates the global parameters
         :param actions: Actions that were chosen

@@ -79,13 +79,13 @@ class A3CWW(ActorCriticApproximator):
         return net
 
 
-class A3CLPQ(ActorCriticApproximator):
+class A3CLPQ(A3CFF):
 
     def _build_pi(self, net):
         with tf.variable_scope("Policy"):
             self.pi = self.dnn.lpq_layer(
                 ppa=Config.ppa, n_classes=self.num_actions, init=Config.lpq_init, temperature=Config.lpq_temp,
-                incoming=net, distance_fn=Config.lpq_distance_fn, glpq=False
+                incoming=net, distance_fn=Config.lpq_distance_fn, glpq=False, name='LPQ'
             )
 
 
@@ -95,5 +95,5 @@ class A3CGLPQ(A3CFF):
         with tf.variable_scope("Policy"):
             self.pi = self.dnn.lpq_layer(
                 ppa=Config.ppa, n_classes=self.num_actions, init=Config.lpq_init, temperature=Config.lpq_temp,
-                incoming=net, distance_fn=Config.lpq_distance_fn, glpq=True
+                incoming=net, distance_fn=Config.lpq_distance_fn, glpq=True, name='GLPQ'
             )

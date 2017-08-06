@@ -224,8 +224,8 @@ class A3CAgent(Agent):
             self.a_t[:batch_len],
             self.s_t[:batch_len],
             self.v_t[:batch_len],
-            current_lr,
             self.G_t[:batch_len],
+            current_lr,
             include_summaries=(self.name == "Agent1" and self.n_batches % 50 == 0)
         )
         if summaries:

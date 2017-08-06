@@ -76,7 +76,7 @@ class Approximator(abc.ABC):
         """
 
     @abc.abstractmethod
-    def update_params(self, actions, states, values, lr, n_step_returns, include_summaries, **kwargs):
+    def update_params(self, actions, states, values, n_step_returns, lr, include_summaries, **kwargs):
         """
         Updates the global parameters
         :param actions: Actions that were chosen
@@ -116,20 +116,6 @@ class Approximator(abc.ABC):
 
     def _base_feed_dict(self, state):
         return {self.states: state}
-
-    '''
-    def _add_trainable(self, layer, name=None):
-        self.layers[layer.name] = layer
-        if name:
-            self.theta += tflearn.get_layer_variables_by_name(name)
-        else:
-            self.theta.append(layer.W)
-            if layer.b:
-                if isinstance(layer.b, list):
-                    self.theta += layer.b
-                else:
-                    self.theta.append(layer.b)
-    '''
 
     def build_param_sync(self):
         with tf.name_scope("ParamSynchronization"):
