@@ -61,4 +61,4 @@ for i in range(10):
         plt.imshow(softmax_features[i, :, :, j], cmap='gray', vmin=0., vmax=1.)
         plt.show()
 
-#print(model.session.run(ss, feed_dict={model.inputs[0]: X[:1]}))
+#print(model.session.run(ss, feed_dict={model.states[0]: X[:1]}))

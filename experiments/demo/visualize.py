@@ -181,18 +181,18 @@ if __name__ == "__main__":
                     ax_prediction.imshow(predicted_frame[0, 0, :, :], cmap='gray')
                     ax_prediction.set_title("Predicted frame")
                 bar = ax_pol.bar(range(env.num_actions()), pi)
-                ax_pol.set_title("Policy")  # r"\pi(s,a)")
-                ax_pol.set_ylabel(r"$\pi(s,a)$")
+                ax_pol.set_title("Policy")  # r_t"\pi(s_t,a_t)")
+                ax_pol.set_ylabel(r_t"$\pi(s_t,a_t)$")
                 ax_pol.set_ylim([0., 1.])
                 ax_pol.set_xticklabels(env.env.get_action_meanings(), rotation=90)
                 xticks_pos = [0.65 * patch.get_width() + patch.get_xy()[0] for patch in bar]
                 ax_pol.set_xticks(xticks_pos)
                 line, = ax_val.plot(range(episode_step - 19, episode_step + 1), value_buffer[-20:], linewidth=2)
                 ax_val.set_title("Value estimate")
-                ax_val.set_ylabel(r"$v(s)$")
+                ax_val.set_ylabel(r_t"$v(s_t)$")
                 ax_val.set_ylim([min_val, max_val])
                 ax_val.set_xlim([episode_step - 19, episode_step])
-                ax_val.set_xlabel(r"Step")
+                ax_val.set_xlabel(r_t"Step")
                 plt.tight_layout()
 
                 canvas2 = fig2.canvas

@@ -28,7 +28,7 @@ tf.app.flags.DEFINE_integer('batch_size', 16,
 tf.app.flags.DEFINE_float('weight_init', .1,
                           """weight init for fully connected layers""")
 
-fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v_t')
 
 
 
@@ -40,9 +40,9 @@ def generate_bouncing_ball_sample(batch_size, seq_length, shape, num_balls):
 
 
 def train():
-    """Train ring_net for a number of steps."""
+    """Train ring_net for a_t number of steps."""
     with tf.Graph().as_default():
-        # make inputs
+        # make states
         x = tf.placeholder(tf.float32, [FLAGS.seq_length, FLAGS.batch_size, 32, 32, 3], name='Input')
         target = tf.placeholder(tf.float32, [FLAGS.seq_length, FLAGS.batch_size, 32, 32, 3], name='Target')
 
@@ -81,7 +81,7 @@ def train():
         # List of all Variables
         variables = tf.all_variables()
 
-        # Build a saver
+        # Build a_t saver
         saver = tf.train.Saver(tf.all_variables())
 
         # Summary op

@@ -9,8 +9,8 @@ import abc
 
 class A3CRecurrent(ActorCriticApproximator):
 
-    def __init__(self, hyperparameters, session, num_actions, optimizer, global_approximator, agent_name):
-        super().__init__(hyperparameters, session, num_actions, optimizer, global_approximator, agent_name)
+    def __init__(self, session, num_actions, optimizer, global_approximator, name):
+        super().__init__(session, num_actions, optimizer, global_approximator, name)
         self.rnn_state_numeric = None
         self.rnn_state_op = None
         self.rnn_state_init = None
@@ -19,14 +19,14 @@ class A3CRecurrent(ActorCriticApproximator):
 
     def get_action(self, state):
         """
-        This function returns a single array reflecting the stochastic policy pi for the given state.
+        This function returns a_t single array reflecting the stochastic policy pi for the given state.
         :param state: The input state
-        :return: State's policy
+        :return: State's_t policy
         """
         pi, self.rnn_state_numeric = self.session.run(
             [self.pi, self.rnn_state_op],
             feed_dict={
-                self.inputs: [state],
+                self.states: [state],
                 self.rnn_state_init: self.rnn_state_numeric,
                 self.n_steps: [1]
             }
@@ -36,14 +36,14 @@ class A3CRecurrent(ActorCriticApproximator):
 
     def get_value(self, state):
         """
-        This function returns a single value that corresponds to the critic's valuation of the given state.
+        This function returns a_t single value that corresponds to the critic's_t valuation of the given state.
         :param state: The input state
-        :return: State's value
+        :return: State's_t value
         """
         return self.session.run(
             self.value,
             feed_dict={
-                self.inputs: [state],
+                self.states: [state],
                 self.rnn_state_init: self.rnn_state_numeric,
                 self.n_steps: [1]
             }
@@ -51,7 +51,7 @@ class A3CRecurrent(ActorCriticApproximator):
 
     def get_value_and_action(self, state):
         """
-        Returns the value and action given a state
+        Returns the value and action given a_t state
         :param state: State input
         :return: Value and action as float and integer, respectively
         """
@@ -60,12 +60,12 @@ class A3CRecurrent(ActorCriticApproximator):
                 self.value, self.pi, self.rnn_state_op
             ],
             feed_dict={
-                self.inputs: [state],
+                self.states: [state],
                 self.rnn_state_init: self.rnn_state_numeric,
                 self.n_steps: [1]
             }
         )
-        value, pi = self.session.run([self.value, self.pi], feed_dict={self.inputs: [state]})
+        value, pi = self.session.run([self.value, self.pi], feed_dict={self.states: [state]})
         action = np.random.choice(self.num_actions, p=pi[0])
         return value[0], action
 
@@ -74,7 +74,7 @@ class A3CRecurrent(ActorCriticApproximator):
         return self.session.run(
             self.embedding_layer,
             feed_dict={
-                self.inputs: [state],
+                self.states: [state],
                 self.rnn_state_init: self.rnn_state_numeric,
                 self.n_steps: [1]
             }
@@ -139,13 +139,13 @@ class A3CRecurrent(ActorCriticApproximator):
 
 class A3CLSTM(A3CRecurrent):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, session):
+        super().__init__(**kwargs)
 
     def _build_hidden_layers(self):
 
         with tf.name_scope('LSTMInput'):
-            # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
+            # An LSTM layers's_t 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
             # 'h' (256), which are both influencing the layer in the forward/backward pass.
             self.rnn_state_init = LSTMStateTuple(
                 tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_c"),
@@ -158,7 +158,7 @@ class A3CLSTM(A3CRecurrent):
         with tf.name_scope(scope) as scope:
             net = tf.reshape(net, [1, -1, 256], "ReshapedLSTMInput")
             net, self.rnn_state_op = custom_lstm(
-                net, 256, initial_state=self.rnn_state_init, name='LSTM4_{}'.format(self.agent_name),
+                net, 256, initial_state=self.rnn_state_init, name='LSTM4_{}'.format(self.name),
                 sequence_length=self.n_steps
             )
             self._add_trainable(net)
@@ -170,17 +170,17 @@ class A3CLSTM(A3CRecurrent):
 
 class A3CLSTMSS(A3CRecurrent):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, session):
+        super().__init__(**kwargs)
 
     def _build_hidden_layers(self):
         """
         This is the feedforward model taken from "Asynchronous Methods for Reinforcement Learning"
         :param network_name:    Name of the network
-        :return:                The feedforward model (last hidden layer) as a graph node
+        :return:                The feedforward model (last hidden layer) as a_t graph node
         """
         with tf.name_scope('LSTMStateInput'):
-            # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
+            # An LSTM layers's_t 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
             # 'h' (256), which are both influencing the layer in the forward/backward pass.
             self.initial_state = LSTMStateTuple(
                 tf.placeholder(tf.float32, shape=[1, 256], name="InitialLSTMState_c"),
@@ -188,7 +188,7 @@ class A3CLSTMSS(A3CRecurrent):
             )
             self.n_steps = tf.placeholder(tf.int32, shape=[1])
         with tf.name_scope('ForwardInputs'):
-            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+            net = tf.transpose(self.states, [0, 2, 3, 1])
         with tf.name_scope('HiddenLayers'):
             net = conv_layer(net, 32, 8, 4, activation=self.hp.activation, name='Conv1')
             self._add_trainable(net)
@@ -199,7 +199,7 @@ class A3CLSTMSS(A3CRecurrent):
             self._add_trainable(net)
             net = tflearn.reshape(net, [1, -1, 256], "ReshapedLSTMInput")
             net, state = custom_lstm(net, 256, initial_state=self.initial_state,
-                                     name='LSTM4_{}'.format(self.agent_name),
+                                     name='LSTM4_{}'.format(self.name),
                                      sequence_length=self.n_steps)
             self._add_trainable(net)
             net = tflearn.reshape(net, [-1, 256], name="ReshapedLSTMOutput")
@@ -212,10 +212,10 @@ class A3CConvLSTM(A3CRecurrent):
 
     def _build_hidden_layers(self):
         with tf.name_scope('Inputs'):
-            net = tf.transpose(self.inputs, [0, 2, 3, 1])
+            net = tf.transpose(self.states, [0, 2, 3, 1])
 
         with tf.name_scope('LSTMInput'):
-            # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
+            # An LSTM layers's_t 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
             # 'h' (256), which are both influencing the layer in the forward/backward pass.
             self.n_steps = tf.placeholder(tf.int32, shape=[1])
 

@@ -100,7 +100,7 @@ def network_spatial_interpolation(input):
 
 def train(idx):
 
-    h5f = h5py.File('/home/jos/datasets/aligned/fold{}.hdf5'.format(idx), 'r')
+    h5f = h5py.File('/home/jos/datasets/aligned/fold{}.hdf5'.format(idx), 'r_t')
     X_train = h5f['train/images']
     y_train = h5f['train/labels']
 

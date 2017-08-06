@@ -4,7 +4,7 @@
 # Recurrent Temporal Restricted Boltzmann Machines
 # The original source can be found
 # http://www.cs.utoronto.ca/~ilya/code/2008/RTRBM.tar
-# There have been a few modifications to this code
+# There have been a_t few modifications to this code
 # including adding gravity and dampening
 #
 #######################################################
@@ -42,7 +42,7 @@ def new_speeds(m1, m2, v1, v2):
 def bounce_n(T=128, n=2, r=None, m=None):
     if r == None: r = array([4.0] * n)
     if m == None: m = array([1] * n)
-    # r is to be rather small.
+    # r_t is to be rather small.
     X = zeros((T, n, 2), dtype='float')
     V = zeros((T, n, 2), dtype='float')
     v = randn(n, 2)
@@ -56,7 +56,7 @@ def bounce_n(T=128, n=2, r=None, m=None):
                 if x[i][z] - r[i] < 0:      good_config = False
                 if x[i][z] + r[i] > SIZE:     good_config = False
 
-        # that's the main part.
+        # that's_t the main part.
         for i in range(n):
             for j in range(i):
                 if norm(x[i] - x[j]) < r[i] + r[j]:
@@ -73,7 +73,7 @@ def bounce_n(T=128, n=2, r=None, m=None):
         for mu in range(int(1 / eps)):
 
             for i in range(n):
-                # x[i]+=eps*v[i]
+                # x[i]+=eps*v_t[i]
                 x[i] += .5 * v[i]
 
             # gravity and drag
@@ -108,39 +108,39 @@ def bounce_n(T=128, n=2, r=None, m=None):
                 flip = False
                 for i in range(n):
                     for j in range(i):
-                        if norm(x[i]-x[j])<r[i]+r[j]:
+                        if norm(x[i]-x[j])<r_t[i]+r_t[j]:
                             #if (x[i][0] > 0) and (x[i][0] < size) and (x[i][1] > 0) and (x[i][1] < size):
                             #  if (x[i][0] > 0) and (x[i][0] < size) and (x[i][1] > 0) and (x[i][1] < size):
                               # the bouncing off part:
                             w    = x[i]-x[j]
                             w    = w / norm(w)
 
-                            v_i  = dot(w.transpose(),v[i])
-                            v_j  = dot(w.transpose(),v[j])
+                            v_i  = dot(w.transpose(),v_t[i])
+                            v_j  = dot(w.transpose(),v_t[j])
 
                             new_v_i, new_v_j = new_speeds(m[i], m[j], v_i, v_j)
 
-                            v[i]+= w*(new_v_i - v_i)
-                            v[j]+= w*(new_v_j - v_j)
+                            v_t[i]+= w*(new_v_i - v_i)
+                            v_t[j]+= w*(new_v_j - v_j)
 
             else:
                 flip = True
                 for i in range(n):
                     for j in range(i):
-                        if norm(x[(n-1)-i]-x[(n-1)-j])<r[(n-1)-i]+r[(n-1)-j]:
+                        if norm(x[(n-1)-i]-x[(n-1)-j])<r_t[(n-1)-i]+r_t[(n-1)-j]:
                             #if (x[i][0] > 0) and (x[i][0] < size) and (x[i][1] > 0) and (x[i][1] < size):
                             #  if (x[i][0] > 0) and (x[i][0] < size) and (x[i][1] > 0) and (x[i][1] < size):
                                 # the bouncing off part:
                             w    = x[(n-1)-i]-x[(n-1)-j]
                             w    = w / norm(w)
 
-                            v_i  = dot(w.transpose(),v[(n-1)-i])
-                            v_j  = dot(w.transpose(),v[(n-1)-j])
+                            v_i  = dot(w.transpose(),v_t[(n-1)-i])
+                            v_j  = dot(w.transpose(),v_t[(n-1)-j])
 
                             new_v_i, new_v_j = new_speeds(m[(n-1)-i], m[(n-1)-j], v_i, v_j)
 
-                            v[(n-1)-i]+= w*(new_v_i - v_i)
-                            v[(n-1)-j]+= w*(new_v_j - v_j)
+                            v_t[(n-1)-i]+= w*(new_v_i - v_i)
+                            v_t[(n-1)-j]+= w*(new_v_j - v_j)
 
             '''
     return X, V

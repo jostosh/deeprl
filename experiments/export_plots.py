@@ -108,7 +108,7 @@ def obtain_name(hp):
         return ' '.join(function_by_name[n](n) for n in args.trace_by)
 
     return hp['model'].upper().replace('_', '-') + \
-        (' {}FP'.format('r' if hp['residual_prediction'] else '') if hp['frame_prediction'] else '') + \
+        (' {}FP'.format('r_t' if hp['residual_prediction'] else '') if hp['frame_prediction'] else '') + \
         (' OT' if hp['optimality_tightening'] else '') + \
         (' relu' if 'activation' not in hp else hp['activation']) + \
         ' ({})'.format(hp['t_max'] if 't_max' in hp else '')
@@ -344,7 +344,7 @@ def export_plots():
                     #marker=dict(
                     #    size=12,
                     #    color=all_surfaces,  # set color to an array/list of desired values
-                    #    colorscale='Viridis',  # choose a colorscale
+                    #    colorscale='Viridis',  # choose a_t colorscale
                     #    opacity=0.8
                     #)
                 )
@@ -368,7 +368,7 @@ def export_plots():
                 if args.yrange:
                     ax.set_ylim(args.yrange)
 
-                #cax = ax.scatter(all_xticks, all_scores, s=80, c=all_surfaces, cmap=cm.winter)
+                #cax = ax.scatter(all_xticks, all_scores, s_t=80, c=all_surfaces, cmap=cm.winter)
                 CS = ax.contour(xi, yi, zi, 15, linewidths=0.5, colors='k')
                 CS = ax.contourf(xi, yi, zi, 15, cmap=cm.viridis)
                 sc = ax.scatter(all_xticks, all_yticks, c='k')

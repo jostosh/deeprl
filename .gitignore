@@ -28,6 +28,7 @@ experiments/conv_lstm/checkpoints
 .installed.cfg
 *.egg
 roms/
+logs/
 
 experiments/mnist
 
