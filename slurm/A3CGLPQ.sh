@@ -9,15 +9,12 @@
 #SBATCH --output job-GLPQ-%j.log
 #SBATCH --mem=2000
 
-module load Python/3.5.1-foss-2016a
+module load tensorflow
+
+source $HOME/envs/mproj10/bin/activate
 
 srun python3 $HOME/mproj/deeprl/train.py \
-    --model a3c_ff \
-    --n_threads 12 \
-    --policy_quantization \
-    --pq_cpa \
-    --glvq \
-    --beta 0.01 \
-    --pi_loss_correct \
-    --zpi \
+    --model a3cglpq \
+    --n_threads 16 \
+    --entropy_beta 0.001 \
     $*
