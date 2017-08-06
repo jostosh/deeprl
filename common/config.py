@@ -32,7 +32,7 @@ class Config:
 
     version = 'v1.0'
 
-    log_base = '/home/jos/mproj/logs'
+    log_base = os.path.join(os.path.realpath(__file__), '../logs')
     log_dir = None
 
 
