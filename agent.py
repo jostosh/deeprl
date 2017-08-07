@@ -44,7 +44,7 @@ class Agent(abc.ABC):
         self.global_time = global_time
         self.clock0 = time.time()
         self.n_batches = 0
-        self._evaluating = False
+        self._evaluating = name == 'Agent0'
         self._storing = False
         self._saver = saver
         self._writer = writer
@@ -98,23 +98,20 @@ class Agent(abc.ABC):
 
         It executes the actor-critic method with asynchronous updates and n-step returns in a_t forward view
         """
-        num_episodes = 25
+        num_episodes = Config.eval_episodes
         # Initialize the reward, action and observation arrays
         logger.info("Evaluating for {} episodes".format(num_episodes))
 
         episode_idx = 0
         self._prepare_episode()
         self._prepare_for_batch()
-        self.env.set_test()
-
         returns = np.zeros(num_episodes)
-
         t = 0
         # Main loop, execute this while T < T_max
         while episode_idx < num_episodes:
             # Get action
-            action = self.approximator.get_action(self.last_state)
-            self.last_state, reward, terminal, info = self.env.step(action)
+            action = self.approximator.get_action([self.last_state])
+            self.last_state, reward, terminal = self.env.step(action)
             returns[episode_idx] += reward
 
             if terminal:

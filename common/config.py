@@ -19,6 +19,7 @@ class Config:
     eval_interval = int(1e6)
     stat_interval = 100
     score_interval = 50
+    eval_episodes = 25
     weight_init = 'glorot'
 
     ppa = 16
@@ -35,6 +36,7 @@ class Config:
 
     log_base = os.path.join(os.path.dirname(__file__), '../logs')
     log_dir = None
+
 
 
 def _get_log_dir():
