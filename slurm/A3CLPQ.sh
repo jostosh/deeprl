@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --time=40:00:00
+#SBATCH --time=00:30:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
@@ -8,6 +8,7 @@
 #SBATCH --mail-user jos.vandewolfshaar@gmail.com
 #SBATCH --output job-GLPQ-%j.log
 #SBATCH --mem=2000
+#SBATCH --partition=short
 
 module load tensorflow
 
@@ -17,4 +18,5 @@ srun python3 $HOME/mproj/deeprl/train.py \
     --model a3clpq \
     --n_threads 16 \
     --entropy_beta 0.001 \
+    --T_max 1000000
     $*
