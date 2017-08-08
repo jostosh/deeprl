@@ -25,7 +25,8 @@ Formerly, I called this spatial interpolation soft weight sharing layers. For fu
 [this repo](github.com/jostosh/siswslayer).
 
 ### Spatial softmax and what-and-where architectures
-These architectures use spatial softmax layers. Generally performs worse than the default A3C architecture. The video 
+These architectures use spatial softmax layers, which are taken from [(Levine et al. 2015)](https://arxiv.org/pdf/1504.00702.pdf). 
+They generally perform worse than the default A3C architecture. The video 
 below demonstrates a trained spatial softmax agent on Pong:
 
 [![A3CSS on Pong](https://img.youtube.com/vi/m4RcohCW4t4/0.jpg)](https://www.youtube.com/watch?v=m4RcohCW4t4)
@@ -34,6 +35,10 @@ The what-and-where architecture works better for certain games, e.g.:
 
 ![alt text](/doc/ww.png "What and where results")
 [WW results](./doc/ww.png)
+Where A3C WW is the what-and-where architecture, the A3C SS is the architecture that uses spatial softmax and finally, 
+the A3C FF is the default architecture as proposed by [Mnih et al. (2016)](http://proceedings.mlr.press/v48/mniha16.pdf).
+The what-and-where architecture basically combines normal ReLU activations on output features with the spatial softmax
+mechanism. The idea is that the network can then decide for itself what it should use (similar to Inception layers).
 
 ## Usage
 `train.py` is the default script. Check out the `Config` class in `common/config.py` to see the command line arguments 
