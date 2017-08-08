@@ -34,7 +34,6 @@ below demonstrates a trained spatial softmax agent on Pong:
 The what-and-where architecture works better for certain games, e.g.:
 
 ![alt text](/doc/ww.png "What and where results")
-[WW results](./doc/ww.png)
 Where A3C WW is the what-and-where architecture, the A3C SS is the architecture that uses spatial softmax and finally, 
 the A3C FF is the default architecture as proposed by [Mnih et al. (2016)](http://proceedings.mlr.press/v48/mniha16.pdf).
 The what-and-where architecture basically combines normal ReLU activations on output features with the spatial softmax
