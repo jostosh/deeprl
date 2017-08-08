@@ -20,9 +20,6 @@ The video here demonstrates an agent with an LPQ layer:
 
 [![LPQ on Breakout](https://img.youtube.com/vi/4k5s9KrVp98/0.jpg)](https://www.youtube.com/watch?v=4k5s9KrVp98)
 
-It certainly shows potential on the simple Catch game:
-[LPQ reults](/doc/lpq.png?raw=true "LPQ results")
-
 ### Local weight sharing
 Formerly, I called this spatial interpolation soft weight sharing layers. For further info see 
 [this repo](github.com/jostosh/sisws).
