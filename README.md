@@ -20,6 +20,9 @@ The video here demonstrates an agent with an LPQ layer:
 
 [![LPQ on Breakout](https://img.youtube.com/vi/4k5s9KrVp98/0.jpg)](https://www.youtube.com/watch?v=4k5s9KrVp98)
 
+It certainly shows potential on the simple Catch game:
+[LPQ reults](doc/lpq.png)
+
 ### Local weight sharing
 Formerly, I called this spatial interpolation soft weight sharing layers. For further info see 
 [this repo](github.com/jostosh/sisws).
@@ -29,6 +32,9 @@ These architectures use spatial softmax layers. Generally performs worse than th
 below demonstrates a trained spatial softmax agent on Pong:
 
 [![A3CSS on Pong](https://img.youtube.com/vi/m4RcohCW4t4/0.jpg)](https://www.youtube.com/watch?v=m4RcohCW4t4)
+
+The what-and-where architecture works better for certain games, e.g.:
+[WW results](doc/ww.png)
 
 ## Usage
 `train.py` is the default script. Check out the `Config` class in `common/config.py` to see the command line arguments 
