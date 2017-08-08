@@ -22,7 +22,7 @@ The video here demonstrates an agent with an LPQ layer:
 
 ### Local weight sharing
 Formerly, I called this spatial interpolation soft weight sharing layers. For further info see 
-[this repo](github.com/jostosh/sisws).
+[this repo](github.com/jostosh/siswslayer).
 
 ### Spatial softmax and what-and-where architectures
 These architectures use spatial softmax layers. Generally performs worse than the default A3C architecture. The video 
