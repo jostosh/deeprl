@@ -5,7 +5,8 @@ MSc. project on Deep Reinforcement Learning. [A3C](http://proceedings.mlr.press/
 Currently, the master branch only supports a minimal working example of the most relevant contributions, which are:
 - Learning policy quantization, run with `python3 train.py --model a3clpq` or `python train.py --model a3cglpq`
 - Local weight sharing layers, run with `python3 train.py --model a3clws`
-- Spatial softmax and what-and-where architectures `python3 `
+- Spatial softmax and what-and-where architectures, run with `python3 train.py --model a3css` or 
+`python train.py --model a3cww`
 
 ### Learning policy quantization
 Learning policy quantization is an output layer that is largely inspired by learning vector quantization. It replaces
