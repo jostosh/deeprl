@@ -18,5 +18,5 @@ srun python3 $HOME/mproj/deeprl/train.py \
     --model a3clpq \
     --n_threads 16 \
     --entropy_beta 0.001 \
-    --T_max 1000000
+    --T_max 1000000 \
     $*

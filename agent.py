@@ -14,11 +14,6 @@ import os
 
 class Agent(abc.ABC):
 
-    class Mode:
-        Train = 'Train'
-        Eval = 'Eval'
-        Display = 'Display'
-
     def __init__(self, approximator: Approximator, session: tf.Session, optimizer: RMSPropOptimizer,
                  global_step, saver: tf.train.Saver, writer: tf.summary.FileWriter, global_time, name='Agent',
                  threaded=True):
@@ -28,13 +23,13 @@ class Agent(abc.ABC):
         self.optimizer = optimizer
         self.global_step = global_step
         self.t = 0
+        self.T = 0
         self.r_t = np.zeros(Config.t_max, dtype='float')
         self.a_t = np.zeros(Config.t_max, dtype='int')
         self.v_t = np.zeros(Config.t_max + 1, dtype='float')
         self.G_t = np.zeros(Config.t_max, dtype='float')
-        self.s_t = np.zeros((Config.t_max,) + (Config.im_h, Config.im_w, Config.stacked_frames), dtype='float')
+        self.s_t = np.zeros((Config.t_max, Config.im_h, Config.im_w, Config.stacked_frames), dtype='float')
         self.last_state = None
-        self.show_stats = True
         self.name = name
         self.threaded = threaded
         self.episode_score = 0
@@ -49,7 +44,6 @@ class Agent(abc.ABC):
         self._saver = saver
         self._writer = writer
         self._weights_path = os.path.join(Config.log_dir, 'model.ckpt')
-        self.T = 0
 
     def train(self):
         """ Performs training algorithm """
@@ -65,7 +59,7 @@ class Agent(abc.ABC):
 
     @abc.abstractmethod
     def _do_batch(self):
-        """ Performs a_t batch of steps in the env :return: Bool whether the state is terminal """
+        """ Performs a_t batch of steps in the env """
 
     def _prepare_episode(self):
         """ Does everything to end the episode internally and externally """
@@ -77,27 +71,14 @@ class Agent(abc.ABC):
     def _update_approximator(self, batch_len):
         """ Updates approximator's parameters """
 
-    def toggle_evaluating(self):
-        self._evaluating = not self._evaluating
-
-    def _show_statistics(self):
+    def _show_efficiency(self):
+        """ Show efficiency stats """
         total_duration = time.time() - self.clock0
         steps_per_second = self.T / total_duration
-
-        if self.n_batches % Config.stat_interval == 0 and self.name == 'Agent1':
-            logger.info("Steps per second: {}, steps per hour: {}".format(steps_per_second, 3600 * steps_per_second))
-
-    def toggle_stats(self):
-        self.show_stats = not self.show_stats
+        logger.info("Steps per second: {}, steps per hour: {}".format(steps_per_second, 3600 * steps_per_second))
 
     def eval(self):
-
-        """
-        This is the thread function for a_t single A3C agent. The pseudo-code can be found in "Asynchronous Methods for
-        Reinforcement Learning" by Mnih et al (2016): https://arxiv.org/abs/1602.01783
-
-        It executes the actor-critic method with asynchronous updates and n-step returns in a_t forward view
-        """
+        """ Evaluates the agent """
         num_episodes = Config.eval_episodes
         # Initialize the reward, action and observation arrays
         logger.info("Evaluating for {} episodes".format(num_episodes))
@@ -129,7 +110,7 @@ class Agent(abc.ABC):
         return np.mean(returns)
 
     def _train(self):
-
+        """ Training thread for any RL agent """
         logger.info('Starting training')
         self.score = 0
 
@@ -144,14 +125,15 @@ class Agent(abc.ABC):
             terminal = self._do_batch()
             if terminal:
                 self._prepare_episode()
-            if self.show_stats:
-                self._show_statistics()
+            if self.n_batches % Config.stat_interval == 0 and self.name == 'Agent1':
+                self._show_efficiency()
             if self._evaluating and self.T - last_checkpoint > Config.eval_interval:
                 self.eval()
                 last_checkpoint = np.round(self.T / Config.eval_interval) * Config.eval_interval
                 self._store_parameters()
 
     def _store_parameters(self):
+        """ Store neural network weights """
         if self._storing:
             logger.info("Storing weights at {}".format(self._weights_path))
             self._saver.save(self.session, self._weights_path, global_step=self.global_step)
@@ -161,10 +143,11 @@ class Agent(abc.ABC):
 class A3CAgent(Agent):
 
     def _prepare_for_batch(self):
+        """ No specific configuration for batch needed """
         pass
 
     def _do_batch(self):
-
+        """ Performs one batch of steps in the environment """
         # Set t_start to current t
         t_start = self.t
 
@@ -211,24 +194,23 @@ class A3CAgent(Agent):
         return terminal_state
 
     def increment_t(self):
+        """ Increment time counters """
         self.t += 1
         self.T = self.session.run(self.global_step)
 
     def _update_approximator(self, batch_len):
+        """ Calls gradient descent update for approximator """
         t = self.session.run(self.global_time)
         current_lr = Config.lr - Config.lr / Config.T_max * t
         summaries = self.approximator.update_params(
-            self.a_t[:batch_len],
-            self.s_t[:batch_len],
-            self.v_t[:batch_len],
-            self.G_t[:batch_len],
-            current_lr,
-            include_summaries=(self.name == "Agent1" and self.n_batches % 50 == 0)
+            self.a_t[:batch_len], self.s_t[:batch_len], self.v_t[:batch_len], self.G_t[:batch_len],
+            current_lr, include_summaries=(self.name == "Agent1" and self.n_batches % 50 == 0)
         )
         if summaries:
             self._writer.add_summary(summaries, t)
 
     def _prepare_episode(self):
+        """ Prepares for episode """
         super()._prepare_episode()
         self.approximator.synchronize_parameters()
 
