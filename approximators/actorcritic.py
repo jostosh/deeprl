@@ -8,9 +8,6 @@ from deeprl.common.config import Config
 
 class ActorCriticApproximator(Approximator, abc.ABC):
 
-    #def __init__(self, session, num_actions, optimizer, global_approximator, name):
-    #    super().__init__(session, num_actions, optimizer, global_approximator, name)
-
     def get_action(self, state):
         """
         This function returns a_t single array reflecting the stochastic policy pi for the given state.

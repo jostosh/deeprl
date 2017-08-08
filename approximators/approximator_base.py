@@ -1,7 +1,6 @@
 import abc
 import tensorflow as tf
 from deeprl.approximators.dnn import DNN
-from deeprl.common.logger import logger
 
 
 class Approximator(abc.ABC):
@@ -20,18 +19,7 @@ class Approximator(abc.ABC):
         self.global_approximator = global_approximator
         self.name = name
         self.layers = {}
-        self.embedding_layer = None
-        self.states = None
-        self.actions = None
-        self.minimize = None
         self.summaries = []
-        self.loss = None
-        self.hidden_head = None
-        self.loss_scope = None
-        self.predicted_frame = None
-        self.fp_loss_coeff = None
-        self.frame_target = None
-        self.param_sync = None
         self.dnn = DNN()
 
         with tf.variable_scope(name):
@@ -47,23 +35,23 @@ class Approximator(abc.ABC):
     @abc.abstractmethod
     def get_action(self, state):
         """
-        This function returns a_t single array reflecting the stochastic policy pi for the given state.
+        This function returns a single array reflecting the stochastic policy pi for the given state.
         :param state: The input state
-        :return: State's_t policy
+        :return: State's policy
         """
 
     @abc.abstractmethod
     def get_value(self, state):
         """
-        This function returns a_t single value that corresponds to the critic's_t valuation of the given state.
+        This function returns a single value that corresponds to the critic's valuation of the given state.
         :param state: The input state
-        :return: State's_t value
+        :return: State's value
         """
 
     @abc.abstractmethod
     def get_value_and_action(self, state):
         """
-        Returns the value and action given a_t state
+        Returns the value and action given a state
         :param state: State input
         :return: Value and action as float and integer, respectively
         """
@@ -71,7 +59,7 @@ class Approximator(abc.ABC):
     @abc.abstractmethod
     def get_embedding(self, state):
         """
-        Returns an embedding vector given a_t state
+        Returns an embedding vector given a state
         :param state:
         """
 
@@ -92,7 +80,7 @@ class Approximator(abc.ABC):
     @abc.abstractmethod
     def _build_loss(self):
         """
-        Builds the loss on top of the network's_t output
+        Builds the loss on top of the network's output
         """
 
     @abc.abstractmethod
@@ -105,12 +93,12 @@ class Approximator(abc.ABC):
     @abc.abstractmethod
     def _build_network(self):
         """
-        Builds the full network for approximated functions such as Q(s_t,a_t), V(s_t) or pi(s_t,a_t)
+        Builds the full network for approximated functions such as Q(s,a), V(s) or pi(s,a)
         """
 
     def reset(self):
         """
-        Does everything to reset the approximator such that it is ready for a_t new episode
+        Does everything to reset the approximator such that it is ready for a new episode
         """
         pass
 
