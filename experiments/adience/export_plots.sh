@@ -1,1 +1,0 @@
-python3 export_plots.py --input_dir ~/tensorflowlogs/v0.9.5/adience/ --interpolate --trace_by model per_feature --xlabel "Train step" --ylabel Accurcacy --title "Adience gender recognition" --scalar_subset "- Accuracy/Validation" --image_suffix adience_170303 --ignore_params idx git_description --xrange 0 5000
