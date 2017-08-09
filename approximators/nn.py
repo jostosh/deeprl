@@ -8,7 +8,6 @@ try:
 except:
     from tensorflow.contrib.rnn.python.ops.core_rnn_cell_impl import LSTMStateTuple
 
-from deeprl.approximators.convlstm import ConvLSTM2D
 from deeprl.approximators.layers import \
     spatialsoftmax, conv_layer, fc_layer, neural_tile_coding
 from deeprl.approximators.recurrent import convolutional_lstm, convolutional_gru, custom_lstm, ConvLSTM
@@ -431,44 +430,6 @@ class ActorCriticNN(object):
 
         return net
 
-    def _a3c_conv_lstm_k(self):
-        """
-        This is an experimental architecture that uses convolutional LSTM layers.
-        """
-        with tf.name_scope('Inputs'):
-            net = tf.transpose(self.inputs, [0, 2, 3, 1])
-
-        with tf.name_scope('LSTMInput'):
-            # An LSTM layers's 'state' is defined by the activation of the cells 'c' (256) plus the output of the cell
-            # 'h' (256), which are both influencing the layer in the forward/backward pass.
-            self.n_steps = tf.placeholder(tf.int32, shape=[1])
-
-        with tf.name_scope('HiddenLayers'):
-            net = conv_layer(net, 32, 8, 4, activation=self.hp.activation, name='Conv1')
-            self._add_trainable(net)
-            net = tf.reshape(net, [-1, 1] + net.get_shape().as_list()[1:])
-
-            self.initial_state = LSTMStateTuple(c=tf.placeholder(tf.float32, [None, 9, 9, 64]),
-                                                h=tf.placeholder(tf.float32, [None, 9, 9, 64]))
-
-            #net, new_state, self.initial_state = convolutional_lstm(net, outer_filter_size=4, num_features=64,
-            #                                                        stride=2, inner_filter_size=5, inner_depthwise=False,
-            #                                                        forget_bias=1.)
-            convlstm_layer = ConvLSTM2D(nb_filter=64, nb_row=4, nb_col=4, subsample=(2, 2), dim_ordering='tf',
-                                        state_ph=self.initial_state, return_sequences=True, nb_row_i=3, nb_col_i=3,
-                                        inner_activation=tf.nn.sigmoid)
-            net = convlstm_layer(net)
-
-            self.theta += convlstm_layer.trainable_weights
-            self.lstm_state_variable = convlstm_layer.state_out
-
-            net = tf.reshape(net, [-1, 9 * 9 * 64])
-            #self.lstm_state_variable = new_state
-            net = fc_layer(net, 256, activation=self.hp.activation, name='FC3')
-            self.embedding_layer = net
-
-        return net
-
 
     def _small_fcn(self):
         """
@@ -547,8 +508,6 @@ class ActorCriticNN(object):
             net = self._a3c_lstm_ss()
         elif self.model_name == ModelNames.A3C_CONV_LSTM:
             net = self._a3c_conv_lstm()
-        elif self.model_name == ModelNames.A3C_CONV_LSTM_K:
-            net = self._a3c_conv_lstm_k()
         elif self.model_name == ModelNames.A3C_SISWS:
             net = self._a3c_sisws()
         elif self.model_name == ModelNames.SMALL_FCN:
@@ -667,7 +626,7 @@ class ActorCriticNN(object):
                             # winning_labels.shape == [batch, k, num_actions]
                             winning_labels = tf.gather(prototype_labels, self.k_ind)
                             # score.shape == [batch, k, num_actions]
-                            score = tf.mul(winning_labels, tf.expand_dims(k_sim, 2))
+                            score = tf.multiply(winning_labels, tf.expand_dims(k_sim, 2))
                             self.pi = tf.nn.softmax(tf.reduce_sum(score, axis=1))
                         else:
                             # k_one_hot.shape == [batch, 20, num_actions]
@@ -690,7 +649,7 @@ class ActorCriticNN(object):
                 if self.policy_weighted_val:
                     q_val = fc_layer(net, num_actions, activation='linear', name='q_sa', init=self.hp.weights_init)
                     self._add_trainable(q_val)
-                    self.value = tf.reduce_sum(tf.mul(q_val, tf.stop_gradient(self.pi)),
+                    self.value = tf.reduce_sum(tf.multiply(q_val, tf.stop_gradient(self.pi)),
                                                reduction_indices=1, name='v_s')
                 else:
                     if self.hp.value_quantization:
@@ -710,7 +669,7 @@ class ActorCriticNN(object):
                         winning_values = tf.gather(prototype_values, k_ind)
 
                         # score.shape == [batch, k]
-                        score = tf.mul(winning_values, tf.nn.softmax(k_sim))
+                        score = tf.multiply(winning_values, tf.nn.softmax(k_sim))
 
                         self.value = tf.reduce_sum(score, axis=1)
 
@@ -772,7 +731,7 @@ class ActorCriticNN(object):
             conv2 = self.layers["{}/HiddenLayers/Conv2/BiasAdd:0".format(self.agent_name)]
 
             # Now we can compute the 'transformation layer' which we will be put into the decoding stream
-            transformation = tflearn.fully_connected(tf.mul(action_embedding, encoding),
+            transformation = tflearn.fully_connected(tf.multiply(action_embedding, encoding),
                                                      np.prod(conv2.get_shape().as_list()[1:]), weight_decay=0.0,
                                                      activation='linear', name='Transformation')
             self._add_trainable(transformation)
@@ -832,7 +791,7 @@ class ActorCriticNN(object):
             # The entropy is added to encourage exploration
             entropy = -tf.reduce_sum(log_pi * self.pi, reduction_indices=1, name="Entropy")
             # Define the loss for the policy (minus is needed to perform *negative* gradient descent == gradient ascent)
-            pi_loss = -tf.reduce_sum((tf.reduce_sum(tf.mul(action_mask, log_pi), reduction_indices=1) * self.advantage_no_grad
+            pi_loss = -tf.reduce_sum((tf.reduce_sum(tf.multiply(action_mask, log_pi), reduction_indices=1) * self.advantage_no_grad
                         + self.beta * entropy))
 
         with tf.name_scope("ValueLoss"):

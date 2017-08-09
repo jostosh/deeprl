@@ -21,7 +21,7 @@ config1 = {
     'beta': 0.01,
     'frames_per_state': 4,
     'input_shape': '4,84,84',
-    'env': 'Pong-v0',
+    'env': 'Pong',
     'model': ModelNames.A3C_FF,
     'n_threads': 8,
     'action_repeat': 4,

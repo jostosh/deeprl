@@ -17,8 +17,6 @@ import subprocess
 from copy import deepcopy
 from deeprl.common.catch import CatchEnv
 from tensorflow.python import debug as tf_debug
-from sklearn.cluster import AffinityPropagation
-from sklearn.mixture import GaussianMixture
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 flags = tf.app.flags
@@ -37,10 +35,7 @@ class A3CAgent(object):
         :param agent_name:      Name of this agent
         :param session:         TensorFlow session
         """
-        self.env = get_env(env_name,
-                           frames_per_state=hp.frames_per_state,
-                           output_shape=hp.input_shape[1:],
-                           noiselevel=hp.noiselevel)
+        self.env = get_env(env_name)
         self.num_actions = self.env.num_actions()
 
         self.local_network = ActorCriticNN(num_actions=self.num_actions,
@@ -121,7 +116,7 @@ class A3CAgent(object):
                 values[i], actions[i] = self.local_network.get_value_and_action(self.last_state, session)
                 # Perform step in environment and obtain rewards and observations
                 a = actions[i] if not self.hp.lpq_single_winner else actions[i] // self.hp.ppa
-                self.last_state, rewards[i], terminal_state, info = self.env.step(a)
+                self.last_state, rewards[i], terminal_state = self.env.step(a)
                 # Increment time counters
                 self.t += 1
                 T = session.run(global_step)
@@ -192,7 +187,7 @@ class A3CAgent(object):
                         self.n_episodes, epr, current_lr, T))
 
                 self.n_episodes += 1
-                self.last_state = self.env.reset_random()
+                self.last_state = self.env.reset()
                 epr = 0
                 self.local_network.reset()
 
@@ -225,9 +220,8 @@ class A3CAgent(object):
 
         episode_idx = 0
         self.synchronize_thread_parameters()
-        self.last_state = self.env.reset_random()
+        self.last_state = self.env.reset()
         self.local_network.reset()
-        self.env.set_test()
         returns = np.zeros(num_episodes)
 
         t = 0
@@ -239,27 +233,15 @@ class A3CAgent(object):
             action = self.local_network.get_action(self.last_state, session)
             a = action if not self.hp.lpq_single_winner else action // self.hp.ppa
 
-            self.last_state, reward, terminal, info = self.env.step(a)
+            self.last_state, reward, terminal = self.env.step(a)
             returns[episode_idx] += reward
 
             if terminal:
-                self.last_state = self.env.reset_random()
+                self.last_state = self.env.reset()
                 self.local_network.reset()
                 episode_idx += 1
 
-            if t % 100 == 0:
-                embeddings.append(self.local_network.get_embedding(self.last_state, session))
-                embedding_images.append(self.env.env._get_image() if isinstance(self.env, AtariEnvironment) else self.last_state[-1, :, :])
-
-                if len(embeddings) > 100:
-                    deletion_index = np.random.randint(100)
-                    del embeddings[deletion_index]
-                    del embedding_images[deletion_index]
-
             t += 1
-
-        if isinstance(self.env, AtariEnvironment):
-            self.store_embeddings(embedding_images, embeddings)
 
         logger.info("Mean score {}".format(np.mean(returns)))
         writer.add_summary(make_summary_from_python_var('Evaluation/Score', np.mean(returns)), self.train_episode)
@@ -271,7 +253,7 @@ class A3CAgent(object):
 
     def sample_head_space(self):
         self.synchronize_thread_parameters()
-        self.last_state = self.env.reset_random()
+        self.last_state = self.env.reset()
         self.local_network.reset()
 
         heads = []
@@ -283,10 +265,10 @@ class A3CAgent(object):
 
             _ = self.local_network.get_action(self.last_state, session)
             action = np.random.randint(self.num_actions)
-            self.last_state, reward, terminal, info = self.env.step(action)
+            self.last_state, reward, terminal = self.env.step(action)
 
             if terminal:
-                self.last_state = self.env.reset_random()
+                self.last_state = self.env.reset()
                 self.local_network.reset()
 
         heads_stacked = np.stack(heads)
@@ -302,32 +284,6 @@ class A3CAgent(object):
         assign_prototypes = tf.assign(prototypes, prototype_ph)
 
         self.session.run(assign_prototypes, feed_dict={prototype_ph: prototype_inits})
-
-    def store_embeddings(self, embedding_images, embeddings):
-        zipped_embeddings = list(zip(embeddings, embedding_images))
-        shuffle(zipped_embeddings)
-        embeddings, embedding_images = zip(*zipped_embeddings[:100])
-        embeddings = list(embeddings)
-        embedding_images = list(embedding_images)
-        frame_height = embedding_images[0].shape[0]
-        frame_width = embedding_images[0].shape[1]
-        sprite_image = np.empty(
-            (10 * frame_height, 10 * frame_width) + ((3,) if isinstance(self.env, AtariEnvironment) else tuple()))
-
-        def create_sprite_im():
-            image_index = 0
-            for i in range(0, sprite_image.shape[0], frame_height):
-                for j in range(0, sprite_image.shape[1], frame_width):
-                    sprite_image[i:i + frame_height, j:j + frame_width] = embedding_images[image_index]
-                    image_index += 1
-                    if image_index == len(embedding_images):
-                        return
-
-        create_sprite_im()
-        if len(embedding_images) < 100:
-            embeddings += (100 - len(embedding_images)) * [np.zeros_like(embeddings[0])]
-        scipy.misc.imsave(os.path.join(writer.get_logdir(), 'embedding_sprite.png'), sprite_image)
-        session.run(embedding_assign, feed_dict={embedding_placeholder: np.concatenate(embeddings, axis=0)})
 
 
 if __name__ == "__main__":
@@ -348,7 +304,7 @@ if __name__ == "__main__":
         session = tf_debug.LocalCLIDebugWrapperSession(session)
         session.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
 
-    global_env = get_env(env_name, noiselevel=hyperparameters.noiselevel)
+    global_env = get_env(env_name)
     num_actions = global_env.num_actions()
 
     learning_rate_ph = tf.placeholder(tf.float32)

@@ -1,20 +1,19 @@
 from scipy.misc import imresize
 import gym
 import numpy as np
-from deeprl.common.config import Config
 from queue import Queue
 
 
-def get_env():
-    if Config.env == 'Catch':
+def get_env(name):
+    if name == 'Catch':
         return CatchEnv()
-    return AtariEnv()
+    return AtariEnvironment(name)
 
 
-class AtariEnv:
-    def __init__(self):
-        self.env = gym.make(Config.env + 'Deterministic-v4')
-        self.nb_frames = Config.stacked_frames
+class AtariEnvironment:
+    def __init__(self, name):
+        self.env = gym.make(name + 'Deterministic-v4')
+        self.nb_frames = 4
         self.frame_q = Queue(maxsize=self.nb_frames)
         self.previous_state = None
         self.current_state = None
@@ -27,8 +26,8 @@ class AtariEnv:
 
     @staticmethod
     def _preprocess(image):
-        image = AtariEnv._rgb2gray(image)
-        image = imresize(image, [Config.im_w, Config.im_h], 'bilinear')
+        image = AtariEnvironment._rgb2gray(image)
+        image = imresize(image, [84, 84], 'bilinear')
         image = image.astype(np.float32) / 128.0 - 1.0
         return image
 
@@ -36,16 +35,16 @@ class AtariEnv:
         if not self.frame_q.full():
             return None  # frame queue is not full yet.
         x_ = np.array(self.frame_q.queue)
-        x_ = np.transpose(x_, [1, 2, 0])  # move channels
+        #x_ = np.transpose(x_, [1, 2, 0])  # move channels
         return x_
 
     def _update_frame_q(self, frame):
         if self.frame_q.full():
             self.frame_q.get()
-        image = AtariEnv._preprocess(frame)
+        image = AtariEnvironment._preprocess(frame)
         self.frame_q.put(image)
 
-    def get_num_actions(self):
+    def num_actions(self):
         return self.env.action_space.n
 
     def reset(self):
@@ -67,6 +66,9 @@ class AtariEnv:
         self.current_state = self._get_current_state()
         return self.current_state, reward, done
 
+    def state_shape(self):
+        return (4, 84, 84)
+
 
 class CatchEnv:
 
@@ -74,7 +76,7 @@ class CatchEnv:
         self.size = 21
         self.image = np.zeros((self.size, self.size))
         self.state = []
-        self.fps = Config.stacked_frames
+        self.fps = 4
         self.output_shape = (84, 84)
 
     def reset_random(self):
