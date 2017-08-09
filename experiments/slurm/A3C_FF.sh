@@ -9,6 +9,8 @@
 #SBATCH --output job-FF-%j.log
 #SBATCH --mem=2000
 
-module load Python/3.5.1-foss-2016a
+module load tensorflow
+source $HOME/envs/mproj10/bin/activate
+
 
 srun python3 $HOME/mproj/deeprl/rlmethods/a3c.py --model a3c_ff --n_threads 12 $*

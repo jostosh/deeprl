@@ -534,9 +534,11 @@ class ActorCriticNN(object):
 
                     self.head = net
                     head_shape = net.get_shape().as_list()[-1]
-                    d = 1.0 / np.sqrt(head_shape)
+                    d = 1.0 / np.sqrt(head_shape) * self.hp.lpq_init_fac
                     if self.hp.lpq_init == 'torch':
-                        prototype_init = tf.random_uniform((num_prototypes, head_shape), minval=0.0 if self.hp.zpi else -d, maxval=d)
+                        prototype_init = tf.random_uniform((num_prototypes, head_shape), minval=-d, maxval=d)
+                        if self.hp.lpq_zero_clip:
+                            prototype_init = tf.nn.relu(prototype_init)
                     elif self.hp.lpq_init == 'trunc_normal':
                         prototype_init = tf.nn.relu(tf.truncated_normal((num_prototypes, head_shape)))
                     elif self.hp.lpq_init == 'exp':

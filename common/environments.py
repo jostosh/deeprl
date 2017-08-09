@@ -122,9 +122,9 @@ class CatchEnv:
         [self.state.append(imresize(self.image, (84, 84))) for _ in range(self.fps - len(self.state) + 1)]
         self.state = self.state[-self.fps:]
 
-        return np.transpose(self.state, [1, 2, 0]), reward, terminal
+        return np.copy(self.state), reward, terminal
 
-    def get_num_actions(self):
+    def num_actions(self):
         return 3
 
     def reset(self):

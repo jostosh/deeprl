@@ -9,6 +9,8 @@
 #SBATCH --output job-A3C_FF_TEST_v09-%j.log
 #SBATCH --mem=2000
 
-module load Python/3.5.1-foss-2016a
+module load tensorflow
+source $HOME/envs/mproj10/bin/activate
+
 
 srun python mproj/deeprl/experiments/param_sweep.py $*

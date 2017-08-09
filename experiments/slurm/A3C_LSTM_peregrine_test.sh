@@ -10,6 +10,8 @@
 #SBATCH --mem=2000
 #SBATCH --partition=short
 
-module load Python/3.5.1-foss-2016a
+module load tensorflow
+source $HOME/envs/mproj10/bin/activate
+
 
 srun python mproj/deeprl/rlmethods/a3c.py --model a3c_ff --n_threads 12 --clip_rewards $* --env Catch --evaluation_interval 50000

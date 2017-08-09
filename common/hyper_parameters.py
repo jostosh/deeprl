@@ -96,7 +96,9 @@ config1 = {
     'exp_beta': 0.5,
     'lpq_init': 'torch',
     'lpq_temp_exp': False,
-    'lpq_gamma': 0.0
+    'lpq_gamma': 0.0,
+    'lpq_init_fac': 1.0,
+    'lpq_zero_clip': False
 }
 
 param_sweep = {
@@ -236,3 +238,5 @@ class HyperParameters(object):
         self.lpq_init = params.lpq_init
         self.lpq_temp_exp = params.lpq_temp_exp
         self.lpq_gamma = params.lpq_gamma
+        self.lpq_init_fac = params.lpq_init_fac
+        self.lpq_zero_clip = params.lpq_zero_clip
