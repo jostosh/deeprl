@@ -199,8 +199,9 @@ class A3CAgent(object):
                                                                            3600 / mean_duration))
 
             if T - last_checkpoint > self.hp.evaluation_interval and self.agent_name == 'Agent_0':
-                if isinstance(self.env, AtariEnvironment) or isinstance(self.env, CatchEnv):
-                    mean_score = self.evaluate(50)
+                print(T - last_checkpoint, self.hp.evaluation_interval, self.agent_name)
+
+                mean_score = self.evaluate(50)
 
                 last_checkpoint = T // (self.hp.evaluation_interval / 10) * (self.hp.evaluation_interval / 10) # round to the nearest 1e6
                 if isinstance(self.env, AtariEnvironment) or self.hp.force_store:

@@ -213,6 +213,7 @@ def export_plots():
 
         totals = []
         for label, (scores, surfaces, xticks, yticks) in sorted(data_by_label.items()):
+            print(label, scores, xticks)
             xi = np.linspace(min(xticks), max(xticks))
 
             indices = np.argsort(xticks).astype('int64')
