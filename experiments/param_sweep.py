@@ -50,7 +50,7 @@ lo_by_param = {
     'noiselevel': 0.0,
     'exp_beta': 0.1,
     'lpq_gamma': 1.0,
-    'lpq_init_fac': 2 ** (-4)
+    'lpq_init_fac': 2 ** (-8)
 }
 
 hi_by_param = {
@@ -70,7 +70,7 @@ hi_by_param = {
     'noiselevel': 0.5,
     'exp_beta': 1.0,
     'lpq_gamma': 256,
-    'lpq_init_fac': 2 ** 4
+    'lpq_init_fac': 2 ** 1
 }
 
 presets = {
@@ -1056,6 +1056,20 @@ presets = {
         'zpi': True,
         'lpq_zero_clip': True
     },
+    '143': {
+        'model': 'a3c_ff',
+        'policy_quantization': True,
+        'ppa': 16,
+        'nwp': 16,
+        'pq_cpa': True,
+        'glvq': True,
+        'lpq_p0': 0.95,
+        'lpq_pN': 0.999,
+        'beta': 0.01,
+        'pi_loss_correct': True,
+        'zpi': True,
+        'lpq_zero_clip': True
+    }
 }
 
 

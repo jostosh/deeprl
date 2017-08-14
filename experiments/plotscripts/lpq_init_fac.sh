@@ -7,10 +7,10 @@ python3 export_plots.py \
     --trace_by lpq_init_fac \
     --image_suffix policy_quantization_best \
     --log_scale \
-    --xrange -4 4 \
+    --xrange -1.204 1.204 \
     --yrange 0 1 \
     --title "Temperature Sweep LPQ" \
-    --xlabel "$\log_{10}(\lambda_{\text{LPQ init}})$" \
+    --xlabel "$\log_{10}(\rho_{LPQ})$" \
     --ylabel "Mean score" \
     --labels "A3C random uniform" "A3C zero clip"  \
     --legend_at "upper left" \
