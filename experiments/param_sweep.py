@@ -50,7 +50,7 @@ lo_by_param = {
     'noiselevel': 0.0,
     'exp_beta': 0.1,
     'lpq_gamma': 1.0,
-    'lpq_init_fac': 2 ** (-8)
+    'lpq_init_fac': 2 ** 1
 }
 
 hi_by_param = {
@@ -70,7 +70,7 @@ hi_by_param = {
     'noiselevel': 0.5,
     'exp_beta': 1.0,
     'lpq_gamma': 256,
-    'lpq_init_fac': 2 ** 1
+    'lpq_init_fac': 2 ** 4
 }
 
 presets = {
