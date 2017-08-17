@@ -19,7 +19,7 @@ srun python3 $HOME/mproj/deeprl/rlmethods/a3c.py \
     --policy_quantization \
     --pq_cpa \
     --glvq \
-    --beta 0.01 \
+    --beta 0.001 \
     --pi_loss_correct \
-    --zpi \
+    --lpq_zero_clip \
     $*
