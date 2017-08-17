@@ -97,7 +97,7 @@ config1 = {
     'lpq_init': 'torch',
     'lpq_temp_exp': False,
     'lpq_gamma': 0.0,
-    'lpq_init_fac': 1.0,
+    'lpq_init_fac': 3.16,
     'lpq_zero_clip': False
 }
 
