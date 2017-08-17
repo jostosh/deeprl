@@ -28,7 +28,7 @@ class AtariEnvironment:
     def _preprocess(image):
         image = AtariEnvironment._rgb2gray(image)
         image = imresize(image, [84, 84], 'bilinear')
-        image = image.astype(np.float32) / 128.0 - 1.0
+        image = image.astype(np.float32) / 255.0
         return image
 
     def _get_current_state(self):
