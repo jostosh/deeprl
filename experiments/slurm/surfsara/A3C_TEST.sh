@@ -7,7 +7,7 @@
 #SBATCH --mail-type ALL
 #SBATCH --mail-user jos.vandewolfshaar@gmail.com
 #SBATCH --output job-TEST-%j.log
-#SBATCH --mem=2000
+#SBATCH --mem=4000
 #SBATCH --partition=short
 
 module load python/3.5.0

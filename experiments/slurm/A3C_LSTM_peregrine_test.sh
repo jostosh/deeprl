@@ -7,7 +7,7 @@
 #SBATCH --mail-type ALL
 #SBATCH --mail-user jos.vandewolfshaar@gmail.com
 #SBATCH --output job-A3C_FF_TEST_v09-%j.log
-#SBATCH --mem=2000
+#SBATCH --mem=4000
 #SBATCH --partition=short
 
 module load tensorflow

@@ -7,7 +7,7 @@
 #SBATCH --mail-type ALL
 #SBATCH --mail-user jos.vandewolfshaar@gmail.com
 #SBATCH --output job-FF-%j.log
-#SBATCH --mem=2000
+#SBATCH --mem=4000
 
 module load python/3.5.0
 module load cuda/7.5.18
