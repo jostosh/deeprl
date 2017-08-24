@@ -179,7 +179,7 @@ class A3CAgent(object):
                                                                             n_updates % 50 == 0))
 
             if summaries:
-                writer.add_summary(summaries, self.t)
+                pass #writer.add_summary(summaries, self.t)
 
             if terminal_state:
                 if n_updates % 20 == 0:
@@ -245,8 +245,11 @@ class A3CAgent(object):
             t += 1
 
         logger.info("Mean score {}".format(np.mean(returns)))
-        writer.add_summary(make_summary_from_python_var('Evaluation/Score', np.mean(returns)), self.train_episode)
-        writer.flush()
+        with open(os.path.join(writer.get_logdir(), 'evals.csv'), 'a+') as f:
+            f.write('{}\t{}\n'.format(self.train_episode, np.mean(returns)))
+
+        #writer.add_summary(make_summary_from_python_var('Evaluation/Score', np.mean(returns)), self.train_episode)
+        #writer.flush()
         self.train_episode += 1
         self.env.set_train()
 
