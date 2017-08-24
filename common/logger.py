@@ -18,8 +18,8 @@ def get_log_dir(hyper_parameters):
         path = os.path.join(logprefixed(LOGDIRBASE, hyper_parameters),
                             hyper_parameters.env,
                             hyper_parameters.model,
-                            'lpq={}'.format(hyper_parameters.lpq),
-                            'glpq={}'.format(hyper_parameters.glpq)
+                            'lpq={}'.format(hyper_parameters.policy_quantization),
+                            'glpq={}'.format(hyper_parameters.glvq)
                             )
         # Check if base directory exists, if not create it
         os.makedirs(path, exist_ok=True)
@@ -31,8 +31,8 @@ def get_log_dir(hyper_parameters):
         path = os.path.join(basepath,
                             hyper_parameters.env,
                             hyper_parameters.model,
-                            'lpq={}'.format(hyper_parameters.lpq),
-                            'glpq={}'.format(hyper_parameters.glpq)
+                            'lpq={}'.format(hyper_parameters.policy_quantization),
+                            'glpq={}'.format(hyper_parameters.glvq)
                             )
         os.makedirs(path.replace("/data/s2098407", os.path.expanduser("~")), exist_ok=True)
 
