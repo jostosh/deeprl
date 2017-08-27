@@ -13,7 +13,7 @@ https://github.com/muupan/async-rl/wiki
 
 config1 = {
     'T_max': 1e8,
-    't_max': 20,
+    't_max': 5,
     'gamma': 0.99,
     'learning_rate': 7e-4,
     'rms_decay': 0.99,
