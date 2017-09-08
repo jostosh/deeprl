@@ -213,7 +213,6 @@ def export_plots():
 
         totals = []
         for label, (scores, surfaces, xticks, yticks) in sorted(data_by_label.items()):
-            print(label, scores, xticks)
             xi = np.linspace(min(xticks), max(xticks))
 
             indices = np.argsort(xticks).astype('int64')
@@ -240,7 +239,7 @@ def export_plots():
         handles.clear()
         fig, ax = plt.subplots()
         ax.set_xlabel(args.xlabel)
-        ax.set_ylabel('Mean score final 5 evaluations')
+        ax.set_ylabel('Mean score final 5 epochs')
         ax.set_title(args.title)
         ax.set_xlim(args.xrange)
         ax.set_ylim(args.yrange)
@@ -251,11 +250,11 @@ def export_plots():
 
             indices = np.argsort(xticks)
             yi = spline([xticks[i] for i in indices], [scores[i] for i in indices], xi, order=1)
-            totals.append((label, np.mean(yi[12:])))
+            totals.append((label, np.mean(yi[12:]), np.std(yi[12:])))
 
             ysmoothed = savgol_filter(yi, window_length=5, polyorder=3)
 
-            handles.append(plt.plot(xi, ysmoothed, linewidth=4.0, label=label)[0])
+            handles.append(plt.plot(xi, ysmoothed, linewidth=3.0, label=label)[0])
             #handles.append(plt.scatter(xticks, scores, label=args.labels[label_idx] + " Data"))
 
 
@@ -357,12 +356,12 @@ def plot_hbar(totals):
     ax.barh(ind, [t[1] for t in totals], width, color='blue')
     ax.set_yticks(ind + width / 2)
     ax.set_yticklabels([t[0] for t in totals], minor=False)
-    for i, (_, v) in enumerate(totals):
-        ax.text(v + 0.01, i + 0.3, "%.2f" % v, color='blue')
+    for i, (_, v, s) in enumerate(totals):
+        ax.text(v + 0.01, i + 0.3, "$%.2f \pm %.2f$" % (v, s), color='blue')
 
     ax.set_xlim([0.2, 0.9])
     plt.title(args.title)
-    plt.xlabel('Mean score final 5 evals over all runs')
+    plt.xlabel('Mean score final 5 epochs over all runs')
     plt.ylabel('Method')
 
     plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '_bars.pdf'))
@@ -616,7 +615,7 @@ def get_event_files_by_hp_by_env(input_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_dir", nargs='+', default=[])
-    parser.add_argument("--output_dir", default='/home/jos/Dropbox/RUG/6e Jaar/mproj/thesis/im')
+    parser.add_argument("--output_dir", default='/home/jos/Dropbox/RUG/6e Jaar/mproj/thesis/lpq/im')
     parser.add_argument("--scalar_subset", nargs='+', default=['Evaluation/Score'])
     parser.add_argument("--ignore_params", nargs='+', default=['git_description'])
     parser.add_argument("--subset_params", nargs='+', default=[])
