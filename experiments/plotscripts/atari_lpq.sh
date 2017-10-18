@@ -2,10 +2,10 @@
 LOGBASE=~/tensorflowlogs/peregrine/v0.9.5/sweep
 
 python3 export_plots.py \
-    --input_dir ~/tensorflowlogs/peregrine/v0.9.8/Pong-v0/ \
+    --input_dir ~/tensorflowlogs/cartesius/v0.9.7/BeamRider-v0/ \
     --mode mean \
     --image_suffix atari_lpq \
-    --xrange 0 60 \
+    --xrange 0 80 \
     --xlabel "Epoch" \
     --ylabel "Score" \
     --legend_at "upper left" \

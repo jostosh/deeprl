@@ -108,7 +108,7 @@ def obtain_name(hp):
             'centroids_trainable': 'LWS small',
             'large': 'LWS',
             'inv_euclidean': 'SISWS IE',
-            'a3c_ff': 'A3C FF',
+            'a3c_ff': 'A3C softmax',
             'a3c_ff_ss': 'A3C SS',
             'a3c_sisws': 'A3C LWS',
             'a3c_ff_ww': 'A3C WW',
@@ -339,6 +339,7 @@ def export_plots():
             ylab = args.scalar_subset[0].split('/')[-1].title() if not args.ylabel else args.ylabel
             if len(args.trace_by) == 1:
                 title = env.replace('-v0', '') if not args.title else args.title
+                title = title.replace('BeamRider', 'Beam Rider')
 
                 render_sweep1d_mpl(all_scores, all_surfaces, all_xticks, title, xlab, ylab)
                 render_sweep1d_plotly(all_scores, all_surfaces, all_xticks, env, layout, title, xlab, ylab)
