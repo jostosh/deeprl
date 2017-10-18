@@ -31,6 +31,8 @@ for c in cl.to_numeric(colorscale):
     colorscalen.append((c[0]/255., c[1]/255, c[2]/255))
 colorscalen.append((0., 0., 0.))
 colorscalen.append((1., 0., 0.))
+linestyles = ['solid', 'dashed', 'dashed', 'dashdot']
+dashed = [[], (10, 3), (20, 3)]
 
 
 def event_arrays_to_mean_and_errors(event_array):
@@ -212,7 +214,7 @@ def export_plots():
         ax.set_ylim(args.yrange)
 
         totals = []
-        for label, (scores, surfaces, xticks, yticks) in sorted(data_by_label.items()):
+        for idx, (label, (scores, surfaces, xticks, yticks)) in enumerate(sorted(data_by_label.items())):
             xi = np.linspace(min(xticks), max(xticks))
 
             indices = np.argsort(xticks).astype('int64')
@@ -221,11 +223,12 @@ def export_plots():
 
             ysmoothed = savgol_filter(yi, window_length=5, polyorder=3)
 
-            handles.append(plt.plot(xi, np.nan_to_num(ysmoothed), linewidth=4.0, label=label)[0])
+            handles.append(plt.plot(xi, np.nan_to_num(ysmoothed), linewidth=4.0, label=label, linestyle=linestyles[idx], dashes=dashed[idx])[0])
             #handles.append(plt.scatter(xticks, scores, label=args.labels[label_idx] + " Data"))
 
         plt.legend(handles=handles, loc=args.legend_at, framealpha=0.)
 
+        # plt.axis('equal')
         plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '.pdf'))
         plt.gcf().patch.set_alpha(0.0)
         plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '.png'), rasterized=True, dpi=600)
@@ -245,7 +248,7 @@ def export_plots():
         ax.set_ylim(args.yrange)
 
         totals = []
-        for label, (scores, surfaces, xticks, yticks) in sorted(data_by_label.items()):
+        for idx, (label, (scores, surfaces, xticks, yticks)) in enumerate(sorted(data_by_label.items())):
             xi = np.linspace(min(xticks), max(xticks))
 
             indices = np.argsort(xticks)
@@ -254,12 +257,12 @@ def export_plots():
 
             ysmoothed = savgol_filter(yi, window_length=5, polyorder=3)
 
-            handles.append(plt.plot(xi, ysmoothed, linewidth=4.0, label=label)[0])
+            handles.append(plt.plot(xi, ysmoothed, linewidth=4.0, label=label, linestyle=linestyles[idx], dashes=dashed[idx])[0])
             #handles.append(plt.scatter(xticks, scores, label=args.labels[label_idx] + " Data"))
 
 
         plt.legend(handles=handles, loc=args.legend_at, framealpha=0.)
-
+        # plt.axis('equal')
         plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '_scores.pdf'))
         plt.gcf().patch.set_alpha(0.0)
         plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '_scores.png'), rasterized=True, dpi=600)
@@ -515,7 +518,7 @@ def add_to_plotly_plot(data_objs, errors, hp_idx, hyper_parameters, steps, value
 def add_to_mpl_plot(errors, handles, hp_idx, hyper_parameters, steps, values):
     plt.fill_between(steps, values - errors, values + errors, facecolor=colorscalen[hp_idx], alpha=0.2)
     handles.append(plt.plot(steps, values, linewidth=2.0, color=colorscalen[hp_idx],
-                            label=obtain_name(hyper_parameters))[0])
+                            label=obtain_name(hyper_parameters), linestyle=linestyles[hp_idx], dashes=dashed[hp_idx])[0])
 
 
 def get_events_by_scalar(event_files):
@@ -615,7 +618,7 @@ def get_event_files_by_hp_by_env(input_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_dir", nargs='+', default=[])
-    parser.add_argument("--output_dir", default='/home/jos/Dropbox/RUG/6e Jaar/mproj/thesis/im')
+    parser.add_argument("--output_dir", default='/home/jos/Dropbox/RUG/6e Jaar/mproj/thesis/lpq/im')
     parser.add_argument("--scalar_subset", nargs='+', default=['Evaluation/Score'])
     parser.add_argument("--ignore_params", nargs='+', default=['git_description'])
     parser.add_argument("--subset_params", nargs='+', default=[])

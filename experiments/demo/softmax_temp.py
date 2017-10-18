@@ -60,7 +60,7 @@ plt.xlabel('$p$', size=16)
 plt.ylabel('$|\mathcal A|$', size=16)
 plt.title("Softmax temperature vs. $|\mathcal A|$ and $p$", size=20)
 cb = plt.colorbar()
-cb.ax.set_title("$\gamma$", size=16)
+cb.ax.set_title(r"$\tau$", size=16)
 plt.savefig('/home/jos/Dropbox/RUG/6e Jaar/mproj/thesis/im/lpq_gamma.pdf')
 #plt.show()
 

@@ -12,8 +12,8 @@ python3 export_plots.py \
     --title "Temperature Configurations" \
     --xlabel "$\log_{10}(\eta)$" \
     --ylabel "Mean score" \
-    --labels "$\gamma=1$" "$\gamma(t)$" \
-    "$\gamma(t), ~ \mathcal L_{\pi}(\gamma)$" "$\gamma$ trainable" \
+    --labels "$\tau=1$" "$\tau(t)$" \
+    "$\tau(t), ~ \mathcal L_{\pi}(\tau)$" "$\tau$ trainable" \
     --legend_at "upper left" \
     --fontsize 22 \
     $*
