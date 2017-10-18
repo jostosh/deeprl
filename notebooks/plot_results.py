@@ -40,6 +40,9 @@ for c in cl.to_numeric(colorscale):
     colorscalen.append((c[0]/255., c[1]/255, c[2]/255))
 colorscalen.append((0., 0., 0.))
 colorscalen.append((1., 0., 0.))
+linestyles = ['solid', 'dashed', 'dashed', 'dashdot']
+dashed = [[], (10, 3), (20, 3)]
+
 
 
 # In[5]:
@@ -83,7 +86,7 @@ for env_name in ['Pong']:
         
         plt.fill_between(averages['Epoch'], averages['Score'] - stds['Score'],
                          averages['Score'] + stds['Score'], alpha=0.2, color=colorscalen[i])
-        handles.append(plt.plot(averages['Epoch'], averages['Score'], linewidth=2, color=colorscalen[i], label=name)[0])
+        handles.append(plt.plot(averages['Epoch'], averages['Score'], linewidth=2, color=colorscalen[i], ls=linestyles[i], dashes=dashed[i], label=name)[0])
         
         
     #dfs_ff_env = read_all_runs(os.path.join(logbase, env_name, ff_infix))
