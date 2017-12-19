@@ -9,8 +9,10 @@ Currently, the master branch only supports a minimal working example of the most
 - Spatial softmax and what-and-where architectures, run with `python3 train.py --model a3css` or 
 `python train.py --model a3cww`
 
+For other command line arguments, check out `common/config.py` in which you'll find a `Config` object class that contains the parameters with their default values.
+
 ## Packages needed
-Just `pip install tensorflow scipy Pillow gym[atari]` should get you started!
+Just `pip install -r requirements.txt` should get you up and running!
 
 ### Learning policy quantization
 Learning policy quantization is an output layer that is largely inspired by learning vector quantization. It replaces
