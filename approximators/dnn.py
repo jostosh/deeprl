@@ -331,23 +331,23 @@ def manhattan(net, prototypes):
 
 def glvq_score(similarities, num_classes):
     # TODO get rid of the inverted implementation
-    distances = -similarities
+    # distances = -similarities
     scores = []
-    _, na, num_p = distances.get_shape().as_list()
+    _, na, num_p = similarities.get_shape().as_list()
     for i in range(num_classes):
         jnoti = [j for j in range(num_classes) if j != i]
 
-        distance_wrong = tf.reshape(tf.reduce_min(
-            tf.transpose(tf.gather(tf.transpose(distances, (1, 0, 2)), jnoti), (1, 0, 2)),
+        similarities_other = tf.reshape(tf.reduce_max(
+            tf.transpose(tf.gather(tf.transpose(similarities, (1, 0, 2)), jnoti), (1, 0, 2)),
             axis=[1, 2]),
             shape=(-1, 1)
         )
 
-        distance_right = distances[:, i, :]
+        similarities_same = similarities[:, i, :]
 
-        scores.append(distance_right - distance_wrong / (distance_right + distance_wrong))
+        scores.append((similarities_same - similarities_other) / (similarities_same + similarities_other))
 
-    return -tf.stack(scores, axis=1)
+    return tf.stack(scores, axis=1)
 
 
 

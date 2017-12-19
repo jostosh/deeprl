@@ -6,7 +6,7 @@ class Config:
     lr = 7e-4
     stacked_frames = 4
     env = dict(default='Pong', type=str, choices=['Pong', 'Breakout', 'BeamRider', 'Qbert', 'SpaceInvaders', 'Catch'])
-    model = 'a3cff'
+    model = dict(default='a3cff', type=str, choices=['a3cff', 'a3clws', 'a3css', 'a3cww', 'a3clpq', 'a3cglpq'])
     T_max = int(1e8)
     t_max = 20
     gamma = 0.99
@@ -40,7 +40,7 @@ class Config:
 
 
 def _get_log_dir():
-    path = os.path.join(Config.log_base, Config.version, Config.env, Config.model)
+    path = os.path.join(Config.log_base, Config.version, Config.log_prefix, Config.env, Config.model)
     os.makedirs(path, exist_ok=True)
     # Check the current directories in there
     current_dirs = sorted([o for o in os.listdir(path) if os.path.isdir(os.path.join(path, o))])
