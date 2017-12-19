@@ -191,7 +191,7 @@ if __name__ == "__main__":
     for i in range(100):
         if args.preset:
             preset_str = convert_preset_to_params(presets[args.preset])
-            command = ["python3", "mproj/deeprl/train.py", '--env=Catch',
+            command = ["python3", "mproj/deeprl/train.py", '--env=Catch', '--log_base=/data/s2098407/tensorflowlogs'
                        '--eval_interval=50000', '--T_max=1000000', '--n_threads=12',
                        '--log_prefix=sweep/preset{}'.format(args.preset)] + preset_str + \
                       ["--{}={}".format(p, func_by_param[p](lo_by_param[p], hi_by_param[p], np.random.rand()))

@@ -15,5 +15,4 @@ source $HOME/envs/mproj10/bin/activate
 
 srun python3 $HOME/mproj/deeprl/experiments/param_sweep.py \
     --preset 30 \
-    --log_base /data/s2098407/tensorflowlogs
     $*
