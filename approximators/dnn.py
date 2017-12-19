@@ -3,6 +3,17 @@ import numpy as np
 from deeprl.common.logger import logger
 
 
+def layer(fn):
+    from functools import wraps
+
+    @wraps(fn)
+    def layer_wrapper(self, *args, **kwargs):
+        out = fn(*args, **kwargs)
+        self._finalize(out, kwargs.get('name'))
+        return out
+    return layer_wrapper
+
+
 class DNN:
 
     def __init__(self, input=None):
@@ -10,8 +21,10 @@ class DNN:
         self.theta = []
         self.outputs = {}
 
+    @layer
     def conv_layer(self, n_filters, filter_size, stride, activation, name, padding='VALID', init='torch',
                    incoming=None):
+        """ Implements a convolutional layer """
         incoming = either(incoming, self.head)
         _, kh, kw, input_channels = incoming.get_shape().as_list()
         with tf.variable_scope(name):
@@ -23,9 +36,11 @@ class DNN:
             self._add_theta(W, b)
             out = activation(tf.nn.bias_add(tf.nn.conv2d(incoming, W, [1, stride, stride, 1], padding), b))
 
-        return self._finalize(out, name)
+        return out #self._finalize(out, name)
 
+    @layer
     def fc_layer(self, n_out, activation, name, init='torch', incoming: tf.Tensor=None):
+        """ Implements a fully connected layer """
         incoming = either(incoming, self.head)
         if incoming.get_shape().ndims == 4:
             incoming = self.flatten(incoming)
@@ -38,18 +53,24 @@ class DNN:
             self._add_theta(W, b)
             out = activation(tf.nn.xw_plus_b(incoming, W, b))
 
-        return self._finalize(out, name)
+        return out
 
+    @layer
     def spatial_softmax(self, epsilon=0.5, trainable_temperature=True, name='SpatialSoftmax', incoming=None):
+        """
+        Implements spatial softmax operator which can be found at https://arxiv.org/abs/1504.00702
+        Incoming should be a 4D tensor.
+        """
         incoming = either(incoming, self.head)
         # Get the incoming dimensions (should be a_t 4D tensor)
         _, h, w, c = incoming.get_shape().as_list()
 
-        edge = 1  # 1 / (c*2) if not hierarchical else 1 / (c*6)
+        edge = 1
 
         with tf.variable_scope(name):
-            # First we create a_t linspace from -1 + epsilon to 1 - epsilon. Epsilon is needed to ensure that the output is
-            # actually in the range (-1, 1) and not greater than 1 or smaller than -1.
+            # First we create a_t linspace from -1 + epsilon to 1 - epsilon.
+            # Epsilon is needed to ensure that the output is actually in the range (-1, 1) and not greater than 1
+            # or smaller than -1.
             #
             # Note that each '1' in the reshape is to enforce broadcasting along that dimension
             cartesian_y = tf.reshape(tf.linspace(-edge + epsilon * edge, edge - epsilon * edge, h), (1, h, 1, 1),
@@ -69,8 +90,8 @@ class DNN:
             # Now we compute the softmax per channel
             softmax_per_channel = tf.div(numerator_softmax, denominator_softmax, name='SoftmaxPerChannel')
 
-            # Compute the x coordinates by element-wise multiplicatoin of the cartesion coordinates with the softmax
-            # activations and summing the result
+            # Compute the x coordinates by element-wise multiplication of the Cartesian coordinates with the softmax
+            # activations and sums the result to extract x-coordinates and y-coordinates.
             x_coordinates = tf.reduce_sum(tf.mul(cartesian_x, softmax_per_channel), reduction_indices=[1, 2],
                                           name='xOut')
             y_coordinates = tf.reduce_sum(tf.mul(cartesian_y, softmax_per_channel), reduction_indices=[1, 2],
@@ -79,9 +100,23 @@ class DNN:
             # Concatenate the resulting tensors to get the output
             out = tf.concat(1, [x_coordinates, y_coordinates], name="Output")
 
-        return self._finalize(out, name)
+        return out
 
-    def lpq_layer(self, ppa, n_classes, name, init, distance_fn, glpq=False, temperature=1.0, incoming=None):
+    @layer
+    def lpq_layer(self, ppa, n_classes, name, sim_fn, glpq=False, temperature=1.0, incoming=None):
+        """
+        Implements LPQ layer
+        Parameters:
+            :param ppa:         Prototypes per action
+            :param n_classes:   Number of classes
+            :param name:        Name used in variable scope
+            :param sim_fn       Similarity function
+            :param glpq         Whether to use GLPQ. If true will compute relative similarity
+            :param temperature  Softmax temperature
+            :param incoming     Incoming tensor
+        Returns:
+            :return A Tensor with dimensions [batch_size, n_classes] representing the LPQ output
+        """
         num_prototypes = ppa * n_classes
         incoming = either(incoming, self.head)
         n_in = incoming.get_shape().as_list()[-1]
@@ -91,18 +126,19 @@ class DNN:
             prototypes = tf.Variable(prototype_init, name='Prototypes')
             self._add_theta(prototypes)
 
-            similarity = lpq_distance(incoming, prototypes, distance_fn)
+            similarity = lpq_similarity(incoming, prototypes, sim_fn)
             if glpq:
                 similarity = tf.reshape(similarity, [-1, n_classes,  ppa])
-                similarity = glvq_score(similarity, n_classes)
+                similarity = relative_similarity(similarity, n_classes)
                 similarity = tf.reshape(similarity, [-1, n_classes * ppa])
 
             similarity *= temperature
             prototype_scores = tf.nn.softmax(similarity)
             out = tf.reduce_sum(tf.reshape(prototype_scores, [-1, n_classes, ppa]), axis=2)
 
-        return self._finalize(out, name)
+        return out
 
+    @layer
     def local_weight_sharing(self, n_centroids, n_filters, filter_size, strides, activation,
                              name='SoftWeightConv',
                              scope=None, reuse=False, local_normalization=True, centroids_trainable=False,
@@ -193,8 +229,8 @@ class DNN:
                     # In case n_centroids is a list, we initialize the centroids in a grid
                     assert len(n_centroids) == 2, "Length of n_centroids list must be 2."
 
-                    # If we initialize the centroids in a grid and take them to be non-trainable, it does not make sense to
-                    # have feature-wise KCPs
+                    # If we initialize the centroids in a grid and take them to be non-trainable, it does not make
+                    # sense to have feature-wise KCPs
                     if not centroids_trainable:
                         centroids_f = 1
                         per_feature = False
@@ -222,9 +258,9 @@ class DNN:
                 else:
                     raise TypeError("n_centroids is neither a list nor an int!")
 
-                # Define the distance of each cell w.r.t. the centroids. We can easily accomplish this through broadcasting
-                # i.e. x_diff2 will have shape [1, 1, n, 1, c] with n as above and c the number of centroids. Similarly,
-                # y_diff2 will have shape [1, m, 1, 1, c]
+                # Define the distance of each cell w.r.t. the centroids. We can easily accomplish this through
+                # broadcasting i.e. x_diff2 will have shape [1, 1, n, 1, c] with n as above and c the number of
+                # centroids. Similarly, y_diff2 will have shape [1, m, 1, 1, c]
 
                 centroid_broadcasting_shape = [1, 1, 1, centroids_f, n_centroids]
 
@@ -278,7 +314,7 @@ class DNN:
                 except:
                     out.W_list = tf.split(convs.W, n_centroids * [n_filters], axis=3)
 
-        return self._finalize(out, name)
+        return out
 
     def _finalize(self, out, name):
         self.head = out
@@ -287,7 +323,9 @@ class DNN:
 
     @staticmethod
     def _get_initializers(init, input_channels, filter_size=1):
+        """ Weight initializers """
         if init == 'torch':
+            # This is used in Deepmind's papers
             d = 1.0 / np.sqrt(filter_size * filter_size * input_channels)
             weight_init = tf.random_uniform_initializer(minval=-d, maxval=d)
             bias_init = tf.random_uniform_initializer(minval=-d, maxval=d)
@@ -299,20 +337,22 @@ class DNN:
     def _add_theta(self, *args):
         self.theta.extend(list(args))
 
+    @layer
     def flatten(self, incoming=None, name='Flatten'):
+        """ Flattens input to a Tensor of rank 2 """
         incoming = either(incoming, self.head)
         n_out = np.prod(incoming.get_shape().as_list()[1:])
         out = tf.reshape(incoming, [-1, n_out])
-        self.outputs[name] = out
-        self.head = out
         return out
 
 
 def either(a, b):
+    """ This allows a tf.Tensor compatible version of 'var = a or b' """
     return b if a is None else a
 
 
-def lpq_distance(net, prototypes, fn_name):
+def lpq_similarity(net, prototypes, fn_name):
+    """ Currently we only implement two similarity functions """
     return {
         'euc2': euclidean_squared,
         'man':  manhattan
@@ -320,39 +360,44 @@ def lpq_distance(net, prototypes, fn_name):
 
 
 def euclidean_squared(net, prototypes):
+    """ Squared Euclidean similarity """
     diff = tf.expand_dims(net, 1) - tf.expand_dims(prototypes, 0)
     return -tf.reduce_sum(tf.square(diff), axis=2)
 
 
 def manhattan(net, prototypes):
+    """ Manhattan similarity """
     diff = tf.expand_dims(net, 1) - tf.expand_dims(prototypes, 0)
     return -tf.reduce_sum(tf.abs(diff), axis=2)
 
 
-def glvq_score(similarities, num_classes):
-    # TODO get rid of the inverted implementation
-    # distances = -similarities
+def relative_similarity(similarities, num_classes):
+    """ Computes relative similarity used for GLPQ """
     scores = []
     _, na, num_p = similarities.get_shape().as_list()
     for i in range(num_classes):
-        jnoti = [j for j in range(num_classes) if j != i]
+        # Get indices j != i
+        j_neq_i = [j for j in range(num_classes) if j != i]
 
+        # Get the most similar other prototype belonging to another class j != i
         similarities_other = tf.reshape(tf.reduce_max(
-            tf.transpose(tf.gather(tf.transpose(similarities, (1, 0, 2)), jnoti), (1, 0, 2)),
+            tf.transpose(tf.gather(tf.transpose(similarities, (1, 0, 2)), j_neq_i), (1, 0, 2)),
             axis=[1, 2]),
             shape=(-1, 1)
         )
 
+        # Get the similarities of the prototypes belonging to class i
         similarities_same = similarities[:, i, :]
 
+        # Compute relative similarity
         scores.append((similarities_same - similarities_other) / (similarities_same + similarities_other))
 
     return tf.stack(scores, axis=1)
 
 
-
 def color_augmentation(current_filter_shape, locally_weighted_kernels, n_centroids, n_filters, per_feature,
                        similarities):
+    """ Function to visualize local weight sharing """
     import colorlover as cl
     # Add color coding such that each centroid codes for a certain color.
     colors_numeric = [
