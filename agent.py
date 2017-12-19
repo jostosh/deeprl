@@ -143,7 +143,7 @@ class Agent(abc.ABC):
 class A3CAgent(Agent):
 
     def _prepare_for_batch(self):
-        """ No specific configuration for batch needed """
+        """ No specific preparation for batch (e.g. setting states of RNN) """
         pass
 
     def _do_batch(self):

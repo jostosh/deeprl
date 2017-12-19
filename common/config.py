@@ -6,7 +6,7 @@ class Config:
     lr = 7e-4
     stacked_frames = 4
     env = dict(default='Pong', type=str, choices=['Pong', 'Breakout', 'BeamRider', 'Qbert', 'SpaceInvaders', 'Catch'])
-    model = 'a3cff'
+    model = dict(default='a3cff', type=str, choices=['a3cff', 'a3clws', 'a3css', 'a3cww', 'a3clpq', 'a3cglpq'])
     T_max = int(1e8)
     t_max = 20
     gamma = 0.99

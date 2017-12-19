@@ -14,7 +14,7 @@ def uniform(lo, hi, rate):
     return rate * (hi - lo) + lo
 
 func_by_param = {
-    'learning_rate': log_uniform,
+    'lr': log_uniform,
     'ss_epsilon': uniform,
     'global_clip_norm': log_uniform,
     'otc': log_uniform,
@@ -23,7 +23,7 @@ func_by_param = {
 }
 
 lo_by_param = {
-    'learning_rate': 1e-6,
+    'lr': 1e-6,
     'ss_epsilon': 0.1,
     'global_clip_norm': 0.5,
     'otc': 2.0 ** (-8),
@@ -32,7 +32,7 @@ lo_by_param = {
 }
 
 hi_by_param = {
-    'learning_rate': 1e-2,
+    'lr': 1e-2,
     'ss_epsilon': 0.5,
     'global_clip_norm': 40.0,
     'otc': 2.0,
@@ -165,6 +165,10 @@ presets = {
     '29': {
         'model': 'a3c_ff_ss',
         'softmax_only': True
+    },
+    '30': {
+        'model': 'a3cglpq',
+        'entropy_beta': 0.001
     }
 }
 
@@ -177,8 +181,7 @@ def convert_preset_to_params(preset):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default='a3c_ff_ss')
-    parser.add_argument("--params", nargs='+', default=['learning_rate', 'ss_epsilon', 'global_clip_norm',
-                                                        'otc', 'fplc', 'fp_decay'])
+    parser.add_argument("--params", nargs='+', default=['lr'])
     parser.add_argument("--a3c_args", nargs='+', default=[])
     parser.add_argument("--preset", default=None)
     args = parser.parse_args()
@@ -188,9 +191,9 @@ if __name__ == "__main__":
     for i in range(100):
         if args.preset:
             preset_str = convert_preset_to_params(presets[args.preset])
-            command = ["python3", "mproj/deeprl/rlmethods/train.py", '--env=Catch',
-                       '--evaluation_interval=50000', '--T_max=1000000', '--n_threads=12',
-                       '--logprefix=sweep/preset{}'.format(args.preset)] + preset_str + \
+            command = ["python3", "mproj/deeprl/train.py", '--env=Catch',
+                       '--eval_interval=50000', '--T_max=1000000', '--n_threads=12',
+                       '--log_prefix=sweep/preset{}'.format(args.preset)] + preset_str + \
                       ["--{}={}".format(p, func_by_param[p](lo_by_param[p], hi_by_param[p], np.random.rand()))
                        for p in args.params]
         else:
