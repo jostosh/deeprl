@@ -4,11 +4,17 @@ from deeprl.common.logger import logger
 
 
 def layer(fn):
+    """
+    Provides wrapper for layer methods that will call _finalize after creation and will make sure 'incoming' in kwargs
+    is either the last added layer or it is provided explicitly through a keyword argument
+    """
     from functools import wraps
 
     @wraps(fn)
     def layer_wrapper(self, *args, **kwargs):
-        out = fn(*args, **kwargs)
+        if 'incoming' not in kwargs:
+            kwargs['incoming'] = self.head
+        out = fn(self, *args, **kwargs)
         self._finalize(out, kwargs.get('name'))
         return out
     return layer_wrapper
@@ -25,7 +31,6 @@ class DNN:
     def conv_layer(self, n_filters, filter_size, stride, activation, name, padding='VALID', init='torch',
                    incoming=None):
         """ Implements a convolutional layer """
-        incoming = either(incoming, self.head)
         _, kh, kw, input_channels = incoming.get_shape().as_list()
         with tf.variable_scope(name):
             bias_init, weight_init = self._get_initializers(init, input_channels, filter_size)
@@ -36,14 +41,13 @@ class DNN:
             self._add_theta(W, b)
             out = activation(tf.nn.bias_add(tf.nn.conv2d(incoming, W, [1, stride, stride, 1], padding), b))
 
-        return out #self._finalize(out, name)
+        return out
 
     @layer
     def fc_layer(self, n_out, activation, name, init='torch', incoming: tf.Tensor=None):
         """ Implements a fully connected layer """
-        incoming = either(incoming, self.head)
         if incoming.get_shape().ndims == 4:
-            incoming = self.flatten(incoming)
+            incoming = self.flatten(incoming=incoming, name="Flatten")
         n_in = incoming.get_shape().as_list()[-1]
 
         with tf.variable_scope(name):
@@ -61,7 +65,6 @@ class DNN:
         Implements spatial softmax operator which can be found at https://arxiv.org/abs/1504.00702
         Incoming should be a 4D tensor.
         """
-        incoming = either(incoming, self.head)
         # Get the incoming dimensions (should be a_t 4D tensor)
         _, h, w, c = incoming.get_shape().as_list()
 
@@ -118,7 +121,6 @@ class DNN:
             :return A Tensor with dimensions [batch_size, n_classes] representing the LPQ output
         """
         num_prototypes = ppa * n_classes
-        incoming = either(incoming, self.head)
         n_in = incoming.get_shape().as_list()[-1]
         d = 1.0 / np.sqrt(n_in)
         with tf.variable_scope(name):
@@ -176,7 +178,6 @@ class DNN:
         Return values:
             :return: A 4D Tensor with similar dimensionality as a normal conv_2d's output
         """
-        incoming = either(incoming, self.head)
         valid_fns = ['Exp', 'InvEuclidean']
         if similarity_fn not in valid_fns:
             raise ValueError("Invalid similarity function {}, must be either {}"
@@ -316,6 +317,14 @@ class DNN:
 
         return out
 
+    @layer
+    def flatten(self, _guard=None, incoming=None, name='Flatten'):
+        assert _guard is None, "DNN.flatten: only provide kwargs!"
+        """ Flattens input to a Tensor of rank 2 """
+        n_out = np.prod(incoming.get_shape().as_list()[1:])
+        out = tf.reshape(incoming, [-1, n_out])
+        return out
+
     def _finalize(self, out, name):
         self.head = out
         self.outputs[name] = out
@@ -337,13 +346,6 @@ class DNN:
     def _add_theta(self, *args):
         self.theta.extend(list(args))
 
-    @layer
-    def flatten(self, incoming=None, name='Flatten'):
-        """ Flattens input to a Tensor of rank 2 """
-        incoming = either(incoming, self.head)
-        n_out = np.prod(incoming.get_shape().as_list()[1:])
-        out = tf.reshape(incoming, [-1, n_out])
-        return out
 
 
 def either(a, b):

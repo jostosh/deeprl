@@ -71,7 +71,7 @@ class A3CWW(ActorCriticApproximator):
             what, where = tf.split(3, 2, net)
             where = self.dnn.spatial_softmax(incoming=where)
             what = tf.nn.relu(what)
-            what = self.dnn.flatten(what, name='Flat')
+            what = self.dnn.flatten(incoming=what, name='Flat')
             net = tf.concat(1, [what, where])
             net = self.dnn.fc_layer(256, tf.nn.relu, name='FC3', incoming=net)
             self.embedding_layer = net
