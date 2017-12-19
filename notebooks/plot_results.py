@@ -103,7 +103,7 @@ for env_name in ['Pong']:
 
     ax.set_xlabel("Epoch", fontsize=fontsize)
     ax.set_ylabel("Score", fontsize=fontsize)
-    ax.set_title(env_name, fontsize=fontsize + 2)
+    ax.set_title(env_name, fontsize=fontsize + 4)
     ax.set_xlim([0, 80])
     plt.legend(handles=handles, framealpha=0., fontsize=fontsize, loc='lower right')
     plt.tight_layout()
