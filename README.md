@@ -1,11 +1,15 @@
 # deeprl
-MSc. project on Deep Reinforcement Learning. [A3C](http://proceedings.mlr.press/v48/mniha16.pdf) was chosen as the baseline algorithm.
+MSc. project on Deep Reinforcement Learning. [A3C](http://proceedings.mlr.press/v48/mniha16.pdf) was chosen as the 
+baseline algorithm. My thesis is available [here](https://pdfs.semanticscholar.org/361c/9ba853c7d69058ddc0f32cdbe94fbc2166d5.pdf).
 
 ## This repo
 Currently, the master branch only supports a minimal working example of the most relevant contributions, which are:
 - Learning policy quantization, run with `python3 train.py --model a3clpq` or `python train.py --model a3cglpq`
 - Local weight sharing layers, run with `python3 train.py --model a3clws`
 - Spatial softmax and what-and-where architectures `python3 `
+
+## Packages needed
+Just `pip install tensorflow scipy Pillow gym[atari]` should get you started!
 
 ### Learning policy quantization
 Learning policy quantization is an output layer that is largely inspired by learning vector quantization. It replaces
