@@ -1,6 +1,8 @@
 import abc
 import tensorflow as tf
 from deeprl.approximators.dnn import DNN
+from deeprl.common.logger import logger
+from deeprl.common.config import Config
 
 
 class Approximator(abc.ABC):
@@ -123,6 +125,13 @@ class Approximator(abc.ABC):
             self.dnn.conv_layer(32, 8, 4, tf.nn.relu, name='Conv1', incoming=self.states)
             self.dnn.conv_layer(64, 4, 2, tf.nn.relu, name='Conv2')
             net = self.dnn.fc_layer(256, tf.nn.relu, name='FC3')
-            self.embedding_layer = net
 
         return net, scope
+
+    def _show_layer_overview(self):
+        logger.info("Layer overview:")
+        for key in self.layers.keys():
+            logger.info('\t' + key)
+
+    def _input_shape(self):
+        return [None, Config.im_h, Config.im_w, Config.stacked_frames]

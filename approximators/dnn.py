@@ -120,23 +120,28 @@ class DNN:
         Returns:
             :return A Tensor with dimensions [batch_size, n_classes] representing the LPQ output
         """
+        # Prototype initlialization
         num_prototypes = ppa * n_classes
         n_in = incoming.get_shape().as_list()[-1]
         d = 1.0 / np.sqrt(n_in)
+        prototype_init = tf.nn.relu(tf.random_uniform((num_prototypes, n_in), minval=-d, maxval=d))
+
         with tf.variable_scope(name):
-            prototype_init = tf.nn.relu(tf.random_uniform((num_prototypes, n_in), minval=-d, maxval=d))
+            # Add prototypes to variables
             prototypes = tf.Variable(prototype_init, name='Prototypes')
             self._add_theta(prototypes)
 
+            # Compute the similarity score
             similarity = lpq_similarity(incoming, prototypes, sim_fn)
             if glpq:
+                # Compute relative similarity
                 similarity = tf.reshape(similarity, [-1, n_classes,  ppa])
                 similarity = relative_similarity(similarity, n_classes)
                 similarity = tf.reshape(similarity, [-1, n_classes * ppa])
 
-            similarity *= temperature
-            prototype_scores = tf.nn.softmax(similarity)
-            out = tf.reduce_sum(tf.reshape(prototype_scores, [-1, n_classes, ppa]), axis=2)
+            similarity *= temperature                                                          # Multiply by temperature
+            prototype_scores = tf.nn.softmax(similarity)                                       # Softmax per prototype
+            out = tf.reduce_sum(tf.reshape(prototype_scores, [-1, n_classes, ppa]), axis=2)    # Sum per class
 
         return out
 
@@ -319,8 +324,8 @@ class DNN:
 
     @layer
     def flatten(self, _guard=None, incoming=None, name='Flatten'):
-        assert _guard is None, "DNN.flatten: only provide kwargs!"
         """ Flattens input to a Tensor of rank 2 """
+        assert _guard is None, "DNN.flatten: only provide kwargs!"
         n_out = np.prod(incoming.get_shape().as_list()[1:])
         out = tf.reshape(incoming, [-1, n_out])
         return out

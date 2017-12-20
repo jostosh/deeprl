@@ -33,7 +33,6 @@ class A3CLWS(ActorCriticApproximator):
             self.dnn.local_weight_sharing(3, n_filters=64, filter_size=4, strides=2, activation=tf.nn.relu,
                                           name='Conv2', centroids_trainable=True, per_feature=True)
             net = self.dnn.fc_layer(256, tf.nn.relu, 'FC3')
-            self.embedding_layer = net
 
         return net
 
@@ -51,7 +50,6 @@ class A3CSS(ActorCriticApproximator):
             self.dnn.conv_layer(64, 3, 2, tf.identity, name='Conv2')
             self.dnn.spatial_softmax()
             net = self.dnn.fc_layer(256, tf.nn.relu, name='FC3')
-            self.embedding_layer = net
 
         return net
 
@@ -74,7 +72,6 @@ class A3CWW(ActorCriticApproximator):
             what = self.dnn.flatten(incoming=what, name='Flat')
             net = tf.concat(1, [what, where])
             net = self.dnn.fc_layer(256, tf.nn.relu, name='FC3', incoming=net)
-            self.embedding_layer = net
 
         return net
 

@@ -12,7 +12,7 @@ class ActorCriticApproximator(Approximator, abc.ABC):
         """
         This function returns a_t single array reflecting the stochastic policy pi for the given state.
         :param state: The input state
-        :return: State's_t policy
+        :return: An action
         """
         pi = self.session.run(self.pi, feed_dict=self._base_feed_dict(state))
         return np.random.choice(self.num_actions, p=pi[0])
@@ -21,7 +21,7 @@ class ActorCriticApproximator(Approximator, abc.ABC):
         """
         This function returns a_t single value that corresponds to the critic's_t valuation of the given state.
         :param state: The input state
-        :return: State's_t value
+        :return: A value estimate
         """
         return self.session.run(self.value, feed_dict=self._base_feed_dict(state))[0]
 
@@ -36,11 +36,8 @@ class ActorCriticApproximator(Approximator, abc.ABC):
         return value[0], action
 
     def get_embedding(self, state):
-        """
-        Returns an embedding vector given a_t state
-        :param state:
-        """
-        return self.session.run(self.embedding_layer, feed_dict={self.states: [state]})
+        """ Returns an embedding vector given a_t state """
+        return self.session.run(self.hidden_head, feed_dict={self.states: [state]})
 
     def update_params(self, actions, states, values, n_step_returns, lr, include_summaries, **kwargs):
         """
@@ -52,7 +49,6 @@ class ActorCriticApproximator(Approximator, abc.ABC):
         :param n_step_returns: n-step returns
         :param include_summaries: Whether to include summaries in output for TensorBoard
         :param kwargs: Other arguments
-        :return:
         """
         feed_dict = self._update_feed_dict(actions, states, values, n_step_returns, lr)
         # Update the parameters
@@ -64,10 +60,7 @@ class ActorCriticApproximator(Approximator, abc.ABC):
 
     @abc.abstractmethod
     def _build_hidden_layers(self):
-        """
-        Builds hidden layers
-        :return: Tensor Op of last layer
-        """
+        """ Builds hidden layers """
 
     def _build_loss(self):
 
@@ -97,8 +90,8 @@ class ActorCriticApproximator(Approximator, abc.ABC):
         # We can combine the policy loss and the value loss in a_t single expression
         with tf.variable_scope("CombinedLoss"):
 
-            # Add losses and
-            self.loss = tf.reduce_sum(pi_loss + value_loss)
+            # Add losses
+            self.loss = tf.reduce_sum(pi_loss) + value_loss
 
             # Add TensorBoard summaries
             self.summaries.append(tf.summary.scalar('{}/Loss'.format(self.name), self.loss))
@@ -114,28 +107,19 @@ class ActorCriticApproximator(Approximator, abc.ABC):
             self.advantage_no_grad: n_step_returns - values
         }
 
-    def _input_shape(self):
-        return [None, Config.im_h, Config.im_w, Config.stacked_frames]
-
     def _build_network(self):
         """ Builds the full network """
         logger.info('Building network: {}'.format(Config.model))
-        with tf.variable_scope('ForwardInputs') as scope:
+        with tf.variable_scope('ForwardInputs'):
             self.states = tf.placeholder(tf.float32, self._input_shape(), name="StateInput")
 
-        net = self._build_hidden_layers()
+        net = self.hidden_head = self._build_hidden_layers()
         with tf.variable_scope("Outputs"):
             self._build_pi(net)
             self._build_v(net)
 
         if self.name == 'Global':
             self._show_layer_overview()
-        self.hidden_head = net
-
-    def _show_layer_overview(self):
-        logger.info("Layer overview:")
-        for key in self.layers.keys():
-            logger.info('\t' + key)
 
     def _build_v(self, net):
         with tf.variable_scope("Value"):
