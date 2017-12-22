@@ -21,7 +21,7 @@ class Config:
     score_interval = 50
     eval_episodes = 25
     weight_init = 'glorot'
-    async = False
+    async = True
 
     ppa = 16
     lpq_distance_fn = 'euc2'

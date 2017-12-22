@@ -44,6 +44,10 @@ class Agent(abc.ABC):
         self._writer = writer
         self._weights_path = os.path.join(Config.log_dir, 'model.ckpt')
 
+        self.csv = open(os.path.join(Config.log_dir, 'scores.csv'), 'w')
+        self.csv.write("Episode,Score\n")
+        self.csv.flush()
+
     def train(self):
         """ Performs training algorithm """
         if self.threaded:
@@ -90,7 +94,7 @@ class Agent(abc.ABC):
         # Main loop, execute this while T < T_max
         while episode_idx < num_episodes:
             # Get action
-            action = self.approximator.get_action([self.last_state])
+            action = self.approximator.get_action([self.last_state])[0]
             self.last_state, reward, terminal = self.env.step(action)
             returns[episode_idx] += reward
 
@@ -102,6 +106,8 @@ class Agent(abc.ABC):
             t += 1
 
         logger.info("Mean score {}".format(np.mean(returns)))
+        self.csv.write("{},{}\n".format(self.train_episode, np.mean(returns)))
+        self.csv.flush()
         self._writer.add_summary(make_summary_from_python_var('Evaluation/Score', np.mean(returns)), self.train_episode)
         self.train_episode += 1
         self.env.set_train()
@@ -137,6 +143,9 @@ class Agent(abc.ABC):
             logger.info("Storing weights at {}".format(self._weights_path))
             self._saver.save(self.session, self._weights_path, global_step=self.global_step)
             logger.info("Stored weights!")
+
+    def __del__(self):
+        self.csv.close()
 
 
 class A3CAgent(Agent):
