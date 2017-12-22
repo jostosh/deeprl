@@ -68,6 +68,7 @@ class AtariEnv:
         return self.current_state, reward, done
 
 
+
 class CatchEnv:
 
     def __init__(self):

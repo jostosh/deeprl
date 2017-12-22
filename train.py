@@ -5,7 +5,7 @@ import subprocess
 from deeprl.common.config import load_config, Config
 from deeprl.approximators.approximators import get_approximator
 from deeprl.approximators.optimizers.shared import RMSPropOptimizer
-from deeprl.agent import A3CAgent
+from deeprl.agent import A3CAgent, PAACAgent
 import os
 import pprint
 
@@ -33,22 +33,33 @@ if __name__ == "__main__":
     shared_optimizer = RMSPropOptimizer(
         session, learning_rate_ph, decay=Config.rms_decay, epsilon=Config.rms_epsilon
     )
-    global_network = get_approximator(session, global_env.get_num_actions(), shared_optimizer, global_approximator=None, name='Global')
+    global_network = get_approximator(session, global_env.get_num_actions(), shared_optimizer, global_approximator=None,
+                                      name='Global')
     shared_optimizer.set_global_theta(global_network.theta)
 
     agents = []
     saver = tf.train.Saver({var.name: var for var in global_network.theta + shared_optimizer.ms + [T_var]})
     writer = tf.summary.FileWriter(Config.log_dir, session.graph)
 
-    for i in range(Config.n_threads):
+    if Config.async:
+        for i in range(Config.n_threads):
+            approximator = get_approximator(
+                session, global_env.get_num_actions(), shared_optimizer, global_approximator=global_network,
+                name='Agent{}'.format(i)
+            )
+            agents.append(A3CAgent(
+                approximator=approximator, session=session, global_step=global_step,
+                saver=saver, writer=writer, name='Agent{}'.format(i), global_time=T_var
+            ))
+    else:
         approximator = get_approximator(
             session, global_env.get_num_actions(), shared_optimizer, global_approximator=global_network,
-            name='Agent{}'.format(i)
+            name='PAACAgent', async=False
         )
-        agents.append(A3CAgent(
-            approximator=approximator, session=session, optimizer=shared_optimizer, global_step=global_step,
-            saver=saver, writer=writer, name='Agent{}'.format(i), global_time=T_var
-        ))
+        agents = PAACAgent(
+            approximator=approximator, session=session, global_step=global_step,
+            saver=saver, writer=writer, name='PAACAgent', global_time=T_var
+        )
 
     store_config()
     weights_path = os.path.join(Config.log_dir, 'model.ckpt')
@@ -57,23 +68,17 @@ if __name__ == "__main__":
     init = tf.global_variables_initializer()
     session.run(init)
 
-    for agent in agents:
-        agent.train()
+    if Config.async:
+        for agent in agents:
+            agent.train()
 
-    if Config.render:
-        while session.run(T_var) < Config.T_max:
-            for a in agents:
-                a.env.env.render()
-                time.sleep(0.02 / Config.n_threads)
+        if Config.render:
+            while session.run(T_var) < Config.T_max:
+                for a in agents:
+                    a.env.env.render()
+                    time.sleep(0.02 / Config.n_threads)
 
-    for agent in agents:
-        agent.thread.join()
-
-
-
-
-
-
-
-
-
+        for agent in agents:
+            agent.thread.join()
+    else:
+        agents.train()

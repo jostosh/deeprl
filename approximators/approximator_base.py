@@ -7,7 +7,7 @@ from deeprl.common.config import Config
 
 class Approximator(abc.ABC):
 
-    def __init__(self, session, num_actions, optimizer, global_approximator, name):
+    def __init__(self, session, num_actions, optimizer, global_approximator, name, async=True):
         """
         Initilaizes an approximator
         :param session: TensorFlow session
@@ -19,6 +19,7 @@ class Approximator(abc.ABC):
         self.num_actions = num_actions
         self.optimizer = optimizer
         self.global_approximator = global_approximator
+        self.async = async
         self.name = name
         self.layers = {}
         self.summaries = []
@@ -28,9 +29,13 @@ class Approximator(abc.ABC):
             self._build_network()
         self.theta = self.dnn.theta
 
-        if global_approximator:
+        if not async:
+            optimizer.set_global_theta(self.theta)
+
+        if global_approximator or not async:
             self._build_loss()
-            self.build_param_sync()
+            if async:
+                self.build_param_sync()
             self.build_param_update()
             self.merged_summaries = tf.summary.merge(self.summaries)
 

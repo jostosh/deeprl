@@ -17,5 +17,5 @@ srun python3 $HOME/mproj/deeprl/train.py \
     --model a3cglpq \
     --n_threads 16 \
     --entropy_beta 0.001 \
-    --log_base /data/s2098407/tensorflowlogs/
+    --log_base /data/s2098407/tensorflowlogs/ \
     $*

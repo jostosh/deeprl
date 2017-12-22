@@ -10,17 +10,16 @@ from deeprl.approximators.approximator_base import Approximator
 from deeprl.approximators.optimizers.shared import RMSPropOptimizer
 from deeprl.common.config import Config
 import os
+from multiprocessing import Pool
 
 
 class Agent(abc.ABC):
 
-    def __init__(self, approximator: Approximator, session: tf.Session, optimizer: RMSPropOptimizer,
-                 global_step, saver: tf.train.Saver, writer: tf.summary.FileWriter, global_time, name='Agent',
-                 threaded=True):
+    def __init__(self, approximator: Approximator, session: tf.Session, global_step, saver: tf.train.Saver,
+                 writer: tf.summary.FileWriter, global_time, name='Agent', threaded=True):
         self.env = get_env()
         self.approximator = approximator
         self.session = session
-        self.optimizer = optimizer
         self.global_step = global_step
         self.t = 0
         self.T = 0
@@ -162,7 +161,8 @@ class A3CAgent(Agent):
             self.s_t[i] = self.last_state
             # Get the corresponding value and action. This is done simultaneously such that the approximators only
             # has to perform a single forward pass.
-            self.v_t[i], self.a_t[i] = self.approximator.get_value_and_action([self.last_state])
+            v, a = self.approximator.get_value_and_action([self.last_state])
+            self.v_t[i], self.a_t[i] = v[0], a[0]
             # Perform step in environment and obtain rewards and observations
             self.last_state, self.r_t[i], terminal_state = self.env.step(self.a_t[i])
             # Increment the relevant counters and sums
@@ -213,4 +213,111 @@ class A3CAgent(Agent):
         """ Prepares for episode """
         super()._prepare_episode()
         self.approximator.synchronize_parameters()
+
+
+class PAACAgent(A3CAgent):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pool = Pool()
+
+        def init_multiple(arr):
+            arr = np.asarray([np.copy(arr) for _ in range(Config.n_threads)])
+            return arr
+        self.a_t = init_multiple(self.a_t)
+        self.r_t = init_multiple(self.r_t)
+        self.G_t = init_multiple(self.G_t)
+        self.s_t = init_multiple(self.s_t)
+        self.t_t = init_multiple(np.zeros_like(self.a_t, dtype=np.bool))
+
+        self.env = [get_env() for _ in range(Config.n_threads)]
+
+    def train(self):
+        self._train()
+
+    def _prepare_episode(self):
+        """ Does everything to prepare the episode internally and externally """
+        self.last_state = self.pool.map(env_do_reset, self.env)
+        self.episode_score = 0
+        self.episode += 1
+
+    def _update_approximator(self, batch_len):
+        """ Calls gradient descent update for approximator """
+        t = self.session.run(self.global_time)
+        current_lr = Config.lr - Config.lr / Config.T_max * t
+        a_t = np.reshape(self.a_t[:, :batch_len], (-1,))
+        s_t = np.concatenate(self.s_t)
+        v_t = np.reshape(self.v_t[:, :batch_len], (-1,))
+        G_t = np.reshape(self.G_t[:, :batch_len], (-1,))
+        summaries = self.approximator.update_params(
+            a_t, s_t, v_t, G_t,
+            current_lr, include_summaries=(self.n_batches % 50 == 0)
+        )
+        if summaries:
+            self._writer.add_summary(summaries, t)
+
+    def _do_batch(self):
+        """ Performs one batch of steps in the environment """
+        # Set t_start to current t
+        t_start = self.t
+
+        # Boolean to denote whether the current state is terminal
+        terminal_state = False
+
+        # Now take steps following the thread-specific policy given by self.theta and self.theta_v
+        while not any(terminal_state) and self.t - t_start != Config.t_max:
+            # Index of current step
+            i = self.t - t_start
+            # Set the current observation
+            self.s_t[:, i] = self.last_state
+            # Get the corresponding value and action. This is done simultaneously such that the approximators only
+            # has to perform a single forward pass.
+            self.v_t[:, i], self.a_t[:, i] = self.approximator.get_value_and_action(self.last_state)
+            # Perform step in environment and obtain rewards and observations
+            self.last_state, self.r_t[:, i], self.t_t = \
+                zip(*self.pool.map(env_do_step, zip(self.env, self.a_t[:, i])))  #self.env.step(self.a_t[i])
+            # Increment the relevant counters and sums
+            self.increment_t()
+            self.episode_score += self.r_t[i]
+
+            self.last_state = self.pool.map(
+                lambda e, terminal, s: e.reset() if terminal else s,
+                zip(self.env, self.t_t, self.last_state)
+            )
+
+        # Reward clipping helps to find a robust hyperparameter setting
+        self.r_t = np.clip(self.r_t, -1.0, 1.0)
+
+        # Initialize the n-step return
+        n_step_target = self.approximator.get_value(self.last_state)
+        batch_len = self.t - t_start
+
+        # Forward view of n-step returns, start from i == t_max - 1 and go to i == 0
+        for i in reversed(range(batch_len)):
+            # Straightforward accumulation of rewards
+            n_step_target = self.r_t[:, i] + Config.gamma * n_step_target * (1 - self.t_t[:, i])
+            self.G_t[:, i] = n_step_target
+
+        if terminal_state and self.name == 'Agent1' and self.episode % Config.score_interval == 0:
+            logger.info(
+                'Terminal state reached (episode {}, reward {}, T {}): resetting state'.
+                    format(self.episode, self.episode_score, self.session.run(self.global_time))
+            )
+
+        self._update_approximator(batch_len)
+        self.n_batches += 1
+
+        return terminal_state
+
+
+def env_do_reset(e):
+    return e.reset()
+
+
+def env_do_step(e, a):
+    return e.step(a)
+
+
+def env_do_reset_or_continue(e, terminal, s):
+    return e.reset() if terminal else s
 

@@ -15,7 +15,7 @@ class ActorCriticApproximator(Approximator, abc.ABC):
         :return: An action
         """
         pi = self.session.run(self.pi, feed_dict=self._base_feed_dict(state))
-        return np.random.choice(self.num_actions, p=pi[0])
+        return self._sample_actions(pi)
 
     def get_value(self, state):
         """
@@ -32,8 +32,10 @@ class ActorCriticApproximator(Approximator, abc.ABC):
         :return: Value and action as float and integer, respectively
         """
         value, pi = self.session.run([self.value, self.pi], feed_dict=self._base_feed_dict(state))
-        action = int(np.random.choice(self.num_actions, p=pi[0]))
-        return value[0], action
+        return value, self._sample_actions(pi)
+
+    def _sample_actions(self, pi):
+        return [np.random.choice(self.num_actions, p=p) for p in pi]
 
     def get_embedding(self, state):
         """ Returns an embedding vector given a_t state """
