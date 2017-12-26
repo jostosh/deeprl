@@ -120,11 +120,12 @@ class DNN:
         Returns:
             :return A Tensor with dimensions [batch_size, n_classes] representing the LPQ output
         """
+
         # Prototype initlialization
         num_prototypes = ppa * n_classes
         n_in = incoming.get_shape().as_list()[-1]
         d = 1.0 / np.sqrt(n_in)
-        prototype_init = tf.nn.relu(tf.random_uniform((num_prototypes, n_in), minval=-d, maxval=d))
+        prototype_init = tf.random_uniform((num_prototypes, n_in), minval=-d, maxval=d)
 
         with tf.variable_scope(name):
             # Add prototypes to variables

@@ -110,7 +110,6 @@ class Agent(abc.ABC):
         self.csv.flush()
         self._writer.add_summary(make_summary_from_python_var('Evaluation/Score', np.mean(returns)), self.train_episode)
         self.train_episode += 1
-        self.env.set_train()
 
         return np.mean(returns)
 
@@ -119,8 +118,7 @@ class Agent(abc.ABC):
         logger.info('Starting training')
         self.score = 0
 
-        T = self.session.run(self.global_time)
-        last_checkpoint = T - Config.eval_interval
+        last_checkpoint = 0 - Config.eval_interval
 
         # Main loop, execute this while T < T_max
         self._prepare_episode()
@@ -132,10 +130,11 @@ class Agent(abc.ABC):
                 self._prepare_episode()
             if self.n_batches % Config.stat_interval == 0 and self.name == 'Agent1':
                 self._show_efficiency()
+
             if self._evaluating and self.T - last_checkpoint > Config.eval_interval:
                 self.eval()
-                last_checkpoint = np.round(self.T / Config.eval_interval) * Config.eval_interval
                 self._store_parameters()
+                last_checkpoint += Config.eval_interval
 
     def _store_parameters(self):
         """ Store neural network weights """
@@ -152,7 +151,7 @@ class A3CAgent(Agent):
 
     def _prepare_for_batch(self):
         """ No specific preparation for batch (e.g. setting states of RNN) """
-        pass
+        self.approximator.synchronize_parameters()
 
     def _do_batch(self):
         """ Performs one batch of steps in the environment """
@@ -217,11 +216,6 @@ class A3CAgent(Agent):
         )
         if summaries:
             self._writer.add_summary(summaries, t)
-
-    def _prepare_episode(self):
-        """ Prepares for episode """
-        super()._prepare_episode()
-        self.approximator.synchronize_parameters()
 
 
 class PAACAgent(A3CAgent):

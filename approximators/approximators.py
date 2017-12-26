@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 from deeprl.approximators.actorcritic import ActorCriticApproximator
 from deeprl.common.config import Config
 from deeprl.common.logger import logger
@@ -90,7 +91,8 @@ class A3CGLPQ(A3CFF):
 
     def _build_pi(self, net):
         with tf.variable_scope("Policy"):
+            temperature = 1/2 * np.log(-Config.lpq_p0 * (self.num_actions - 1) / (Config.lpq_p0 - 1))
             self.pi = self.dnn.lpq_layer(
-                ppa=Config.ppa, n_classes=self.num_actions, temperature=Config.lpq_temp,
+                ppa=Config.ppa, n_classes=self.num_actions, temperature=temperature,
                 incoming=net, sim_fn=Config.lpq_distance_fn, glpq=True, name='GLPQ'
             )
