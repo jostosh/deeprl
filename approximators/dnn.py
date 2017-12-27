@@ -398,7 +398,7 @@ def relative_similarity(similarities, num_classes):
         similarities_same = similarities[:, i, :]
 
         # Compute relative similarity
-        scores.append((similarities_same - similarities_other) / (similarities_same + similarities_other))
+        scores.append((similarities_other - similarities_same) / (similarities_same + similarities_other))
 
     return tf.stack(scores, axis=1)
 
