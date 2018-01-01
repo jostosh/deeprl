@@ -13,6 +13,4 @@ module load tensorflow
 
 source $HOME/envs/mproj10/bin/activate
 
-srun python3 $HOME/mproj/deeprl/experiments/param_sweep.py \
-    --preset 30 \
-    $*
+srun python3 $HOME/mproj/deeprl/experiments/param_sweep.py $*
