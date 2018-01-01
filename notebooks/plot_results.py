@@ -108,6 +108,8 @@ for env_name in ['Pong']:
     plt.legend(handles=handles, framealpha=0., fontsize=fontsize, loc='lower right')
     plt.tight_layout()
     plt.savefig(os.path.join('/home/jos/Dropbox/RUG/6e Jaar/mproj/thesis/lpq/im', 'PongAtari.pdf'))
+    plt.gcf().patch.set_alpha(0.0)
+    plt.savefig(os.path.join('/home/jos/Dropbox/RUG/6e Jaar/mproj/thesis/lpq/im', 'PongAtari.png'), rasterized=True, dpi=300)
     plt.show()
     plt.clf()
 

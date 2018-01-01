@@ -106,10 +106,11 @@ def obtain_name(hp):
             'centroids_trainable': 'LWS small',
             'large': 'LWS',
             'inv_euclidean': 'SISWS IE',
-            'a3c_ff': 'A3C FF',
+            'a3c_ff': 'A3C Softmax',
             'a3c_ff_ss': 'A3C SS',
             'a3c_sisws': 'A3C LWS',
             'a3c_ff_ww': 'A3C WW',
+            'a3c_lstm': "A3C LSTM"
         }[hp[p]],
         'per_feature': lambda p: '/F' if (p in hp and hp[p] == True) else '',
         'policy_quantization': lambda p: "PQ" if (hp[p] == True) else "",
@@ -228,7 +229,7 @@ def export_plots():
 
         plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '.pdf'))
         plt.gcf().patch.set_alpha(0.0)
-        plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '.png'), rasterized=True, dpi=600)
+        plt.savefig(os.path.join(args.output_dir, args.title.lower().replace(' ', '_') + '.png'), rasterized=True, dpi=300)
         if args.display:
             plt.show()
 
@@ -456,6 +457,7 @@ def render_mean_score_mpl(env, handles, position_by_env):
     plt.savefig(os.path.join(args.output_dir, env.replace('-v0', '') + args.image_suffix + '.pdf'))
     plt.gcf().patch.set_alpha(0.0)
     plt.savefig(os.path.join(args.output_dir, env.replace('-v0', '') + args.image_suffix + '.png'), dpi=600)
+
     plt.clf()
 
 

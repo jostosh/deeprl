@@ -2,7 +2,7 @@
 LOGBASE=~/tensorflowlogs/peregrine/v0.9.5/sweep
 
 python3 export_plots.py \
-    --input_dir ~/tensorflowlogs/peregrine/v0.9.8/Pong/ \
+    --input_dir ~/tensorflowlogs/peregrine/v0.9.8/BeamRider/ \
     --mode mean \
     --image_suffix pong0.9.8 \
     --xrange 0 80 \
