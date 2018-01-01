@@ -19,7 +19,8 @@ func_by_param = {
     'global_clip_norm': log_uniform,
     'otc': log_uniform,
     'fplc': log_uniform,
-    'fp_decay': log_uniform
+    'fp_decay': log_uniform,
+    'lpq_p0': log_uniform
 }
 
 lo_by_param = {
@@ -28,7 +29,8 @@ lo_by_param = {
     'global_clip_norm': 0.5,
     'otc': 2.0 ** (-8),
     'fplc': 1e-5,
-    'fp_decay': 0.999
+    'fp_decay': 0.999,
+    'lpq_p0': 0.9
 }
 
 hi_by_param = {
@@ -37,7 +39,8 @@ hi_by_param = {
     'global_clip_norm': 40.0,
     'otc': 2.0,
     'fplc': 1.0,
-    'fp_decay': 0.99999999
+    'fp_decay': 0.99999999,
+    'lpq_p0': 0.999
 }
 
 presets = {
@@ -169,6 +172,10 @@ presets = {
     '30': {
         'model': 'a3cglpq',
         'entropy_beta': 0.001
+    },
+    '31': {
+        'model': 'a3cglpq',
+        'entropy_beta': 0.001
     }
 }
 
@@ -191,7 +198,7 @@ if __name__ == "__main__":
     for i in range(100):
         if args.preset:
             preset_str = convert_preset_to_params(presets[args.preset])
-            command = ["python3", "mproj/deeprl/train.py", '--env=Catch', '--log_base=/data/s2098407/tensorflowlogs'
+            command = ["python3", "mproj/deeprl/train.py", '--env=Catch', '--log_base=/home/jos/tensorflowlogs',
                        '--eval_interval=50000', '--T_max=1000000', '--n_threads=12',
                        '--log_prefix=sweep/preset{}'.format(args.preset)] + preset_str + \
                       ["--{}={}".format(p, func_by_param[p](lo_by_param[p], hi_by_param[p], np.random.rand()))
