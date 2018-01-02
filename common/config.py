@@ -6,7 +6,9 @@ class Config:
     lr = 7e-4
     stacked_frames = 4
     env = dict(default='Pong', type=str, choices=['Pong', 'Breakout', 'BeamRider', 'Qbert', 'SpaceInvaders', 'Catch'])
-    model = dict(default='a3cff', type=str, choices=['a3cff', 'a3clws', 'a3css', 'a3cww', 'a3clpq', 'a3cglpq'])
+    model = dict(
+        default='a3cff', type=str, choices=['a3cff', 'a3clws', 'a3css', 'a3cww', 'a3clpq', 'a3cglpq', 'a3clpqld']
+    )
     T_max = int(1e8)
     t_max = 20
     gamma = 0.99
@@ -29,6 +31,10 @@ class Config:
     lpq_p0 = 0.9
     lpq_pN = 0.99
     lpq_init = 'glorot'
+    lpq_d = 2
+    neural_gas = False
+    ng_t0 = 0.0
+    ng_tN = 1000.0
 
     im_w = 84
     im_h = 84
@@ -37,7 +43,6 @@ class Config:
 
     log_base = os.path.join(os.path.dirname(__file__), '../logs')
     log_dir = None
-
 
 
 def _get_log_dir():

@@ -13,7 +13,8 @@ def get_approximator(*args, **kwargs):
         'a3css':    A3CSS,
         'a3cww':    A3CWW,
         'a3clpq':   A3CLPQ,
-        'a3cglpq':  A3CGLPQ
+        'a3cglpq':  A3CGLPQ,
+        'a3clpqld': A3CLPQLD
     }[Config.model](*args, **kwargs)
 
 
@@ -81,8 +82,9 @@ class A3CLPQ(A3CFF):
 
     def _build_pi(self, net):
         with tf.variable_scope("Policy"):
+            temperature = 1/2 * np.log(-Config.lpq_p0 * (self.num_actions - 1) / (Config.lpq_p0 - 1))
             self.pi = self.dnn.lpq_layer(
-                ppa=Config.ppa, n_classes=self.num_actions, temperature=Config.lpq_temp,
+                ppa=Config.ppa, n_classes=self.num_actions, temperature=temp,
                 incoming=net, sim_fn=Config.lpq_distance_fn, glpq=False, name='LPQ'
             )
 
@@ -91,8 +93,28 @@ class A3CGLPQ(A3CFF):
 
     def _build_pi(self, net):
         with tf.variable_scope("Policy"):
-            temperature = 1/2 * np.log(-Config.lpq_p0 * (self.num_actions - 1) / (Config.lpq_p0 - 1))
+            self.lpq_temp = 1/2 * np.log(-Config.lpq_p0 * (self.num_actions - 1) / (Config.lpq_p0 - 1))
             self.pi = self.dnn.lpq_layer(
-                ppa=Config.ppa, n_classes=self.num_actions, temperature=temperature,
+                ppa=Config.ppa, n_classes=self.num_actions, temperature=self.lpq_temp,
                 incoming=net, sim_fn=Config.lpq_distance_fn, glpq=True, name='GLPQ'
+            )
+
+    def _build_pi_loss(self, action_mask, entropy, log_pi):
+        return -(tf.reduce_sum(tf.multiply(action_mask, log_pi), reduction_indices=1) * self.advantage_no_grad
+                 + Config.entropy_beta * entropy) / self.lpq_temp
+
+
+class A3CLPQLD(A3CFF):
+
+    def _build_pi(self, net):
+        with tf.variable_scope("Policy"):
+            t0 = 1/2 * np.log(-Config.lpq_p0 * (self.num_actions - 1) / (Config.lpq_p0 - 1))
+            tN = 1/2 * np.log(-Config.lpq_pN * (self.num_actions - 1) / (Config.lpq_pN - 1))
+
+            self.temp_var = tf.to_float(t0 + self.global_t / Config.T_max * (tN - t0))
+
+            ld = self.dnn.fc_layer(Config.lpq_d, activation=tf.identity, name="LD", incoming=net)
+            self.pi = self.dnn.lpq_layer(
+                ppa=Config.ppa, n_classes=self.num_actions, temperature=self.temp_var,
+                incoming=ld, sim_fn=Config.lpq_distance_fn, glpq=False, name='LPQ'
             )

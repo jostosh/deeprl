@@ -7,7 +7,7 @@ from deeprl.common.config import Config
 
 class Approximator(abc.ABC):
 
-    def __init__(self, session, num_actions, optimizer, global_approximator, name, async=True):
+    def __init__(self, session, num_actions, optimizer, global_approximator, name, global_t=None, async=True):
         """
         Initilaizes an approximator
         :param session: TensorFlow session
@@ -23,7 +23,8 @@ class Approximator(abc.ABC):
         self.name = name
         self.layers = {}
         self.summaries = []
-        self.dnn = DNN()
+        self.dnn = DNN(global_t=global_t)
+        self.global_t = global_t
 
         with tf.variable_scope(name):
             self._build_network()
@@ -126,7 +127,6 @@ class Approximator(abc.ABC):
 
     def _nips_hidden_layers(self):
         with tf.variable_scope('HiddenLayers') as scope:
-            # Add first convolutional layer
             self.dnn.conv_layer(32, 8, 4, tf.nn.relu, name='Conv1', incoming=self.states)
             self.dnn.conv_layer(64, 4, 2, tf.nn.relu, name='Conv2')
             net = self.dnn.fc_layer(256, tf.nn.relu, name='FC3')

@@ -176,6 +176,19 @@ presets = {
     '31': {
         'model': 'a3cglpq',
         'entropy_beta': 0.001
+    },
+    '32': {
+        'model': 'a3clpqld',
+        'ppa': 64
+    },
+    '33': {
+        'model': 'a3clpqld',
+        'ppa': 64,
+        'lpq_d': 3
+    },
+    '34': {
+        'model': 'a3cglpq',
+        'neural_gas': True
     }
 }
 

@@ -81,8 +81,7 @@ class ActorCriticApproximator(Approximator, abc.ABC):
             # The entropy is added to encourage exploration
             entropy = -tf.reduce_sum(log_pi * self.pi, reduction_indices=1, name="Entropy")
             # Define the loss for the policy (minus is needed to perform *negative* gradient descent == gradient ascent)
-            pi_loss = -(tf.reduce_sum(tf.multiply(action_mask, log_pi), reduction_indices=1) * self.advantage_no_grad
-                        + Config.entropy_beta * entropy)
+            pi_loss = self._build_pi_loss(action_mask, entropy, log_pi)
 
         with tf.variable_scope("ValueLoss"):
             # A3C originally uses a_t factor 0.5 for the value loss. The l2_loss() method already does this
@@ -99,6 +98,10 @@ class ActorCriticApproximator(Approximator, abc.ABC):
             self.summaries.append(tf.summary.scalar('{}/Loss'.format(self.name), self.loss))
             self.summaries.append(tf.summary.scalar('{}/MaxAbsValue'.format(self.name),
                                                     tf.reduce_max(tf.abs(self.value))))
+
+    def _build_pi_loss(self, action_mask, entropy, log_pi):
+        return -(tf.reduce_sum(tf.multiply(action_mask, log_pi), reduction_indices=1) * self.advantage_no_grad
+                 + Config.entropy_beta * entropy)
 
     def _update_feed_dict(self, actions, states, values, n_step_returns, lr):
         return {

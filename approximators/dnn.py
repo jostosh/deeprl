@@ -1,5 +1,8 @@
 import tensorflow as tf
 import numpy as np
+from scipy.stats import rankdata
+
+from deeprl.common.config import Config
 from deeprl.common.logger import logger
 
 
@@ -22,10 +25,11 @@ def layer(fn):
 
 class DNN:
 
-    def __init__(self, input=None):
+    def __init__(self, input=None, global_t=None):
         self.head = input
         self.theta = []
         self.outputs = {}
+        self.global_t = global_t
 
     @layer
     def conv_layer(self, n_filters, filter_size, stride, activation, name, padding='VALID', init='torch',
@@ -137,7 +141,8 @@ class DNN:
             if glpq:
                 # Compute relative similarity
                 similarity = tf.reshape(similarity, [-1, n_classes,  ppa])
-                similarity = relative_similarity(similarity, n_classes)
+                ng_temp = Config.ng_t0 + (Config.ng_tN - Config.ng_t0) * tf.to_float(self.global_t) / Config.T_max
+                similarity = relative_similarity(similarity, n_classes, ng_temp=ng_temp)
                 similarity = tf.reshape(similarity, [-1, n_classes * ppa])
 
             similarity *= temperature                                                          # Multiply by temperature
@@ -379,13 +384,20 @@ def manhattan(net, prototypes):
     return -tf.reduce_sum(tf.abs(diff), axis=2)
 
 
-def relative_similarity(similarities, num_classes):
+def relative_similarity(similarities, num_classes, epsilon=1e-10, ng_temp=None):
     """ Computes relative similarity used for GLPQ """
     scores = []
     _, na, num_p = similarities.get_shape().as_list()
     for i in range(num_classes):
         # Get indices j != i
         j_neq_i = [j for j in range(num_classes) if j != i]
+
+        if Config.neural_gas:
+            assert ng_temp is not None
+            similarities_other = tf.transpose(tf.gather(tf.transpose(similarities, (1, 0, 2)), j_neq_i), (1, 0, 2))
+            ranks = val_to_ranking(tf.reshape(similarities_other, (-1, (na-1) * num_p))) - 1.0
+            neighborhood_function = tf.reshape(tf.nn.softmax(-ng_temp * ranks), (-1, na-1, num_p))
+            similarities_other *= neighborhood_function
 
         # Get the most similar other prototype belonging to another class j != i
         similarities_other = tf.reshape(tf.reduce_max(
@@ -398,11 +410,18 @@ def relative_similarity(similarities, num_classes):
         similarities_same = similarities[:, i, :]
 
         # Compute relative similarity
-        denom = tf.abs(similarities_same) + tf.abs(similarities_other)
+        denom = tf.abs(similarities_same) + tf.abs(similarities_other) + epsilon
 
         scores.append((similarities_same - similarities_other) / denom)
 
     return tf.stack(scores, axis=1)
+
+
+def val_to_ranking(x):
+    """ Computes ranking for values for each row in x """
+    def rankdata_on_rows(val):
+        return np.apply_along_axis(rankdata, axis=1, arr=val).astype(np.float32)
+    return tf.py_func(rankdata_on_rows, [x], tf.float32)
 
 
 def color_augmentation(current_filter_shape, locally_weighted_kernels, n_centroids, n_filters, per_feature,
